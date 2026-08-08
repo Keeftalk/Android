@@ -10,11 +10,11 @@ interface ConversationKeyDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertKey(key: ConversationKeyEntity)
 
-    @Query("SELECT * FROM conversation_keys WHERE conversationId = :conversationId")
-    suspend fun getKeyForConversation(conversationId: String): ConversationKeyEntity?
+    @Query("SELECT * FROM conversation_keys WHERE conversationId = :conversationId AND user_id = :userId")
+    suspend fun getKeyForConversation(conversationId: String, userId: String): ConversationKeyEntity?
 
-    @Query("DELETE FROM conversation_keys WHERE conversationId = :conversationId")
-    suspend fun deleteKeyForConversation(conversationId: String)
+    @Query("DELETE FROM conversation_keys WHERE conversationId = :conversationId AND user_id = :userId")
+    suspend fun deleteKeyForConversation(conversationId: String, userId: String)
 
     @Query("DELETE FROM conversation_keys")
     suspend fun deleteAll()

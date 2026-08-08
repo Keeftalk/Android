@@ -10,6 +10,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_security_settings' AND column_name='key_nonce') THEN
         ALTER TABLE public.user_security_settings ADD COLUMN key_nonce TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_security_settings' AND column_name='verification_tag') THEN
+        ALTER TABLE public.user_security_settings ADD COLUMN verification_tag TEXT;
+    END IF;
 END $$;
 
 -- 2. Correct RLS Policy to allow INSERTs

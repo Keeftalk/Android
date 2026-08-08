@@ -46,6 +46,9 @@ class FileUploadManager(
             val thumbnailPath = generateThumbnail(processedFile)
             
             // 2. Per-User Deduplication (HMAC)
+            if (!KeyManager.isInitialized()) {
+                KeyManager.restoreAEK(context)
+            }
             val fpk = KeyManager.getFileProtectionKey()
             val hash = calculateHMAC(processedFile, fpk)
             Log.d(TAG, "File HMAC: $hash")

@@ -202,7 +202,7 @@ fun SettingsScreen(
 
     showLegalDocumentType?.let { type ->
         com.keeftalk.chat.ui.components.LegalViewerModal(
-            type = type,
+            typeOrUrl = type,
             onDismiss = { showLegalDocumentType = null }
         )
     }

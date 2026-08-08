@@ -72,6 +72,9 @@ class AuthViewModel(
     private val _usernameSuggestions = MutableStateFlow<List<String>>(emptyList())
     val usernameSuggestions = _usernameSuggestions.asStateFlow()
 
+    private val _signupErrors = MutableStateFlow<Map<String, String>>(emptyMap())
+    val signupErrors = _signupErrors.asStateFlow()
+
     // Verification State
     private val _resendCountdown = MutableStateFlow(0)
     val resendCountdown = _resendCountdown.asStateFlow()
@@ -197,18 +200,36 @@ class AuthViewModel(
     fun onLoginPasswordChange(value: String) { _loginPassword.value = value }
     fun onRememberMeChange(value: Boolean) { _rememberMe.value = value }
 
-    fun onSignupFullNameChange(value: String) { _signupFullName.value = value }
+    fun onSignupFullNameChange(value: String) { 
+        _signupFullName.value = value 
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("fullName") }
+    }
     fun onSignupUsernameChange(value: String) { 
-        _signupUsername.value = value.lowercase().filter { it.isLetterOrDigit() || it == '_' || it == '.' }
+        val filtered = value.lowercase().filter { it.isLetterOrDigit() || it == '_' || it == '.' }
+        _signupUsername.value = filtered
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("username") }
     }
-    fun onSignupEmailChange(value: String) { _signupEmail.value = value }
+    fun onSignupEmailChange(value: String) { 
+        _signupEmail.value = value 
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("email") }
+    }
     fun onSignupPhoneChange(value: String) {
-        val formatted = phoneNumberService.formatAsYouType(value, currentCountry.value.isoCode)
-        _signupPhone.value = formatted
+        // Keep raw digits in state, let VisualTransformation handle display
+        _signupPhone.value = value.filter { it.isDigit() || it == '+' }
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("phone") }
     }
-    fun onSignupPasswordChange(value: String) { _signupPassword.value = value }
-    fun onSignupConfirmPasswordChange(value: String) { _signupConfirmPassword.value = value }
-    fun onAgreeToTermsChange(value: Boolean) { _agreeToTerms.value = value }
+    fun onSignupPasswordChange(value: String) { 
+        _signupPassword.value = value 
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("password") }
+    }
+    fun onSignupConfirmPasswordChange(value: String) { 
+        _signupConfirmPassword.value = value 
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("confirmPassword") }
+    }
+    fun onAgreeToTermsChange(value: Boolean) { 
+        _agreeToTerms.value = value 
+        _signupErrors.value = _signupErrors.value.toMutableMap().apply { remove("terms") }
+    }
 
     fun login() {
         viewModelScope.launch {
@@ -255,6 +276,8 @@ class AuthViewModel(
     }
 
     fun signup() {
+        if (!validateSignup()) return
+
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
 
@@ -262,6 +285,9 @@ class AuthViewModel(
             val isAvailable = authRepository.checkUsernameAvailability(_signupUsername.value).getOrDefault(false)
             if (!isAvailable) {
                 _usernameAvailable.value = false
+                _signupErrors.value = _signupErrors.value.toMutableMap().apply {
+                    put("username", "Username already taken")
+                }
                 _uiState.value = AuthUiState.Error("Username already taken. Please choose another one.")
                 generateSuggestions(_signupUsername.value)
                 return@launch
@@ -299,6 +325,43 @@ class AuthViewModel(
                     }
                 }
         }
+    }
+
+    private fun validateSignup(): Boolean {
+        val errors = mutableMapOf<String, String>()
+        
+        if (_signupFullName.value.isBlank()) {
+            errors["fullName"] = "Full name is required"
+        }
+        
+        if (!AuthUtils.isValidUsername(_signupUsername.value)) {
+            errors["username"] = "Username must be 4-30 chars (a-z, 0-9, _, .)"
+        } else if (_usernameAvailable.value == false) {
+            errors["username"] = "Username already taken"
+        }
+        
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(_signupEmail.value).matches()) {
+            errors["email"] = "Invalid email address"
+        }
+        
+        if (!phoneNumberService.isValid(_signupPhone.value, currentCountry.value.isoCode)) {
+            errors["phone"] = "Invalid phone number"
+        }
+        
+        if (_signupPassword.value.length < 6) {
+            errors["password"] = "Password must be at least 6 characters"
+        }
+        
+        if (_signupPassword.value != _signupConfirmPassword.value) {
+            errors["confirmPassword"] = "Passwords do not match"
+        }
+        
+        if (!_agreeToTerms.value) {
+            errors["terms"] = "You must agree to the Terms & Privacy Policy"
+        }
+        
+        _signupErrors.value = errors
+        return errors.isEmpty()
     }
 
     fun resendVerification() {

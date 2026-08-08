@@ -29,6 +29,20 @@ object KeyManager {
     @Volatile
     private var accountEncryptionKey: SecretKey? = null
 
+    @Volatile
+    private var appContext: Context? = null
+
+    /**
+     * Initializes the KeyManager with the application context for automatic restoration.
+     */
+    fun init(context: Context) {
+        this.appContext = context.applicationContext
+        // Proactively attempt restoration if not already initialized
+        if (accountEncryptionKey == null) {
+            restoreAEK(context)
+        }
+    }
+
     /**
      * Retrieves the current Account Encryption Key if available.
      */
@@ -154,7 +168,17 @@ object KeyManager {
      * @throws IllegalStateException if the user is not logged in or AEK is missing.
      */
     fun getMasterKey(): SecretKey {
-        val key = accountEncryptionKey
+        var key = accountEncryptionKey
+        if (key == null) {
+            // Attempt automatic restoration if context is available
+            appContext?.let { context ->
+                Log.i(TAG, "AEK missing from memory, attempting automatic restoration...")
+                if (restoreAEK(context)) {
+                    key = accountEncryptionKey
+                }
+            }
+        }
+
         if (key == null) {
             val msg = "[FATAL] Account Encryption Key (AEK) is MISSING from memory. " +
                       "Please perform a fresh login to restore your encryption context."
@@ -168,6 +192,29 @@ object KeyManager {
      * Returns true if the Account Encryption Key is loaded in memory.
      */
     fun isInitialized(): Boolean = accountEncryptionKey != null
+
+    /**
+     * Returns true if the Account Encryption Key is persisted in local storage.
+     */
+    fun isPersisted(context: Context): Boolean {
+        return try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            val prefs = EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+
+            prefs.contains(KEY_WRAPPED_AEK)
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     private fun deriveKey(info: String): SecretKey {
         val rootKey = getMasterKey()

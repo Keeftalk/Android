@@ -33,39 +33,58 @@ class ConversationKeyManager(
      * If not in cache, attempts to load from DB and decrypt using CPK.
      */
     suspend fun getOrLoadKey(conversationId: String): SecretKey? {
+        val userId = AppModule.provideUserPreferencesRepository(context).getUserIdFast() ?: return null
+        
         // 1. Check cache
         keyCache[conversationId]?.let { return it }
 
         // 2. Load from DB
-        var entity = dao.getKeyForConversation(conversationId)
+        var entity = dao.getKeyForConversation(conversationId, userId)
         
         // 3. If missing locally, try fetching from Supabase
         if (entity == null) {
-            Log.d(TAG, "Key missing in local DB for $conversationId, attempting cloud fetch...")
+            Log.d(TAG, "Key missing in local DB for $conversationId (user $userId), attempting cloud fetch...")
             entity = withContext(Dispatchers.IO) {
                 try {
                     val supabase = getSupabase()
-                    val result = supabase.postgrest["conversation_keys"]
-                        .select {
-                            filter {
-                                eq("conversation_id", conversationId)
+                    // Attempt to fetch with epoch ordering (Standard)
+                    val queryResult = try {
+                        supabase.postgrest["conversation_keys"]
+                            .select {
+                                filter {
+                                    eq("conversation_id", conversationId)
+                                    eq("user_id", userId)
+                                }
+                                order("epoch", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+                                limit(1)
                             }
-                            order("epoch", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
-                            limit(1)
-                        }
-                        .decodeSingleOrNull<JsonObject>()
+                            .decodeSingleOrNull<JsonObject>()
+                    } catch (e: io.github.jan.supabase.postgrest.exception.PostgrestRestException) {
+                        if (e.code == "42703" || e.description?.contains("user_id") == true) { // Undefined Column
+                            Log.w(TAG, "Remote table missing columns. Falling back to legacy select.")
+                            supabase.postgrest["conversation_keys"]
+                                .select {
+                                    filter {
+                                        eq("conversation_id", conversationId)
+                                    }
+                                    limit(1)
+                                }
+                                .decodeSingleOrNull<JsonObject>()
+                        } else throw e
+                    }
 
-                    if (result != null) {
-                        val encKey = result["encrypted_key"]?.jsonPrimitive?.content
-                        val nonce = result["nonce"]?.jsonPrimitive?.content
-                        val version = result["version"]?.jsonPrimitive?.intOrNull ?: 1
-                        val epoch = result["epoch"]?.jsonPrimitive?.intOrNull ?: 1
+                    if (queryResult != null) {
+                        val encKey = queryResult["encrypted_key"]?.jsonPrimitive?.content
+                        val nonce = queryResult["nonce"]?.jsonPrimitive?.content
+                        val version = queryResult["version"]?.jsonPrimitive?.intOrNull ?: 1
+                        val epoch = queryResult["epoch"]?.jsonPrimitive?.intOrNull ?: 1
                         
                         if (encKey != null && nonce != null) {
                             Log.i(TAG, "Successfully fetched PCK (Epoch $epoch) from cloud for $conversationId")
                             val newEntity = ConversationKeyEntity(
                                 id = UUID.randomUUID().toString(),
                                 conversationId = conversationId,
+                                userId = userId,
                                 encryptedKey = encKey,
                                 nonce = nonce,
                                 version = version,
@@ -118,17 +137,24 @@ class ConversationKeyManager(
      * Generates a new random conversation key, encrypts it with CPK, and saves to DB.
      */
     suspend fun createKey(conversationId: String, epoch: Int = 1): SecretKey {
+        val userId = AppModule.provideUserPreferencesRepository(context).getUserIdFast() 
+            ?: throw IllegalStateException("Cannot create conversation key: User not logged in")
+
         val randomKey = StorageCryptoService.generateRandomKey()
         keyCache[conversationId] = randomKey
         
         withContext(Dispatchers.IO) {
             try {
+                if (!KeyManager.isInitialized()) {
+                    KeyManager.restoreAEK(context)
+                }
                 val cpk = KeyManager.getConversationProtectionKey()
                 val encrypted = StorageCryptoService.encrypt(randomKey.encoded, cpk)
                 
                 val entity = ConversationKeyEntity(
                     id = UUID.randomUUID().toString(),
                     conversationId = conversationId,
+                    userId = userId,
                     encryptedKey = encrypted.ciphertext,
                     nonce = encrypted.iv,
                     version = 2,
@@ -138,6 +164,7 @@ class ConversationKeyManager(
                 
                 getSupabase().postgrest["conversation_keys"].upsert(buildJsonObject {
                     put("conversation_id", conversationId)
+                    put("user_id", userId)
                     put("encrypted_key", encrypted.ciphertext)
                     put("nonce", encrypted.iv)
                     put("version", 2)
@@ -156,7 +183,8 @@ class ConversationKeyManager(
      * Used when group membership changes.
      */
     suspend fun rotateKey(conversationId: String): SecretKey {
-        val currentEntity = dao.getKeyForConversation(conversationId)
+        val userId = AppModule.provideUserPreferencesRepository(context).getUserIdFast() ?: "anonymous"
+        val currentEntity = dao.getKeyForConversation(conversationId, userId)
         val nextEpoch = (currentEntity?.epoch ?: 0) + 1
         Log.i(TAG, "Rotating PCK for $conversationId to Epoch $nextEpoch")
         return createKey(conversationId, nextEpoch)
@@ -166,9 +194,11 @@ class ConversationKeyManager(
      * Saves an existing (recovered) encrypted key to the local database.
      */
     suspend fun saveRestoredKey(conversationId: String, encryptedKey: String, nonce: String, version: Int, epoch: Int = 1) {
+        val userId = AppModule.provideUserPreferencesRepository(context).getUserIdFast() ?: return
         val entity = ConversationKeyEntity(
             id = UUID.randomUUID().toString(),
             conversationId = conversationId,
+            userId = userId,
             encryptedKey = encryptedKey,
             nonce = nonce,
             version = version,

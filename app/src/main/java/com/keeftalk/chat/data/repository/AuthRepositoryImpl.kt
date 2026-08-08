@@ -29,6 +29,7 @@ import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.CoroutineScope
@@ -485,14 +486,14 @@ class AuthRepositoryImpl(
 
     override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = try {
         Log.d(TAG, "ENDPOINT: postgrest/profiles/check_username | USERNAME: $username")
-        val count = getSupabase().postgrest["profiles"]
-            .select(Columns.raw("id")) {
+        val response = getSupabase().postgrest["profiles"]
+            .select(Columns.list("id")) {
                 filter {
                     eq("username", username)
                 }
             }
-            .decodeList<Map<String, String>>().size
-        Result.success(count == 0)
+            .decodeList<JsonObject>()
+        Result.success(response.isEmpty())
     } catch (e: Exception) {
         Log.e(TAG, "ENDPOINT: postgrest/profiles/check_username | ERROR: ${e.message}")
         Result.failure(e)
@@ -619,9 +620,22 @@ class AuthRepositoryImpl(
         Log.d(TAG, "Attempting to recover AEK for userId=$userId")
         try {
             val supabase = getSupabase()
-            val settings = supabase.postgrest["user_security_settings"]
-                .select { filter { eq("user_id", userId) } }
-                .decodeSingleOrNull<UserSecuritySettingsDto>()
+            
+            // Robust select to handle missing columns
+            val settings = try {
+                supabase.postgrest["user_security_settings"]
+                    .select { filter { eq("user_id", userId) } }
+                    .decodeSingleOrNull<UserSecuritySettingsDto>()
+            } catch (e: PostgrestRestException) {
+                if (e.description?.contains("verification_tag") == true) {
+                    Log.w(TAG, "Schema mismatch detected during AEK recovery. Falling back to specific columns.")
+                    // If select * fails due to missing column, try to select only what we need
+                    supabase.postgrest["user_security_settings"]
+                        .select(Columns.list("user_id", "encrypted_account_key", "key_salt", "key_nonce")) {
+                            filter { eq("user_id", userId) }
+                        }.decodeSingleOrNull<UserSecuritySettingsDto>()
+                } else throw e
+            }
             
             if (settings?.encryptedAccountKey != null && settings.keySalt != null && settings.keyNonce != null) {
                 Log.d(TAG, "Found encrypted AEK on server. Deriving KEK...")
@@ -674,17 +688,32 @@ class AuthRepositoryImpl(
             val verificationTag = KeyManager.generateVerificationTag(aek)
             
             Log.d(TAG, "Uploading new encrypted AEK to user_security_settings...")
-            getSupabase().postgrest["user_security_settings"].upsert(buildJsonObject {
-                put("user_id", userId)
-                put("encrypted_account_key", encryptedAEK.ciphertext)
-                put("key_salt", Base64.getEncoder().encodeToString(salt))
-                put("key_nonce", encryptedAEK.iv)
-                put("verification_tag", Json.encodeToString(verificationTag))
-            })
+            try {
+                getSupabase().postgrest["user_security_settings"].upsert(buildJsonObject {
+                    put("user_id", userId)
+                    put("encrypted_account_key", encryptedAEK.ciphertext)
+                    put("key_salt", Base64.getEncoder().encodeToString(salt))
+                    put("key_nonce", encryptedAEK.iv)
+                    put("verification_tag", Json.encodeToString(verificationTag))
+                })
+            } catch (e: PostgrestRestException) {
+                if (e.description?.contains("verification_tag") == true || e.message?.contains("PGRST204") == true) {
+                    Log.w(TAG, "Supabase schema mismatch: 'verification_tag' column missing. Retrying without tag.")
+                    // Fallback: Retry without the verification tag to allow login to proceed
+                    getSupabase().postgrest["user_security_settings"].upsert(buildJsonObject {
+                        put("user_id", userId)
+                        put("encrypted_account_key", encryptedAEK.ciphertext)
+                        put("key_salt", Base64.getEncoder().encodeToString(salt))
+                        put("key_nonce", encryptedAEK.iv)
+                    })
+                } else {
+                    throw e
+                }
+            }
             
             KeyManager.setAEK(aek)
             KeyManager.persistAEK(context, aek)
-            Log.i(TAG, "New AEK successfully initialized, uploaded, and persisted.")
+            Log.i(TAG, "New AEK successfully initialized, uploaded (fallback used=$userId), and persisted.")
         } catch (e: Exception) {
             Log.e(TAG, "CRITICAL: Failed to initialize new AEK for userId=$userId", e)
             throw e

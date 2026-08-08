@@ -100,7 +100,10 @@ fun AuthScreen(
                 ) { targetType ->
                     when (targetType) {
                         AuthFormType.LOGIN -> LoginForm(viewModel, onForgotPassword)
-                        AuthFormType.SIGNUP -> SignUpForm(viewModel, onShowLegal = { showLegalDocumentType = it })
+                        AuthFormType.SIGNUP -> SignUpForm(
+                            viewModel = viewModel, 
+                            onShowLegal = { showLegalDocumentType = it }
+                        )
                         AuthFormType.VERIFY_EMAIL -> EmailVerificationScreen(viewModel)
                     }
                 }
@@ -136,9 +139,9 @@ fun AuthScreen(
         }
     }
 
-    showLegalDocumentType?.let { type ->
+    showLegalDocumentType?.let { typeOrUrl ->
         com.keeftalk.chat.ui.components.LegalViewerModal(
-            type = type,
+            typeOrUrl = typeOrUrl,
             onDismiss = { showLegalDocumentType = null }
         )
     }
@@ -338,11 +341,13 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
     val password by viewModel.signupPassword.collectAsStateWithLifecycle()
     val confirmPassword by viewModel.signupConfirmPassword.collectAsStateWithLifecycle()
     val agreeToTerms by viewModel.agreeToTerms.collectAsStateWithLifecycle()
-    val isSignupValid by viewModel.isSignupValid.collectAsStateWithLifecycle()
     val passwordStrength by viewModel.signupPasswordStrength.collectAsStateWithLifecycle()
     val usernameAvailable by viewModel.usernameAvailable.collectAsStateWithLifecycle()
     val usernameSuggestions by viewModel.usernameSuggestions.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isSignupValid by viewModel.isSignupValid.collectAsStateWithLifecycle()
+    
+    val signupErrors by viewModel.signupErrors.collectAsStateWithLifecycle()
     
     val focusManager = LocalFocusManager.current
     var showCountryPicker by remember { mutableStateOf(false) }
@@ -353,6 +358,7 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             onValueChange = viewModel::onSignupFullNameChange,
             label = "Full Name",
             icon = Icons.Default.Badge,
+            error = signupErrors["fullName"],
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next, capitalization = KeyboardCapitalization.Words)
         )
         
@@ -364,7 +370,7 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
                 onValueChange = viewModel::onSignupUsernameChange,
                 label = "Username",
                 icon = Icons.Default.AlternateEmail,
-                error = when {
+                error = signupErrors["username"] ?: when {
                     username.isNotEmpty() && username.length < 4 -> "Username must be at least 4 characters"
                     usernameAvailable == false -> "Username already taken"
                     else -> null
@@ -372,7 +378,7 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
                 success = if (usernameAvailable == true && username.length >= 4) "Username available" else null,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
-
+            
             if (usernameAvailable == false && usernameSuggestions.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -412,6 +418,7 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             onValueChange = viewModel::onSignupEmailChange,
             label = "Email",
             icon = Icons.Default.Email,
+            error = signupErrors["email"],
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
         )
         
@@ -421,7 +428,8 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             value = phone,
             onValueChange = viewModel::onSignupPhoneChange,
             selectedCountry = currentCountry,
-            onCountryClick = { showCountryPicker = true }
+            onCountryClick = { showCountryPicker = true },
+            error = signupErrors["phone"]
         )
         
         if (showCountryPicker) {
@@ -439,10 +447,11 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             label = "Password",
             icon = Icons.Default.Lock,
             isPassword = true,
+            error = signupErrors["password"],
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
         )
         
-        // Password Strength Indicator
+        // ... progress indicator ...
         if (password.isNotEmpty()) {
             LinearProgressIndicator(
                 progress = { passwordStrength },
@@ -468,7 +477,7 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             label = "Confirm Password",
             icon = Icons.Default.CheckCircle,
             isPassword = true,
-            error = if (confirmPassword.isNotEmpty() && password != confirmPassword) "Passwords do not match" else null,
+            error = signupErrors["confirmPassword"] ?: if (confirmPassword.isNotEmpty() && password != confirmPassword) "Passwords do not match" else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
         )
@@ -487,13 +496,13 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             
             val annotatedText = buildAnnotatedString {
                 append("I agree to the ")
-                pushStringAnnotation(tag = "terms", annotation = "terms")
+                pushStringAnnotation(tag = "terms", annotation = "https://keeftalk.com/legal/terms.html")
                 withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                     append("Terms")
                 }
                 pop()
                 append(" & ")
-                pushStringAnnotation(tag = "privacy", annotation = "privacy")
+                pushStringAnnotation(tag = "privacy", annotation = "https://keeftalk.com/legal/privacy.html")
                 withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                     append("Privacy Policy")
                 }
@@ -507,10 +516,19 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
                 ),
                 onClick = { offset ->
                     annotatedText.getStringAnnotations(tag = "terms", start = offset, end = offset)
-                        .firstOrNull()?.let { onShowLegal("terms") }
+                        .firstOrNull()?.let { onShowLegal(it.item) }
                     annotatedText.getStringAnnotations(tag = "privacy", start = offset, end = offset)
-                        .firstOrNull()?.let { onShowLegal("privacy") }
+                        .firstOrNull()?.let { onShowLegal(it.item) }
                 }
+            )
+        }
+        
+        if (signupErrors.containsKey("terms")) {
+            Text(
+                text = signupErrors["terms"]!!,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 12.dp, top = 4.dp)
             )
         }
         

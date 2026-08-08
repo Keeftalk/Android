@@ -1,0 +1,13 @@
+- [x] Update `KeyManager.kt` for context-based restoration
+- [x] Initialize `KeyManager` in `KeeftalkApplication.kt`
+- [x] Add proactive restoration in `ConversationKeyManager.kt`
+- [x] Add proactive restoration in `FileUploadManager.kt`
+- [x] Update `fix_security_rls.sql` with `verification_tag` column
+- [x] Add robust AEK initialization in `AuthRepositoryImpl.kt`
+- [x] Add `isPersisted` to `KeyManager.kt`
+- [ ] Add `user_id` to `ConversationKeyEntity.kt` and update index
+- [ ] Update `ConversationKeyDao.kt` for user isolation
+- [ ] Update `ConversationKeyManager.kt` to sync with `user_id`
+- [ ] Implement Room migration 82 -> 83 in `KeeftalkDatabase.kt`
+- [ ] Update SQL schema files
+- [ ] Verify AEK restoration & login logic

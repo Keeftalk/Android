@@ -63,6 +63,7 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
         
         // Critical only
         com.keeftalk.chat.util.KeeftalkStore.init(this)
+        com.keeftalk.chat.security.crypto.KeyManager.init(this)
         
         PerformanceProfiler.endStage("Tier 1: Local Prep", category = PerformanceProfiler.Category.STORAGE)
         Trace.endSection()
@@ -106,11 +107,13 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
                 val jobController = com.keeftalk.chat.util.job.JobController.init(this@KeeftalkApplication, instantiator)
                 jobController.start()
 
-                // CRYPTO INITIALIZATION
+                // CRYPTO & AUTH INITIALIZATION
                 val userId = com.keeftalk.chat.di.AppModule.provideUserPreferencesRepository(this@KeeftalkApplication).getUserIdFast()
                 if (userId != null) {
                     PerformanceProfiler.startStage("Crypto Session Restore")
-                    // Pre-warm conversation keys if AEK is available
+                    // Start session monitoring and restore AEK if needed
+                    com.keeftalk.chat.di.AppModule.provideAuthRepository(this@KeeftalkApplication)
+                    // Pre-warm conversation keys
                     com.keeftalk.chat.di.AppModule.provideCryptoManager(this@KeeftalkApplication)
                     PerformanceProfiler.endStage("Crypto Session Restore", category = PerformanceProfiler.Category.AUTH)
                 }

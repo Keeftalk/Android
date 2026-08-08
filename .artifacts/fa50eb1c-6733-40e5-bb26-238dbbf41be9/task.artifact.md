@@ -1,0 +1,4 @@
+- [x] Provide SQL Migration Snippet
+- [x] Modify `ConversationKeyManager.kt` to handle missing `epoch` column
+- [x] Verify compilation
+- [x] Finalize walkthrough with instructions for the user
