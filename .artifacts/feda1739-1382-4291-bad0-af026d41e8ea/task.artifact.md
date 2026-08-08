@@ -5,9 +5,9 @@
 - [x] Update `fix_security_rls.sql` with `verification_tag` column
 - [x] Add robust AEK initialization in `AuthRepositoryImpl.kt`
 - [x] Add `isPersisted` to `KeyManager.kt`
-- [ ] Add `user_id` to `ConversationKeyEntity.kt` and update index
-- [ ] Update `ConversationKeyDao.kt` for user isolation
-- [ ] Update `ConversationKeyManager.kt` to sync with `user_id`
-- [ ] Implement Room migration 82 -> 83 in `KeeftalkDatabase.kt`
-- [ ] Update SQL schema files
-- [ ] Verify AEK restoration & login logic
+- [x] Add `user_id` to `ConversationKeyEntity.kt` and update index
+- [x] Update `ConversationKeyDao.kt` for user isolation
+- [x] Update `ConversationKeyManager.kt` to sync with `user_id`
+- [x] Implement Room migration 82 -> 83 in `KeeftalkDatabase.kt`
+- [x] Update SQL schema files
+- [x] Verify AEK restoration & login logic

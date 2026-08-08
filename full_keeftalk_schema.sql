@@ -24,11 +24,13 @@ CREATE TABLE IF NOT EXISTS public.user_security_settings (
 CREATE TABLE IF NOT EXISTS public.conversation_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id TEXT NOT NULL, -- Changed to TEXT to match existing chats.id
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     encrypted_key TEXT NOT NULL,
     nonce TEXT NOT NULL,
     version INTEGER DEFAULT 2,
     epoch INTEGER DEFAULT 1,
-    created_at TIMESTAMPTZ DEFAULT now()
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(conversation_id, user_id)
 );
 
 -- 3. UNIFIED FILES

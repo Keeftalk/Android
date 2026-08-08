@@ -54,7 +54,7 @@ import com.keeftalk.chat.data.local.entities.*
         NoteAttachmentEntity::class,
         AgendaAttachmentEntity::class,
     ],
-    version = 82,
+    version = 83,
     exportSchema = false
 )
 @TypeConverters(KeeftalkConverters::class)
@@ -360,6 +360,19 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                         PRIMARY KEY(id)
                     )
                 """.trimIndent())
+            }
+        }
+
+        val MIGRATION_82_83 = object : Migration(82, 83) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add user_id column to conversation_keys
+                db.execSQL("ALTER TABLE conversation_keys ADD COLUMN user_id TEXT NOT NULL DEFAULT 'legacy'")
+                
+                // 2. Drop the old unique index on conversationId
+                db.execSQL("DROP INDEX IF EXISTS index_conversation_keys_conversationId")
+                
+                // 3. Create a new unique composite index on (conversationId, user_id)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_conversation_keys_conversationId_user_id ON conversation_keys (conversationId, user_id)")
             }
         }
     }

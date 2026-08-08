@@ -344,7 +344,8 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_70_71,
                             KeeftalkDatabase.MIGRATION_71_72,
                             KeeftalkDatabase.MIGRATION_72_73,
-                            KeeftalkDatabase.MIGRATION_73_74
+                            KeeftalkDatabase.MIGRATION_73_74,
+                            KeeftalkDatabase.MIGRATION_82_83
                         )
                         .openHelperFactory(factory)
                         .addCallback(object : RoomDatabase.Callback() {
