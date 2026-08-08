@@ -1,0 +1,7 @@
+- [x] Create `ScrollToBottomFAB` Composable
+- [x] Update `ChatDetailScreen` state to include `unreadCount`
+- [x] Implement `unreadCount` logic in `AdapterDataObserver`
+- [x] Update `showScrollToBottom` derivation and threshold
+- [x] Integrate `ScrollToBottomFAB` into `ChatDetailScreen`
+- [x] Add smooth scroll and haptic feedback
+- [x] Verify UI and behavior (Auto-scroll, Badge clearing)

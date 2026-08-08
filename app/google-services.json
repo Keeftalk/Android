@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "263449157700",
+    "project_id": "keeftalk",
+    "storage_bucket": "keeftalk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:263449157700:android:54d1774bd9f9f5f20c1c11",
+        "android_client_info": {
+          "package_name": "com.keeftalk.chat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "263449157700-bmd2nrmmchrjhhldihq9t5lrttavef6t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.keeftalk.chat",
+            "certificate_hash": "dfca3d927312f2ff98d672ab0024098d4384b03a"
+          }
+        },
+        {
+          "client_id": "263449157700-5jmpabi45c5m8qkgmb3vsjiu4smfulo1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBurbl_00CBnBtlyJ5rjeorStOpEKkjNXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "263449157700-5jmpabi45c5m8qkgmb3vsjiu4smfulo1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

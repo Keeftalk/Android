@@ -1,0 +1,6 @@
+- [x] Fix Date Separator logic in `ChatDetailViewModel`
+- [x] Consolidate status icons in `ChatMessageBubbles`
+- [x] Fix timestamp toggle gesture in `ChatMessageBubbles`
+- [x] Add logging and verify Real-Time Sync in `ChatRepositoryImpl`
+- [x] Verify `DiffUtil` in `MessagePagingAdapter`
+- [x] Perform regression testing

@@ -1,0 +1,34 @@
+# Tasks: Media Architecture Refactoring
+
+- [x] **Phase 1: Database & Entities**
+    - [x] Create `FileEntity` and `FileDao`
+    - [x] Create attachment entities: `MessageAttachmentEntity`, `NoteAttachmentEntity`, `AgendaAttachmentEntity`
+    - [x] Refactor `VaultItemEntity`
+    - [x] Update `KeeftalkDatabase` and remove old media tables
+- [x] **Phase 2: Core Infrastructure**
+    - [x] Implement `FileRepository`
+    - [x] Implement `FileReferenceManager`
+    - [x] Implement `FileUploadManager` with the new pipeline (compress -> thumbnail -> hash -> deduplicate -> encrypt -> upload)
+- [x] **Phase 3: Feature Refactoring**
+    - [x] Refactor Chat Module (update `ChatRepositoryImpl`)
+    - [x] Refactor Notes Module (update `NoteRepositoryImpl`)
+    - [x] Refactor Agenda Module (update `CalendarRepositoryImpl`)
+    - [x] Refactor Vault Module (update `VaultRepositoryImpl` and unified views)
+- [x] **Phase 4: Reference Management & Cleanup Integration**
+    - [x] Integrate `FileReferenceManager` into `ChatRepositoryImpl.deleteMessage` and `clearChat`
+    - [x] Integrate `FileReferenceManager` into `NoteRepositoryImpl.deleteNote`
+    - [x] Integrate `FileReferenceManager` into `CalendarRepositoryImpl.deleteItem`
+    - [x] Integrate `FileReferenceManager` into `VaultRepositoryImpl.deleteItem` (permanent)
+- [x] **Phase 5: Vault Redesign (Unified Views)**
+    - [x] Update `VaultTab` enum to include Source-based tabs
+    - [x] Update `VaultScreen` filtering logic to use `SourceType`
+    - [x] Add navigation from Home folders to specific source tabs
+- [x] **Phase 6: Verification & Cleanup**
+    - [x] Run unit tests for core managers
+    - [x] Manual verification of deduplication and reference counting
+    - [x] Final code cleanup and removing redundant media logic
+- [ ] **Phase 7: Final Stability & Sync Fixes**
+    - [ ] Sync `referenceCount` to Supabase in `FileRepositoryImpl`
+    - [ ] Fix Paging "collect twice" crash in `ChatDetailViewModel`
+    - [ ] Global singularization of `message_attachment` in Supabase queries
+    - [ ] Ensure Supabase existence check in `FileUploadManager` deduplication

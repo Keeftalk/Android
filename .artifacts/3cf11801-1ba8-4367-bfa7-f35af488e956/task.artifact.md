@@ -1,0 +1,7 @@
+- `[ ]` Add `width` and `height` to `Message` domain and entity
+- `[ ]` Update `ChatRepositoryImpl` to extract image dimensions
+- `[ ]` Fix FAB layering and behavior in `ChatDetailScreen.kt`
+- `[ ]` Implement dynamic aspect ratio for vertical videos
+- `[ ]` Correct placement of message status icons (isMe only)
+- `[ ]` Finalize RTL/Arabic support for input and bubbles
+- `[ ]` Verify HD logic based on 1920x1080 resolution

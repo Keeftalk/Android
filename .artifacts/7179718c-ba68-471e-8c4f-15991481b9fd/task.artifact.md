@@ -1,0 +1,5 @@
+- `[ ]` Update `ChatRepository` and `ChatRepositoryImpl` for progress reporting
+- `[ ]` Enhance `ChatDetailViewModel` with transfer progress tracking and failure handling
+- `[ ]` Update `ChatMessageBubbles.kt` with aligned status, progress circles, and HD badges
+- `[ ]` Refine `ChatDetailScreen.kt` scroll logic and implement the "Failure Popup"
+- `[ ]` Verify all features and fix any regressions

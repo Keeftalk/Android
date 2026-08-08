@@ -1,0 +1,14 @@
+{
+  "client_id" : "00000000-0000-0000-0000-000000000000",
+  "authorization_user_agent" : "DEFAULT",
+  "redirect_uri" : "msauth://com.keeftalk.chat/000000000000000000000000000",
+  "account_mode" : "SINGLE",
+  "authorities" : [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADandPersonalMicrosoftAccount"
+      }
+    }
+  ]
+}

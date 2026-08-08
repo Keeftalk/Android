@@ -1,0 +1,114 @@
+Checking keystore: /home/m-abidi/.gradle/caches/9.4.1/cc-keystore/gradle.keystore
+Trying password: android
+Failed with code 1
+keytool error: java.io.IOException: Integrity check failed: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+java.io.IOException: Integrity check failed: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2225)
+	at java.base/sun.security.util.KeyStoreDelegator.engineLoad(KeyStoreDelegator.java:221)
+	at java.base/java.security.KeyStore.load(KeyStore.java:1493)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1823)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1701)
+	at java.base/sun.security.tools.keytool.Main.doCommands(Main.java:949)
+	at java.base/sun.security.tools.keytool.Main.run(Main.java:423)
+	at java.base/sun.security.tools.keytool.Main.main(Main.java:416)
+Caused by: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.lambda$engineLoad$2(PKCS12KeyStore.java:2219)
+	at java.base/sun.security.pkcs12.PKCS12KeyStore$RetryWithZero.run(PKCS12KeyStore.java:257)
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2203)
+	... 7 more
+
+Trying password: gradle
+Failed with code 1
+keytool error: java.io.IOException: Integrity check failed: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+java.io.IOException: Integrity check failed: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2225)
+	at java.base/sun.security.util.KeyStoreDelegator.engineLoad(KeyStoreDelegator.java:221)
+	at java.base/java.security.KeyStore.load(KeyStore.java:1493)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1823)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1701)
+	at java.base/sun.security.tools.keytool.Main.doCommands(Main.java:949)
+	at java.base/sun.security.tools.keytool.Main.run(Main.java:423)
+	at java.base/sun.security.tools.keytool.Main.main(Main.java:416)
+Caused by: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.lambda$engineLoad$2(PKCS12KeyStore.java:2219)
+	at java.base/sun.security.pkcs12.PKCS12KeyStore$RetryWithZero.run(PKCS12KeyStore.java:257)
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2203)
+	... 7 more
+
+Trying password: password
+Failed with code 1
+keytool error: java.io.IOException: Integrity check failed: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+java.io.IOException: Integrity check failed: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2225)
+	at java.base/sun.security.util.KeyStoreDelegator.engineLoad(KeyStoreDelegator.java:221)
+	at java.base/java.security.KeyStore.load(KeyStore.java:1493)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1823)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1701)
+	at java.base/sun.security.tools.keytool.Main.doCommands(Main.java:949)
+	at java.base/sun.security.tools.keytool.Main.run(Main.java:423)
+	at java.base/sun.security.tools.keytool.Main.main(Main.java:416)
+Caused by: java.security.UnrecoverableKeyException: Failed PKCS12 integrity checking
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.lambda$engineLoad$2(PKCS12KeyStore.java:2219)
+	at java.base/sun.security.pkcs12.PKCS12KeyStore$RetryWithZero.run(PKCS12KeyStore.java:257)
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2203)
+	... 7 more
+
+Checking keystore: /home/m-abidi/.android/debug.keystore
+Trying password: android
+Keystore type: PKCS12
+Keystore provider: SUN
+
+Your keystore contains 1 entry
+
+Alias name: androiddebugkey
+Creation date: Jun 14, 2026
+Entry type: PrivateKeyEntry
+Certificate chain length: 1
+Certificate[1]:
+Owner: C=US, O=Android, CN=Android Debug
+Issuer: C=US, O=Android, CN=Android Debug
+Serial number: 1
+Valid from: Sun Jun 14 10:35:57 CET 2026 until: Tue Jun 06 10:35:57 CET 2056
+Certificate fingerprints:
+	 SHA1: D6:4E:A3:10:E0:A5:42:FF:30:1C:33:21:96:A6:ED:60:71:06:BE:EC
+	 SHA256: 77:89:39:99:FE:60:45:98:68:87:E3:8C:F6:CE:67:C1:DD:73:75:24:D8:2E:FD:AD:78:2B:8E:A9:59:C3:F1:09
+Signature algorithm name: SHA256withRSA
+Subject Public Key Algorithm: 2048-bit RSA key
+Version: 1
+
+
+*******************************************
+*******************************************
+
+
+
+Trying password: gradle
+Failed with code 1
+keytool error: java.io.IOException: keystore password was incorrect
+java.io.IOException: keystore password was incorrect
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2160)
+	at java.base/sun.security.util.KeyStoreDelegator.engineLoad(KeyStoreDelegator.java:221)
+	at java.base/java.security.KeyStore.load(KeyStore.java:1493)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1823)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1701)
+	at java.base/sun.security.tools.keytool.Main.doCommands(Main.java:949)
+	at java.base/sun.security.tools.keytool.Main.run(Main.java:423)
+	at java.base/sun.security.tools.keytool.Main.main(Main.java:416)
+Caused by: java.security.UnrecoverableKeyException: failed to decrypt safe contents entry: javax.crypto.BadPaddingException: Given final block not properly padded. Such issues can arise if a bad key is used during decryption.
+	... 8 more
+
+Trying password: password
+Failed with code 1
+keytool error: java.io.IOException: keystore password was incorrect
+java.io.IOException: keystore password was incorrect
+	at java.base/sun.security.pkcs12.PKCS12KeyStore.engineLoad(PKCS12KeyStore.java:2160)
+	at java.base/sun.security.util.KeyStoreDelegator.engineLoad(KeyStoreDelegator.java:221)
+	at java.base/java.security.KeyStore.load(KeyStore.java:1493)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1823)
+	at java.base/java.security.KeyStore.getInstance(KeyStore.java:1701)
+	at java.base/sun.security.tools.keytool.Main.doCommands(Main.java:949)
+	at java.base/sun.security.tools.keytool.Main.run(Main.java:423)
+	at java.base/sun.security.tools.keytool.Main.main(Main.java:416)
+Caused by: java.security.UnrecoverableKeyException: failed to decrypt safe contents entry: javax.crypto.BadPaddingException: Given final block not properly padded. Such issues can arise if a bad key is used during decryption.
+	... 8 more
+

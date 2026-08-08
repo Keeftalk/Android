@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- LAYER 1: Native Fragment Shell (Instant Render) -->
+    <!-- This stays active for the whole session for the ChatList -->
+    <FrameLayout
+        android:id="@+id/native_fragment_shell"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- LAYER 2: Compose Overlay (Hydrated Decorations) -->
+    <!-- This renders the Scaffold and Navigation OVER the native shell -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/compose_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</FrameLayout>

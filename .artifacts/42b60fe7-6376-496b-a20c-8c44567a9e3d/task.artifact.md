@@ -1,0 +1,22 @@
+# Task: Update "My Calendar" Feature
+
+- [x] Update Data Layer (Room Entities & DAO)
+    - [x] Modify `CalendarEntities.kt` to include family and permissions
+    - [x] Update `CalendarDao.kt` for family management
+    - [x] Register new entities in `KeeftalkDatabase.kt` and increment version
+- [x] Update Repository & Sync logic
+    - [x] Update `CalendarRepository.kt`
+    - [x] Enhance `CalendarRepositoryImpl.kt` for autosync and family sharing
+- [x] Update UI Styling & State
+    - [x] Refine `CalendarDesign.kt` with HTML colors/gradients
+    - [x] Update `CalendarViewModel.kt` with analytics and family state
+- [x] Rebuild UI Components (Jetpack Compose)
+    - [x] Header & Feature Tabs
+    - [x] Styled Calendar Grid with dot indicators
+    - [x] Sidebar: Upcoming (grouped), Stats, Family, Analytics
+    - [x] Animated FAB Menu with shortcuts
+    - [x] Dynamic Editor Modals as overlays
+- [x] Verification & Testing
+    - [x] Verify offline-first autosync
+    - [x] Verify UI pixel-perfection against HTML
+    - [x] Fix build errors and KSP issues

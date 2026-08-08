@@ -1,0 +1,12 @@
+- [x] Standardize `KeeftalkFeatureTopBar` in `KeeftalkTopBar.kt`
+- [x] Centralize Top Bar logic in `MainActivity.kt`
+- [x] Cleanup `NotesScreen.kt` internal top bar
+- [x] Cleanup `VaultScreen.kt` internal top bar
+- [x] Cleanup `EmailScreen.kt` internal top bar
+- [x] Cleanup `CalendarScreen.kt` internal top bar
+- [x] Verify consistent Top Bar across all modules
+- [x] Remove `HorizontalDivider` from `KeeftalkTopBar.kt`
+- [x] Remove Email navigation icon override in `MainActivity.kt`
+- [x] Add menu icon row below Top Bar in `EmailScreen.kt`
+- [x] Disable redundant window insets in internal module Scaffolds
+- [x] Reduce top padding in module content areas

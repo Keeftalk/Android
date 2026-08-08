@@ -1,0 +1,5 @@
+- [x] Fix back navigation from Share Picker to Chat Detail
+- [x] Implement "Back to Attachment Menu" logic via `showAttachmentsForChatId` state
+- [x] Add `BackHandler` to all Share picker screens
+- [x] Verify back buttons in `NotePicker`, `EmailPicker`, `VaultPicker`, and `AgendaPicker`
+- [x] Ensure sharing success returns to the correct chat detail view

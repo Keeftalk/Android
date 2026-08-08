@@ -1,0 +1,15 @@
+Lcom/keeftalk/chat/MainActivity;
+HSPLcom/keeftalk/chat/MainActivity;->onCreate(Landroid/os/Bundle;)V
+Lcom/keeftalk/chat/ui/screens/ChatListScreenKt;
+HSPLcom/keeftalk/chat/ui/screens/ChatListScreenKt;->ChatListContent(Lkotlinx/coroutines/flow/StateFlow;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;ZZLkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ZLandroidx/compose/runtime/Composer;III)V
+Lcom/keeftalk/chat/ui/screens/ChatListScreenKt;
+HSPLcom/keeftalk/chat/ui/screens/ChatListScreenKt;->ChatItem(Lcom/keeftalk/chat/domain/model/ChatListItemUiModel;Ljava/lang/String;ZZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
+Lcom/keeftalk/chat/ui/components/KeeftalkAvatarKt;
+HSPLcom/keeftalk/chat/ui/components/KeeftalkAvatarKt;->KeeftalkAvatar(Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/unit/Dp;FZLandroidx/compose/runtime/Composer;II)V
+Lcom/keeftalk/chat/ui/MainViewModel;
+HSPLcom/keeftalk/chat/ui/MainViewModel;-><init>(Landroid/app/Application;)V
+HSPLcom/keeftalk/chat/ui/MainViewModel;->initialize()V
+Lcom/keeftalk/chat/data/repository/ChatRepositoryImpl;
+HSPLcom/keeftalk/chat/data/repository/ChatRepositoryImpl;->hydrateChatCache()V
+Lcom/keeftalk/chat/util/PerformanceProfiler;
+HSPLcom/keeftalk/chat/util/PerformanceProfiler;->logEvent(Ljava/lang/String;Ljava/lang/String;Lcom/keeftalk/chat/util/PerformanceProfiler$Category;ZLjava/util/Map;)V

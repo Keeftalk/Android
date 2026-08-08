@@ -1,0 +1,4 @@
+- [x] Fix `ChatRepositoryImpl.getIncomingCalls()` crash by using unique realtime channel
+- [x] Optimize `EmailRepository.getAccounts()` flow and logging
+- [x] Handle coroutine cancellation in `MainActivity` FCM token fetch
+- [x] Build and verify fixes

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Keeftalk Privacy Policy - Secure Communication Application</title>
+    <meta name="application-name" content="Keeftalk">
+    <meta name="description" content="Keeftalk's exhaustive, legally-binding Privacy Policy document. We utilize Google Sign-In for secure authentication." />
+    <link rel="canonical" href="https://keeftalk.com/legal/privacy-full.html" />
+    <link rel="icon" type="image/png" href="../favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            primary: '#6C63FF',
+                            secondary: '#00CCCC',
+                            accent: '#7D5CFF',
+                            online: '#2ECC71',
+                            text: { light: '#1E1E2F', dark: '#ECECF0' },
+                            bg: { light: '#F2F4F8', dark: '#000000' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-brand-bg-light dark:bg-brand-bg-dark text-brand-text-light dark:text-brand-text-dark font-['Inter']">
+
+    <nav class="fixed w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-slate-200 dark:border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <a href="../index.html" class="flex items-center space-x-2">
+                    <div class="p-1">
+                        <img src="../favicon.png" alt="Keeftalk Logo" class="w-10 h-10 object-contain">
+                    </div>
+                    <span class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
+                </a>
+                
+                <div class="hidden md:flex items-center space-x-8">
+                    <div class="relative group">
+                        <button class="flex items-center space-x-1 text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">
+                            <span>Features</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div class="absolute left-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div class="grid grid-cols-1 divide-y divide-slate-50 dark:divide-white/5">
+                                <a href="../features/messaging.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary rounded-t-xl">Messaging & SMS</a>
+                                <a href="../features/calls.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Voice & Video</a>
+                                <a href="../features/email.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Secure Email</a>
+                                <a href="../features/notes.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Unified Notes</a>
+                                <a href="../features/agenda.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Smart Agenda</a>
+                                <a href="../features/vault.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Secure Vault</a>
+                                <a href="../features/wallet.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary rounded-b-xl flex justify-between items-center">
+                                    <span>Digital Wallet</span>
+                                    <span class="text-[10px] bg-slate-100 dark:bg-white/10 text-slate-500 px-1.5 py-0.5 rounded">Soon</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="../security.html" class="text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">Security</a>
+                    <a href="../about.html" class="text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">About</a>
+                    
+                    <div class="flex items-center space-x-6 border-l border-slate-200 dark:border-white/10 pl-8">
+                        <button id="theme-toggle" class="text-slate-500 dark:text-slate-400 hover:text-brand-primary transition">
+                            <i class="fas fa-moon dark:hidden"></i>
+                            <i class="fas fa-sun hidden dark:block"></i>
+                        </button>
+                        <div class="relative group">
+                            <button class="text-slate-400 dark:text-slate-500 font-medium transition flex items-center cursor-not-allowed">
+                                Login <span class="ml-1.5 text-[9px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-400 font-bold">SOON</span>
+                            </button>
+                            <div class="absolute right-0 mt-2 w-48 bg-slate-900 text-white text-[10px] p-3 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                                Our web portal is coming soon! You'll be able to manage your account from any browser.
+                            </div>
+                        </div>
+                        <a href="../index.html#about" class="bg-gradient-brand text-white px-6 py-2.5 rounded-full font-semibold shadow-md hover:opacity-90 transition whitespace-nowrap">Get App</a>
+                    </div>
+                </div>
+
+                <div class="md:hidden flex items-center space-x-4">
+                    <button id="theme-toggle-mobile" class="text-slate-500 dark:text-slate-400">
+                         <i class="fas fa-moon dark:hidden"></i>
+                         <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                    <button id="mobile-menu-btn" class="text-slate-600 dark:text-slate-300 focus:outline-none">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-black border-b border-slate-200 dark:border-white/10 px-4 py-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <a href="../index.html" class="block text-lg font-medium text-slate-800 dark:text-white">Home</a>
+            <div class="space-y-2 pl-4 border-l-2 border-slate-100 dark:border-white/10">
+                <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Features</p>
+                <a href="../features/messaging.html" class="block text-slate-600 dark:text-slate-400 py-1">Messaging & SMS</a>
+                <a href="../features/calls.html" class="block text-slate-600 dark:text-slate-400 py-1">Voice & Video</a>
+                <a href="../features/email.html" class="block text-slate-600 dark:text-slate-400 py-1">Secure Email</a>
+                <a href="../features/notes.html" class="block text-slate-600 dark:text-slate-400 py-1">Unified Notes</a>
+                <a href="../features/agenda.html" class="block text-slate-600 dark:text-slate-400 py-1">Smart Agenda</a>
+                <a href="../features/vault.html" class="block text-slate-600 dark:text-slate-400 py-1">Secure Vault</a>
+                <a href="../features/wallet.html" class="block text-slate-600 dark:text-slate-400 py-1 opacity-50">Wallet (Soon)</a>
+            </div>
+            <a href="../security.html" class="block text-lg font-medium text-slate-800 dark:text-white">Security</a>
+            <a href="../about.html" class="block text-lg font-medium text-slate-800 dark:text-white">About</a>
+            <div class="pt-4 border-t border-slate-100 dark:border-white/10">
+                <button class="w-full bg-slate-50 dark:bg-white/5 text-slate-400 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 cursor-not-allowed">
+                    <i class="fas fa-globe"></i>
+                    <span>Browser Login (Soon)</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <section class="pt-40 pb-24">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 bg-white dark:bg-white/5 p-8 md:p-16 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-white/10">
+            <a href="privacy.html" class="inline-flex items-center text-brand-primary font-bold mb-8 hover:underline">
+                <i class="fas fa-arrow-left mr-2"></i> Back to Summary
+            </a>
+
+            <h1 class="text-4xl font-extrabold text-slate-900 dark:text-white mb-4">Keeftalk Privacy Policy</h1>
+            <div class="bg-slate-50 dark:bg-white/5 p-6 rounded-2xl mb-12 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p><strong>Effective Date:</strong> August 6, 2026</p>
+                <p><strong>Company:</strong> Keeftalk LLC</p>
+                <p><strong>Website:</strong> https://keeftalk.com</p>
+                <p><strong>Contact:</strong> support@keeftalk.com</p>
+                <p><strong>Jurisdiction:</strong> Tunisia</p>
+            </div>
+
+            <div class="prose prose-slate dark:prose-invert max-w-none space-y-8 text-slate-600 dark:text-slate-300">
+
+                <!-- ==================== SECTION 1 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">1. Introduction</h2>
+                    <h3 class="text-xl font-bold mb-3">1.1 Our Commitment</h3>
+                    <p>Keeftalk LLC (?Keeftalk,? ?we,? ?us,? or ?our?) is committed to protecting your privacy and the security of your personal information. This Privacy Policy describes how we collect, use, store, disclose, and safeguard your information when you access or use the Keeftalk application (the ?App?), our website located at https://keeftalk.com (the ?Site?), and any related services, features, or content (collectively, the ?Service?). It also explains your rights regarding your information and how you can control it.</p>
+                    <h3 class="text-xl font-bold mb-3">1.2 Scope and Consent</h3>
+                    <p>By creating an account or otherwise using the Service, you consent to the practices described in this Privacy Policy. If you do not agree with this policy, you must not use the Service. This Privacy Policy is incorporated into and forms an integral part of our Terms of Service. Capitalized terms used but not defined in this policy shall have the meanings given to them in the Terms of Service.</p>
+                    <h3 class="text-xl font-bold mb-3">1.3 Definitions</h3>
+                    <p>For clarity, in addition to the definitions in the Terms:</p>
+                    <ul>
+                        <li><strong>?Personal Data?</strong> or <strong>?Personal Information?</strong> means any information relating to an identified or identifiable natural person, such as name, email address, phone number, or online identifiers.</li>
+                        <li><strong>?Processing?</strong> means any operation performed on Personal Data, including collection, recording, organization, storage, alteration, retrieval, use, disclosure, erasure, or destruction.</li>
+                        <li><strong>?End-to-End Encryption?</strong> or <strong>?E2EE?</strong> has the meaning given in the Terms, referring to the encryption of messages such that only the sender and intended recipient(s) can read the content.</li>
+                        <li><strong>?Metadata?</strong> means data about data, such as timestamps, sender and recipient identifiers, message size, and call duration, but not the content of the communication.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">1.4 Agreement with Terms</h3>
+                    <p>Your use of the Service is also governed by our Terms of Service. Please read this Privacy Policy together with the Terms to fully understand how we handle your information.</p>
+                </section>
+
+                <!-- ==================== SECTION 2 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">2. Core Privacy Principles</h2>
+                    <p>Keeftalk is founded on a set of unwavering privacy principles that guide every aspect of our design and operations:</p>
+                    <h3 class="text-xl font-bold mb-3">2.1 ? End-to-End Encrypted Messaging</h3>
+                    <p>All your one-on-one and group messages, voice messages, and (where technically feasible) file transfers are secured with state-of-the-art end-to-end encryption. This means neither Keeftalk nor any third party can read or listen to your communications. We have engineered the Service so that plaintext message content is never accessible to us, even for the purpose of targeted advertising or law enforcement access.</p>
+                    <h3 class="text-xl font-bold mb-3">2.2 ? No Ads, Ever</h3>
+                    <p>Keeftalk does not and will never display third-party advertisements. Our business model does not rely on collecting user data for advertising or profiling. We do not allow ad networks, data brokers, or any other advertising-related tracking technologies within the Service.</p>
+                    <h3 class="text-xl font-bold mb-3">2.3 ? No Sale of Personal Data</h3>
+                    <p>We do not sell, rent, or trade your Personal Data to anyone for any purpose. We do not share your data with third parties for their own direct marketing. Any sharing with service providers is strictly limited to operating and improving the Service under contractual confidentiality and security obligations.</p>
+                    <h3 class="text-xl font-bold mb-3">2.4 ? You Own Your Content</h3>
+                    <p>You retain full ownership of all messages, files, images, and other content you send or store through the Service. Our limited license to process your content is solely for the purpose of delivering the Service (e.g., encrypted transmission and temporary storage). We do not scan, analyze, or mine your messages for any purpose.</p>
+                    <h3 class="text-xl font-bold mb-3">2.5 ?? You Can Delete Your Account</h3>
+                    <p>You have the right to delete your account at any time, directly through the App settings. When you delete your account, we follow a rigorous deletion process to remove your personal information from our active systems, as detailed in Section 13.</p>
+                    <h3 class="text-xl font-bold mb-3">2.6 ? Transparency and User Control</h3>
+                    <p>We are committed to transparency about our data practices. This Privacy Policy describes in detail what data we collect, why we collect it, and how it is used. We provide you with controls to manage your privacy, including settings for disappearing messages, profile visibility, and data download.</p>
+                </section>
+
+                <!-- ==================== SECTION 3 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">3. Information We Collect</h2>
+                    <p>We collect only the information that is necessary to provide the Service and improve your experience. The types of information we collect depend on how you interact with the Service.</p>
+                    <h3 class="text-xl font-bold mb-3">3.1 Account Information</h3>
+                    <p>When you register for a Keeftalk account, you provide certain information directly:</p>
+                    <ul>
+                        <li><strong>Full name:</strong> You may be required to provide your first and last name or a display name.</li>
+                        <li><strong>Username:</strong> A unique identifier chosen by you, visible to other users.</li>
+                        <li><strong>Email address:</strong> Used for account verification, login, recovery, and important communications.</li>
+                        <li><strong>Phone number (optional):</strong> If you choose to verify a phone number, we collect and store it to enable phone number-based discovery and account security features. Phone numbers are hashed and stored securely.</li>
+                        <li><strong>Date of birth:</strong> We collect your date of birth to verify that you meet the minimum age requirement (13 years or older, or the applicable digital consent age). We do not display your age or date of birth publicly.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">3.2 Profile Information</h3>
+                    <p>You may optionally provide additional information to customize your profile:</p>
+                    <ul>
+                        <li><strong>Profile picture:</strong> An image you upload to represent yourself. You can choose not to upload one.</li>
+                        <li><strong>Bio or status:</strong> A short text description that you can set to be visible to your contacts.</li>
+                    </ul>
+                    <p>This information is end-to-end encrypted or, if not encrypted, is under your control and can be managed in your privacy settings.</p>
+                    <h3 class="text-xl font-bold mb-3">3.3 Usage Data</h3>
+                    <p>We automatically collect certain information about how you interact with the Service to ensure it functions properly, to understand feature usage, and to improve performance. This includes:</p>
+                    <ul>
+                        <li><strong>App activity:</strong> The features you use (e.g., messaging, calling, AI assistant, settings changes), the frequency and duration of your sessions, and actions taken within the App (such as creating groups, deleting messages).</li>
+                        <li><strong>Feature usage metrics:</strong> Aggregated counts of messages sent, calls made, media shared, etc., without accessing the content. This data is anonymized where possible.</li>
+                        <li><strong>Crash reports:</strong> When the App encounters an error, we may automatically collect diagnostic information such as stack traces, device state, and the sequence of actions leading to the crash to identify and fix bugs.</li>
+                        <li><strong>Analytics data:</strong> We use analytics services (see Section 10) that collect aggregated data like screen views, button taps, and user flow patterns. This data is used solely to improve the Service and is never used for advertising profiling.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">3.4 Device Information</h3>
+                    <p>To deliver the Service effectively, we collect technical information from the device you use to access Keeftalk:</p>
+                    <ul>
+                        <li><strong>Device type and model:</strong> (e.g., iPhone 15, Samsung Galaxy S24)</li>
+                        <li><strong>Operating system and version:</strong> (e.g., iOS 18, Android 15)</li>
+                        <li><strong>App version:</strong> The specific build of the Keeftalk App you are using.</li>
+                        <li><strong>IP address:</strong> Logged temporarily for security, rate limiting, and network diagnostics. IP addresses are not permanently linked to your account and are stored in hashed form or deleted after a short period.</li>
+                        <li><strong>Push notification token:</strong> A unique identifier provided by the operating system (Apple Push Notification Service or Firebase Cloud Messaging) used to send notifications to your device. This token does not reveal your message content.</li>
+                        <li><strong>Language preferences and time zone:</strong> To customize the App experience.</li>
+                        <li><strong>Mobile network information (carrier):</strong> Possibly collected for diagnostic purposes only.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">3.5 Content and Communications</h3>
+                    <p>Due to our end-to-end encryption architecture, Keeftalk has <strong>no access</strong> to the plaintext content of your messages, voice calls, video calls, or shared files. However, for the Service to function, we necessarily process:</p>
+                    <ul>
+                        <li><strong>Encrypted message payloads:</strong> These are temporarily stored on our servers for delivery and synchronization. The payloads are indecipherable to us.</li>
+                        <li><strong>Metadata:</strong> For message routing, we process metadata such as the sender's and recipient's user IDs, message timestamps, and approximate message size. For calls, we may store call logs (participants, duration, time). This metadata is necessary for features like delivery receipts, message ordering, and call history.</li>
+                        <li><strong>Reported content:</strong> If you report a user or a message, the App may allow you to share specific message content with our support team. In such cases, only the messages you choose to report are decrypted and transmitted to us; all other messages remain encrypted.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">3.6 Optional Information</h3>
+                    <ul>
+                        <li><strong>Location data:</strong> Keeftalk does <strong>not</strong> track your real-time location. If you share your location in a chat via a location-sharing feature, that location is treated as message content and is end-to-end encrypted. We do not access, store, or retain your device's GPS coordinates or any background location data.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">3.7 Information from Third Parties</h3>
+                    <p>We may receive limited information when you connect third-party services to Keeftalk (if such integrations become available in the future). For example, if you choose to link a cloud storage provider for backups, we would process data as directed by you, in accordance with that provider's privacy policy.</p>
+                    <h3 class="text-xl font-bold mb-3">3.8 What We Do NOT Collect</h3>
+                    <p>We explicitly do not collect:</p>
+                    <ul>
+                        <li>Message content (plaintext).</li>
+                        <li>Call audio or video content (unless you explicitly use the call recording feature, in which case the recording is stored locally on your device, not on our servers).</li>
+                        <li>Your contacts' address book without your permission (if a contact discovery feature is added, it will be optional and privacy-preserving).</li>
+                        <li>Precise real-time geolocation.</li>
+                        <li>Biometric data or health information.</li>
+                        <li>Sensitive personal data such as race, political opinions, religious beliefs, or sexual orientation unless you voluntarily include it in your profile or messages, which remains encrypted.</li>
+                    </ul>
+                </section>
+
+                <!-- ==================== SECTION 4 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">4. How We Use Your Information</h2>
+                    <p>We use the information we collect for the following purposes, and only as necessary:</p>
+                    <h3 class="text-xl font-bold mb-3">4.1 Service Provision and Operations</h3>
+                    <ul>
+                        <li>To create, maintain, and secure your account.</li>
+                        <li>To enable the core functionalities of the Service: delivering messages, routing calls, synchronizing across devices, and displaying your profile.</li>
+                        <li>To process your account settings and preferences.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">4.2 Communication with You</h3>
+                    <ul>
+                        <li>To send service-related announcements, security alerts, and administrative messages via email or in-app notifications. These are essential communications; you cannot opt out of them while having an active account.</li>
+                        <li>To respond to your inquiries, support requests, and feedback.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">4.3 Service Improvement and Development</h3>
+                    <ul>
+                        <li>To analyze aggregated usage patterns to understand how users interact with the Service and prioritize new features or improvements.</li>
+                        <li>To identify and fix bugs, crashes, and performance issues using crash reports and analytics.</li>
+                        <li>To test and validate new functionality in beta programs.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">4.4 Security and Integrity</h3>
+                    <ul>
+                        <li>To detect, prevent, and combat fraudulent activity, spam, abuse, and Terms of Service violations.</li>
+                        <li>To verify user identity and prevent unauthorized account access.</li>
+                        <li>To enforce our Terms of Service and protect the rights, property, and safety of Keeftalk, our users, and the public.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">4.5 Legal Compliance</h3>
+                    <ul>
+                        <li>To comply with applicable laws, regulations, legal processes, or enforceable governmental requests.</li>
+                        <li>To respond to valid legal orders such as subpoenas, court orders, or warrants, to the extent consistent with our encryption architecture and our commitment to user privacy.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">4.6 Aggregated and De-identified Data</h3>
+                    <p>We may create aggregated, anonymized, or de-identified data from the information we collect, such as statistical metrics about overall service usage. This data cannot reasonably be linked to any specific individual and may be used for any lawful purpose, including research and public reporting.</p>
+                </section>
+
+                <!-- ==================== SECTION 5 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">5. Legal Bases for Processing (For Users in the EEA, UK, and Similar Jurisdictions)</h2>
+                    <p>If you are located in the European Economic Area, the United Kingdom, or a jurisdiction with similar data protection laws, our legal bases for processing your Personal Data are:</p>
+                    <ul>
+                        <li><strong>Performance of a Contract:</strong> Processing is necessary to provide the Service and fulfill our obligations under the Terms of Service (e.g., creating your account, delivering messages).</li>
+                        <li><strong>Legitimate Interests:</strong> We process data for our legitimate interests in improving the Service, ensuring its security, and preventing fraud, provided those interests are not overridden by your data protection rights.</li>
+                        <li><strong>Consent:</strong> We rely on your explicit consent for certain optional processing, such as sending you non-essential marketing communications (which we currently do not send) or enabling certain AI features that require data processing beyond the core service. You may withdraw consent at any time.</li>
+                        <li><strong>Legal Obligation:</strong> Processing is necessary to comply with our legal and regulatory obligations.</li>
+                    </ul>
+                </section>
+
+                <!-- ==================== SECTION 6 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">6. End-to-End Encryption and Message Privacy</h2>
+                    <h3 class="text-xl font-bold mb-3">6.1 How Encryption Protects You</h3>
+                    <p>All messages, voice messages, and file transfers sent through Keeftalk are protected by end-to-end encryption (E2EE). This means:</p>
+                    <ul>
+                        <li><strong>Encryption on your device:</strong> Messages are encrypted using a lock that only the recipient has the key to open.</li>
+                        <li><strong>No plaintext on our servers:</strong> Keeftalk never has access to the decryption keys. We only see encrypted data that is unreadable to us.</li>
+                        <li><strong>Even if compelled by law</strong>, we cannot provide the content of your encrypted communications because we simply do not have it.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">6.2 What is Not Encrypted</h3>
+                    <ul>
+                        <li><strong>Metadata:</strong> As described, we process metadata for routing. Metadata does not include the message body.</li>
+                        <li><strong>Public profile information:</strong> Your username, display name, and profile picture (if you set visibility to ?everyone?) are visible to other users and are not encrypted end-to-end.</li>
+                        <li><strong>Data you explicitly report:</strong> If you choose to report a message, the specific message content is shared with us.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">6.3 Your Control Over Encryption</h3>
+                    <p>You can verify the security of your chats by comparing safety numbers or security codes with your contacts (if the feature is available). You are responsible for ensuring your device is not compromised, as a jailbroken or rooted device may undermine encryption.</p>
+                </section>
+
+                <!-- ==================== SECTION 7 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">7. Call Data</h2>
+                    <h3 class="text-xl font-bold mb-3">7.1 Voice and Video Calls</h3>
+                    <p>Keeftalk supports end-to-end encrypted voice and video calls. During a call, audio and video are encrypted and transmitted peer-to-peer or via relay servers in a manner that we cannot access. We do not listen to or record calls.</p>
+                    <h3 class="text-xl font-bold mb-3">7.2 Call Logs</h3>
+                    <p>We store basic metadata about calls to display your call history: the participants, date/time, duration, and type (voice/video). This data is stored in association with your account and can be deleted by you by clearing your call log within the App.</p>
+                    <h3 class="text-xl font-bold mb-3">7.3 Call Recording</h3>
+                    <p>If call recording is available and you enable it:</p>
+                    <ul>
+                        <li>The recording is created and stored locally on your device. Keeftalk does not have access to the recording content.</li>
+                        <li>It is your responsibility to comply with laws regarding consent to recording. The App will provide visual or audible indicators where required.</li>
+                    </ul>
+                </section>
+
+                <!-- ==================== SECTION 8 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">8. Media Storage and Deletion</h2>
+                    <h3 class="text-xl font-bold mb-3">8.1 Media Handling</h3>
+                    <p>When you send images, videos, or other files:</p>
+                    <ul>
+                        <li>Media is compressed by default to reduce data usage. You may choose to send original quality.</li>
+                        <li>Media files are end-to-end encrypted when transmitted and may be temporarily stored in encrypted form on our servers to facilitate delivery and cross-device synchronization.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">8.2 Deletion and Retention</h3>
+                    <p>When you delete a media file from a chat, it is not instantly removed from all infrastructure. Our system retains deleted media for up to <strong>14 days</strong> in encrypted form within backup and caching systems. After this period, the data is permanently and securely erased. This grace period allows for recovery from accidental deletion and technical contingencies. The media remains inaccessible to Keeftalk throughout.</p>
+                </section>
+
+                <!-- ==================== SECTION 9 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">9. AI Features and Data Processing</h2>
+                    <h3 class="text-xl font-bold mb-3">9.1 AI Chat Assistant</h3>
+                    <p>Keeftalk may provide an AI-powered assistant that you can interact with. The AI is designed with privacy in mind:</p>
+                    <ul>
+                        <li><strong>On-device translation:</strong> Text you translate is processed locally on your device and never sent to our servers.</li>
+                        <li><strong>Server-based AI:</strong> If a server-based AI feature is offered, we will clearly inform you, and we will only send the necessary input to our servers. We will strip personal identifiers where possible, and we will never use your AI queries to train our models unless you give explicit opt-in consent.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">9.2 AI Data Protection</h3>
+                    <ul>
+                        <li>AI interactions that occur on our servers may be logged for quality and abuse monitoring, but these logs are not linked to your identity beyond the necessary and are deleted per our retention policy.</li>
+                        <li>You must not input sensitive personal data (e.g., passwords, financial information) into the AI assistant.</li>
+                    </ul>
+                </section>
+
+                <!-- ==================== SECTION 10 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">10. Analytics and Crash Reports</h2>
+                    <h3 class="text-xl font-bold mb-3">10.1 Analytics Tools</h3>
+                    <p>We use the following analytics services to understand usage and improve the Service:</p>
+                    <ul>
+                        <li><strong>Firebase Analytics (Google):</strong> Collects anonymized usage data, device information, and engagement metrics. We have configured Firebase Analytics to limit data collection and do not use it for advertising or remarketing.</li>
+                        <li><strong>Supabase Analytics:</strong> As part of our backend infrastructure, we may use Supabase's built-in analytics for database performance monitoring. This includes query metrics and request patterns, not personal message content.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">10.2 Data Collected by Analytics</h3>
+                    <p>These services may collect:</p>
+                    <ul>
+                        <li>App events (screen views, feature interactions)</li>
+                        <li>Device model and OS</li>
+                        <li>Coarse location (country-level derived from IP address, which we have truncated)</li>
+                        <li>Crash data (stack traces, device state)</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">10.3 Opting Out</h3>
+                    <p>You may be able to limit analytics collection through your device settings (e.g., ?Limit Ad Tracking? on iOS or ?Opt out of Ads Personalization? on Android, even though we do not personalize ads). Because we do not show ads, the impact of such settings is limited to the analytics data collected. We are exploring an in-app opt-out for analytics.</p>
+                </section>
+
+                <!-- ==================== SECTION 11 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">11. Notifications</h2>
+                    <h3 class="text-xl font-bold mb-3">11.1 Push Notifications</h3>
+                    <p>We use <strong>Firebase Cloud Messaging (FCM)</strong> to deliver push notifications to your device. To enable this, we share your device push token with Firebase. This token is a unique but pseudonymous identifier; it does not contain message content. Notifications sent through FCM may be processed on Google's servers in accordance with their privacy policy.</p>
+                    <h3 class="text-xl font-bold mb-3">11.2 Control</h3>
+                    <p>You can disable notifications entirely or for specific types through your device's system settings or within the App's notification settings. Disabling notifications does not affect message delivery.</p>
+                </section>
+
+                <!-- ==================== SECTION 12 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">12. Data Sharing and Disclosure</h2>
+                    <h3 class="text-xl font-bold mb-3">12.1 Service Providers</h3>
+                    <p>We share limited information with trusted third-party service providers who assist us in operating the Service. These providers are contractually bound to process your data only on our instructions and in accordance with this Privacy Policy. They include:</p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm border border-slate-200 dark:border-white/10 rounded-lg">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-white/5">
+                                    <th class="px-4 py-2 text-left font-semibold">Service Provider</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Purpose</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Data Shared</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-t border-slate-200 dark:border-white/10">
+                                    <td class="px-4 py-2">Firebase (Google)</td>
+                                    <td class="px-4 py-2">Analytics, crash reporting, push notifications</td>
+                                    <td class="px-4 py-2">Device token, app events, crash logs, coarse IP</td>
+                                </tr>
+                                <tr class="border-t border-slate-200 dark:border-white/10">
+                                    <td class="px-4 py-2">Supabase</td>
+                                    <td class="px-4 py-2">Backend database hosting, storage</td>
+                                    <td class="px-4 py-2">Encrypted data, account metadata, usage logs</td>
+                                </tr>
+                                <tr class="border-t border-slate-200 dark:border-white/10">
+                                    <td class="px-4 py-2">Infrastructure/CDN</td>
+                                    <td class="px-4 py-2">File delivery, DNS, server hosting</td>
+                                    <td class="px-4 py-2">IP addresses, encrypted traffic</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3">We do not authorize these providers to use your data for their own purposes.</p>
+                    <h3 class="text-xl font-bold mb-3">12.2 Legal Compliance and Law Enforcement</h3>
+                    <p>We may disclose information if we believe in good faith that it is necessary to:</p>
+                    <ul>
+                        <li>Comply with a valid legal process, court order, or government request.</li>
+                        <li>Protect the safety of any person; prevent death or imminent bodily harm.</li>
+                        <li>Investigate, prevent, or take action regarding illegal activities, suspected fraud, or violations of our Terms.</li>
+                        <li>Protect the rights, property, or security of Keeftalk, our users, or the public.</li>
+                    </ul>
+                    <p>Due to E2EE, the only information we can provide is metadata and account details, not message content. We publish transparency reports regarding law enforcement requests when legally permissible.</p>
+                    <h3 class="text-xl font-bold mb-3">12.3 Business Transfers</h3>
+                    <p>If Keeftalk is involved in a merger, acquisition, reorganization, or sale of assets, your Personal Data may be transferred as part of that transaction. We will notify you (e.g., via email or prominent notice in the App) before your data is transferred and becomes subject to a different privacy policy.</p>
+                    <h3 class="text-xl font-bold mb-3">12.4 With Your Consent</h3>
+                    <p>We may share your data for other purposes if you give us explicit consent.</p>
+                    <h3 class="text-xl font-bold mb-3">12.5 Aggregated or De-identified Data</h3>
+                    <p>We may share aggregated, anonymized, or de-identified data that cannot reasonably identify you with third parties for research, marketing, or other purposes.</p>
+                    <h3 class="text-xl font-bold mb-3">12.6 No Sale of Data</h3>
+                    <p>We do not sell, rent, or trade your Personal Data to any third party for monetary or other valuable consideration. This includes your messages, profile, or usage data.</p>
+                </section>
+
+                <!-- ==================== SECTION 13 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">13. Data Retention</h2>
+                    <h3 class="text-xl font-bold mb-3">13.1 Account Data</h3>
+                    <p>We retain your account information (email, username, phone number if provided) for as long as your account is active. When you delete your account, we initiate a deletion process:</p>
+                    <ul>
+                        <li><strong>30-day grace period:</strong> Your account is deactivated immediately, but data is retained for 30 days in case of accidental deletion. You can contact us to reactivate.</li>
+                        <li><strong>Permanent deletion:</strong> After 30 days, we begin permanently deleting your personal data from active systems. This process may take up to an additional 60 days to fully clear backups and logs.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">13.2 Messages and Content</h3>
+                    <ul>
+                        <li>Encrypted messages are stored on our servers only until delivered. Undelivered messages may be retained for a maximum of 30 days, then permanently deleted.</li>
+                        <li>When you delete a message, it is removed from our active delivery systems. Backups may hold encrypted remnants for up to 14 days.</li>
+                        <li>Media follows the 14-day post-deletion retention described in Section 8.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">13.3 Analytics and Logs</h3>
+                    <p>Analytics data (anonymized) may be retained for up to 26 months. Server logs (IP addresses, request paths) are retained for a rolling 30-day period or less.</p>
+                    <h3 class="text-xl font-bold mb-3">13.4 Legal Holds</h3>
+                    <p>If we are subject to a legal preservation order or are required by law to retain data, we will keep the specified information beyond our standard periods. We will notify you of any such hold where permitted.</p>
+                </section>
+
+                <!-- ==================== SECTION 14 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">14. Your Rights and Choices</h2>
+                    <p>You have control over your data. Depending on your jurisdiction, you may have the following rights:</p>
+                    <h3 class="text-xl font-bold mb-3">14.1 Access and Portability</h3>
+                    <p>You can request a copy of the Personal Data we hold about you in a structured, machine-readable format. We provide an in-app ?Download My Data? feature or you can email us. Note that due to E2EE, we cannot export the plaintext of encrypted messages; you must back up those locally.</p>
+                    <h3 class="text-xl font-bold mb-3">14.2 Rectification</h3>
+                    <p>You can update, correct, or modify your account and profile information at any time through the App settings. If you need assistance, contact us.</p>
+                    <h3 class="text-xl font-bold mb-3">14.3 Deletion (Right to be Forgotten)</h3>
+                    <p>You can delete your account and associated data as described in Section 13. You may also request deletion of specific non-encrypted data. Some data may be retained as necessary for legal compliance.</p>
+                    <h3 class="text-xl font-bold mb-3">14.4 Restriction and Objection</h3>
+                    <p>You may have the right to restrict or object to certain processing of your data, for example, if you contest accuracy or object to processing based on legitimate interests. Contact us to exercise these rights.</p>
+                    <h3 class="text-xl font-bold mb-3">14.5 Withdrawal of Consent</h3>
+                    <p>Where processing is based on consent, you may withdraw that consent at any time. This will not affect the lawfulness of processing prior to withdrawal.</p>
+                    <h3 class="text-xl font-bold mb-3">14.6 Right to Lodge a Complaint</h3>
+                    <p>If you believe your data protection rights have been violated, you can file a complaint with the relevant supervisory authority in your country. In Tunisia, the national authority is the <em>Instance Nationale de Protection des Données Personnelles</em> (INPDP). We encourage you to contact us first to resolve any issues.</p>
+                    <h3 class="text-xl font-bold mb-3">14.7 Communication Preferences</h3>
+                    <p>You can manage email and notification preferences in the App. You cannot opt out of essential service communications (e.g., security alerts) while your account is active.</p>
+                </section>
+
+                <!-- ==================== SECTION 15 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">15. Security Measures</h2>
+                    <h3 class="text-xl font-bold mb-3">15.1 Our Security Practices</h3>
+                    <p>We implement robust technical and organizational measures to protect your information against unauthorized access, alteration, disclosure, or destruction:</p>
+                    <ul>
+                        <li><strong>Encryption in transit:</strong> All data transmission between your device and our servers is encrypted using TLS.</li>
+                        <li><strong>End-to-end encryption:</strong> Messages and calls are E2EE as described.</li>
+                        <li><strong>Data at rest:</strong> Data stored on our servers (including encrypted message payloads and account information) is encrypted using industry-standard encryption.</li>
+                        <li><strong>Access controls:</strong> Strict internal access policies ensure that only authorized personnel with a legitimate need can access limited, non-encrypted data. Multi-factor authentication, audit logs, and regular reviews are employed.</li>
+                        <li><strong>Infrastructure security:</strong> We partner with leading cloud providers that maintain rigorous physical and network security.</li>
+                        <li><strong>Incident response:</strong> We maintain a security incident response plan. In the event of a data breach affecting your Personal Data, we will notify you and relevant authorities as required by law.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">15.2 Your Role</h3>
+                    <p>Security is a shared responsibility. Please safeguard your account credentials, enable biometric or PIN protection on your device, and keep the App updated.</p>
+                </section>
+
+                <!-- ==================== SECTION 16 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">16. International Data Transfers</h2>
+                    <h3 class="text-xl font-bold mb-3">16.1 Data Hosting and Processing</h3>
+                    <p>Your data may be processed and stored on servers located in Tunisia, the European Economic Area (EEA), the United States, or other countries where our service providers operate. Some of these countries may have data protection laws different from your home country.</p>
+                    <h3 class="text-xl font-bold mb-3">16.2 Safeguards</h3>
+                    <p>When we transfer Personal Data internationally, we implement appropriate safeguards to ensure a level of protection equivalent to that provided under the applicable law. These safeguards include:</p>
+                    <ul>
+                        <li><strong>Adequacy decisions:</strong> Relying on countries recognized as providing adequate protection.</li>
+                        <li><strong>Standard Contractual Clauses (SCCs):</strong> Entering into EU-approved standard contractual clauses with service providers.</li>
+                        <li><strong>Binding corporate rules or similar commitments.</strong></li>
+                    </ul>
+                    <p>For more information on transfer mechanisms, contact us.</p>
+                </section>
+
+                <!-- ==================== SECTION 17 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">17. Children's Privacy</h2>
+                    <h3 class="text-xl font-bold mb-3">17.1 Age Restriction</h3>
+                    <p>Keeftalk is not intended for use by children under the age of <strong>13</strong> (or the applicable age of digital consent in your country). We do not knowingly collect or solicit Personal Data from anyone under that age.</p>
+                    <h3 class="text-xl font-bold mb-3">17.2 Parental Measures</h3>
+                    <p>If we become aware that we have collected Personal Data from a child under the required age without verified parental consent, we will delete that data as quickly as possible. If you believe a child has provided us with personal information, please contact us immediately.</p>
+                </section>
+
+                <!-- ==================== SECTION 18 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">18. Cookies and Similar Technologies</h2>
+                    <h3 class="text-xl font-bold mb-3">18.1 Use on the Website</h3>
+                    <p>Our Site at https://keeftalk.com may use essential cookies and similar technologies to ensure proper functionality:</p>
+                    <ul>
+                        <li><strong>Essential cookies:</strong> Necessary for website operation, such as session management and security. These do not require your consent.</li>
+                        <li><strong>Analytics cookies:</strong> We may use cookies to understand website traffic and improve our web presence. You can manage or disable these via your browser settings.</li>
+                    </ul>
+                    <h3 class="text-xl font-bold mb-3">18.2 In-App Tracking</h3>
+                    <p>The App itself does not use cookies; instead, it relies on the data collection methods described in this Policy (device identifiers, analytics SDKs). You can control tracking through your device's privacy settings.</p>
+                    <h3 class="text-xl font-bold mb-3">18.3 Your Choices</h3>
+                    <p>You can set your browser to reject cookies or alert you when a cookie is placed. Disabling essential cookies may affect the functionality of the Site.</p>
+                </section>
+
+                <!-- ==================== SECTION 19 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">19. Changes to This Privacy Policy</h2>
+                    <h3 class="text-xl font-bold mb-3">19.1 Updates</h3>
+                    <p>We may update this Privacy Policy from time to time to reflect changes in our practices, technology, legal requirements, or for other operational reasons. The ?Effective Date? at the top will be revised.</p>
+                    <h3 class="text-xl font-bold mb-3">19.2 Notification</h3>
+                    <p>For material changes, we will notify you through:</p>
+                    <ul>
+                        <li>A prominent in-app notice; or</li>
+                        <li>An email to the address associated with your account.</li>
+                    </ul>
+                    <p>We encourage you to review this policy periodically.</p>
+                    <h3 class="text-xl font-bold mb-3">19.3 Continued Use</h3>
+                    <p>Your continued use of the Service after the effective date of the updated Privacy Policy constitutes acceptance of the changes. If you disagree with the changes, you must stop using the Service and delete your account.</p>
+                </section>
+
+                <!-- ==================== SECTION 20 ==================== -->
+                <section>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">20. Contact Us</h2>
+                    <p>If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
+                    <p><strong>Email:</strong> support@keeftalk.com<br /><strong>Website:</strong> https://keeftalk.com</p>
+                    <p>For legal and privacy-specific inquiries, you may also write to:</p>
+                    <p>Keeftalk LLC<br />[Insert Physical Address, Tunis, Tunisia]<br />Attention: Data Protection Officer<br />Email: privacy@keeftalk.com</p>
+                    <p>We will respond to your request within the timeframe required by applicable law.</p>
+                    <div class="mt-6 p-4 bg-slate-50 dark:bg-white/5 rounded-xl text-center text-sm">
+                        <p><strong>By using Keeftalk, you acknowledge that you have read and understood this Privacy Policy.</strong></p>
+                        <p class="mt-2 text-slate-400">© Keeftalk LLC. All rights reserved.</p>
+                    </div>
+                </section>
+
+            </div>
+            <!-- /prose -->
+
+            <div class="mt-16 pt-8 border-t border-slate-100 dark:border-white/10 text-center">
+                <p class="text-slate-400 text-sm">© 2026 Keeftalk. All rights reserved.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-white dark:bg-black py-16 border-t border-slate-200 dark:border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="flex items-center space-x-2 mb-6">
+                        <img src="../favicon.png" alt="Keeftalk Logo" class="w-8 h-8 object-contain">
+                        <span class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+                        Secure communication and productivity application.
+                    </p>
+                    <p class="mt-4 text-xs text-slate-400 dark:text-slate-500 uppercase tracking-widest font-bold">Location</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Keeftalk LLC, Menzah 6, Tunis, Tunisia</p>
+                    <div class="mt-6 flex items-center space-x-2 text-brand-online text-sm font-semibold">
+                        <i class="fas fa-sync-alt animate-spin-slow"></i>
+                        <span>Secure data handling and synchronization.</span>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-6 text-slate-800">Product</h4>
+                    <ul class="space-y-4 text-slate-500 dark:text-slate-400">
+                        <li><a href="../features/messaging.html" class="hover:text-brand-primary transition">Messaging</a></li>
+                        <li><a href="../features/calls.html" class="hover:text-brand-primary transition">Calls</a></li>
+                        <li><a href="../features/email.html" class="hover:text-brand-primary transition">Email</a></li>
+                        <li><a href="../features/notes.html" class="hover:text-brand-primary transition">Notes</a></li>
+                        <li><a href="../features/agenda.html" class="hover:text-brand-primary transition">Agenda</a></li>
+                        <li><a href="../features/vault.html" class="hover:text-brand-primary transition">Vault</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-6 text-slate-800">Company</h4>
+                    <ul class="space-y-4 text-slate-500 dark:text-slate-400">
+                        <li><a href="../about.html" class="hover:text-brand-primary transition">About Keeftalk</a></li>
+                        <li><a href="../security.html" class="hover:text-brand-primary transition">Security Standards</a></li>
+                        <li><a href="../contact.html" class="hover:text-brand-primary transition">Contact the Keeftalk team</a></li>
+                        <li><a href="privacy.html" class="hover:text-brand-primary transition">Privacy Policy</a></li>
+                        <li><a href="terms.html" class="hover:text-brand-primary transition">Terms of Service</a></li>
+                        <li><a href="licenses.html" class="hover:text-brand-primary transition">Open Source Licenses</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-slate-100 dark:border-white/5">
+                <div class="text-slate-400 dark:text-slate-600 text-sm mb-6 md:mb-0">
+                    &copy; 2026 Keeftalk. All rights reserved.
+                </div>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-github"></i></a>
+                    <a href="#" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-linkedin"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/components.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+- [x] Add `benchmark-macro` to `libs.versions.toml`
+- [x] Remove duplicate Composables in `CalendarScreen.kt`
+- [x] Fix `CalendarViewModel` instantiation in `MainActivity.kt`
+- [x] Verify build with `gradle assembleDebug`

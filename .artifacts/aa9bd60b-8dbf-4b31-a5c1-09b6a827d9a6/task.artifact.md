@@ -1,0 +1,9 @@
+- [x] Implement filtering logic and badge counts in `ChatListViewModel.kt`
+- [x] Update `ChatContainersRow` in `ChatListScreen.kt`
+    - [x] Remove "Channels"
+    - [x] Increase badge text size to 10.5.sp
+    - [x] Ensure counts use unfiltered data
+- [x] Update `MainActivity.kt`
+    - [x] Remove "Channels" from `containers` list
+    - [x] Fix "Chats"/"SMS" tab colors for Light Mode
+- [x] Verify Filtering, Badge Sizes, and Light Mode visibility

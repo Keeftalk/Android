@@ -1,0 +1,11 @@
+- `[x]` Fix warnings and errors in `MainActivity.kt`
+    - `[x]` Remove unused imports
+    - `[x]` Refactor `onAttachmentClick` for better readability
+    - `[x]` Clean up redundant qualifiers and formatting
+- `[x]` Fix warnings and errors in `ChatRepositoryImpl.kt`
+    - `[x]` Remove duplicate imports
+    - `[x]` Use imported `AppModule` instead of FQN
+    - `[x]` Add logging to empty `catch` blocks
+    - `[x]` Suppress unused parameters where intentional
+    - `[x]` General code cleanup
+- `[x]` Verify changes by compiling the project

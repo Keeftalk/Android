@@ -1,0 +1,8 @@
+- [ ] Stabilize `AttachmentMenu` in `ChatInput.kt` to prevent wiggling
+- [ ] Implement `isCaptioning` state and preview Microphone in `ChatInput.kt`
+- [x] Refine `MediaItemThumbnail.kt` interactions (Circle select vs Thumbnail preview)
+- [x] Refactor `AttachmentMenu` for stable layout and proper clicks
+- [x] Enhance `ChatInput` for captioning with active Send and preview Mic
+- [x] Double the size of `HDBadge` in `ChatMessageBubbles.kt`
+- [x] Verify build and interactions
+- [x] Create walkthrough

@@ -1,0 +1,21 @@
+# Task: Message Delivery State System Redesign
+
+- [x] **Database Schema Migration**
+    - [x] Update `ChatMemberEntity` in Room to include pointers
+    - [x] Create `ReceiptSyncQueueEntity` for offline support
+    - [x] Update Supabase schema (Conceptual/Migration script)
+- [x] **Repository Layer Implementation**
+    - [x] Implement Pointer-based Receipt logic in `ChatRepositoryImpl`
+    - [x] Add Forward-only state transition guard
+    - [x] Implement local `ReceiptSyncQueue` processing
+- [x] **Real-time Synchronization**
+    - [x] Observe `chat_members` table in Supabase Realtime
+    - [x] Update peer status in local Room DB on pointer changes
+- [x] **UI Layer Updates**
+    - [x] Implement visibility tracking in `ChatDetailViewModel`
+    - [x] Update `MessagePagingAdapter` to calculate status from pointers
+    - [x] Implement Signal-style "Seen" avatars in UI
+- [x] **Verification & Testing**
+    - [x] Test bulk seen logic (highest ID)
+    - [x] Test offline queueing and flush
+    - [x] Test group chat status aggregation

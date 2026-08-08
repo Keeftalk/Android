@@ -1,0 +1,5 @@
+- `[ ]` Create `website/legal/licenses.html` with categorized library attributions
+- `[ ]` Add "Open Source Licenses" link to the footer of all root pages
+- `[ ]` Add "Open Source Licenses" link to the footer of all `features/` pages
+- `[ ]` Add "Open Source Licenses" link to the footer of all `legal/` pages
+- `[ ]` Verify links and layout consistency

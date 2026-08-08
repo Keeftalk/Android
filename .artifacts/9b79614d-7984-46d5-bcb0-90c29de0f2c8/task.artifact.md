@@ -1,0 +1,5 @@
+- [x] Intercept `AttachmentType.FILE` in `ChatDetailContent` to show custom document picker
+- [x] Verify `ChatDetailBottomSheets` callbacks are correctly wired
+- [x] Ensure "Browse System Documents" still works from within the custom picker
+- [x] Update `DocumentPickerBottomSheet.kt` for theme support and solid background
+- [x] Update `DocumentItem.kt` for theme support

@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Keeftalk</string>
+    <string name="camera_permission_denied">Camera permission is required to take photos.</string>
+</resources>

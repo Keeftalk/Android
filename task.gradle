@@ -1,0 +1,33 @@
+
+task printFingerprints {
+    doLast {
+        def keystores = [
+            "/home/m-abidi/.gradle/caches/9.4.1/cc-keystore/gradle.keystore",
+            "/home/m-abidi/.android/debug.keystore"
+        ]
+        def passwords = ["android", "gradle", "password"]
+
+        keystores.each { path ->
+            println "Checking keystore: $path"
+            File f = new File(path)
+            if (!f.exists()) {
+                println "File does not exist"
+                return
+            }
+            passwords.each { pass ->
+                println "Trying password: $pass"
+                try {
+                    def process = "keytool -list -v -keystore $path -storepass $pass".execute()
+                    def output = process.text
+                    if (process.exitValue() == 0) {
+                        println output
+                    } else {
+                        // println "Failed with code ${process.exitValue()}"
+                    }
+                } catch (Exception e) {
+                    // println "Error: ${e.message}"
+                }
+            }
+        }
+    }
+}

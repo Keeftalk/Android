@@ -1,0 +1,5 @@
+- `[x]` Fix Media Sending & Smooth Read Receipts
+    - `[x]` Ensure `content` is non-null for media messages in `ChatRepositoryImpl.kt`
+    - `[x]` Correct `targetX` calculation in `ReadReceiptOverlay` (`ChatDetailScreen.kt`)
+    - `[x]` Refine physics constants for ultra-smooth "liquid" motion
+    - `[x]` Verify build and visual alignment
