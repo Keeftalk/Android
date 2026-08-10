@@ -1,6 +1,7 @@
 package com.keeftalk.chat.security.crypto
 
 import android.util.Log
+import android.util.Base64
 import com.keeftalk.chat.data.local.dao.MessageDao
 import com.keeftalk.chat.data.local.entities.MessageEntity
 import com.keeftalk.chat.domain.model.DecryptionState
@@ -9,7 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
-import java.util.Base64
 
 /**
  * Centralized service for message decryption across all app components.
@@ -21,6 +21,7 @@ class MessageDecryptionManager(
 ) {
     private val TAG = "DecryptionManager"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val B64_FLAGS = Base64.NO_WRAP
     
     private val _decryptionEvents = MutableStateFlow<String?>(null)
     /** Emits messageId when a message decryption state changes. */
@@ -59,11 +60,24 @@ class MessageDecryptionManager(
         try {
             val envelope = EncryptedMessageEnvelope(
                 type = entity.envelopeType,
-                ciphertext = Base64.getDecoder().decode(entity.ciphertext),
+                ciphertext = Base64.decode(entity.ciphertext, B64_FLAGS),
                 nonce = entity.nonce
             )
             
-            val decrypted = cryptoManager.decryptMessage(entity.chatId, envelope, entity.cryptoVersion)
+            val decrypted = try {
+                cryptoManager.decryptMessage(
+                    chatId = entity.chatId, 
+                    messageId = entity.id, 
+                    senderId = entity.senderId,
+                    envelope = envelope, 
+                    cryptoVersion = entity.cryptoVersion
+                )
+            } catch (e: Exception) {
+                if (e.message?.contains("BAD_DECRYPT") == true) {
+                    Log.e(TAG, "[DECRYPT_PIPELINE] BAD_DECRYPT | chatId=${entity.chatId} | msgId=${entity.id} | version=${entity.cryptoVersion}")
+                }
+                throw e
+            }
             var decryptedContent = decrypted
             var wrappedFek: String? = null
             var mediaIv: String? = null
@@ -76,6 +90,7 @@ class MessageDecryptionManager(
             } catch (_: Exception) {}
             
             if (updateDb) {
+                Log.d(TAG, "[DECRYPT_PIPELINE] SUCCESS | updating local state for id=${entity.id}")
                 messageDao.updateMessageContent(entity.id, decryptedContent)
                 messageDao.updateDecryptionState(entity.id, DecryptionState.SUCCESS, entity.retryCount)
                 _decryptionEvents.value = entity.id
@@ -91,10 +106,18 @@ class MessageDecryptionManager(
             val errorMsg = e.message ?: "Unknown error"
             Log.w(TAG, "[DECRYPT_PIPELINE] FAILED | id=${entity.id} | source=$source | error=$errorMsg | timeMs=${System.currentTimeMillis() - startTime}")
             
-            val permanent = entity.retryCount >= 5
-            val nextState = if (permanent) DecryptionState.PERMANENT_FAILURE else DecryptionState.RETRY_REQUIRED
+            // Differentiate between retryable and permanent failures
+            val isBadDecrypt = errorMsg.contains("BAD_DECRYPT") || errorMsg.contains("Tag mismatch")
+            val isKeyMissing = errorMsg.contains("PCK not found")
+            
+            val permanent = isBadDecrypt || entity.retryCount >= 10
+            val nextState = when {
+                permanent -> DecryptionState.PERMANENT_FAILURE
+                isKeyMissing -> DecryptionState.PENDING // Wait for key sync
+                else -> DecryptionState.RETRY_REQUIRED
+            }
 
-            if (updateDb) {
+            if (updateDb && entity.decryptionState != nextState) {
                 messageDao.updateDecryptionState(entity.id, nextState, entity.retryCount + 1)
                 _decryptionEvents.value = entity.id
             }
@@ -107,16 +130,17 @@ class MessageDecryptionManager(
         scope.launch {
             while (isActive) {
                 try {
-                    val pendingCount = messageDao.countMessagesNeedingDecryption(maxRetries = 6)
+                    // Only repair messages that aren't marked as permanent failures
+                    val pendingCount = messageDao.countMessagesNeedingDecryption(maxRetries = 11)
                     if (pendingCount > 0) {
                         Log.d(TAG, "[BACKGROUND_REPAIR] Retrying $pendingCount messages...")
-                        val messages = messageDao.getMessagesForRepair(limit = 10, maxRetries = 6)
+                        val messages = messageDao.getMessagesForRepair(limit = 20, maxRetries = 11)
                         messages.forEach { decrypt(it, updateDb = true, source = "REPAIR") }
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "[BACKGROUND_REPAIR] Cycle failed", e)
                 }
-                delay(30000) // Run every 30 seconds
+                delay(60000) // Run every 60 seconds to save battery
             }
         }
     }

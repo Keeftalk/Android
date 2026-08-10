@@ -16,6 +16,7 @@ data class UserPrivacySettingsDto(
     @SerialName("profile_view_history_enabled") val profileViewHistoryEnabled: Boolean = false,
     @SerialName("call_permission") val callPermission: String = "EVERYONE",
     @SerialName("group_permission") val groupPermission: String = "EVERYONE",
+    @SerialName("connections_visibility") val connectionsVisibility: String = "EVERYONE",
     @SerialName("screenshot_protection_enabled") val screenshotProtectionEnabled: Boolean = false,
     @SerialName("biometric_lock_enabled") val biometricLockEnabled: Boolean = false,
     @SerialName("biometric_timeout_minutes") val biometricTimeoutMinutes: Int = 0
@@ -30,6 +31,7 @@ data class UserPrivacySettingsDto(
         profileViewHistoryEnabled = profileViewHistoryEnabled,
         callPermission = PrivacyVisibility.fromString(callPermission),
         groupPermission = PrivacyVisibility.fromString(groupPermission),
+        connectionsVisibility = PrivacyVisibility.fromString(connectionsVisibility),
         screenshotProtectionEnabled = screenshotProtectionEnabled,
         biometricLockEnabled = biometricLockEnabled,
         biometricTimeoutMinutes = biometricTimeoutMinutes
@@ -46,6 +48,7 @@ data class UserPrivacySettingsDto(
             profileViewHistoryEnabled = settings.profileViewHistoryEnabled,
             callPermission = settings.callPermission.name,
             groupPermission = settings.groupPermission.name,
+            connectionsVisibility = settings.connectionsVisibility.name,
             screenshotProtectionEnabled = settings.screenshotProtectionEnabled,
             biometricLockEnabled = settings.biometricLockEnabled,
             biometricTimeoutMinutes = settings.biometricTimeoutMinutes

@@ -1,0 +1,21 @@
+# Task: Vault UX Overhaul & Cloud FAB
+
+- `[x]` **Premium Sync & Direct Actions**
+    - `[x]` Update `processSyncQueue` for folder color in `VaultRepositoryImpl.kt`.
+    - `[x]` Implement direct FAB actions in `VaultScreen.kt`.
+- `[x]` **Layout & Drag-and-Drop**
+    - `[x]` Update grid to 5 columns in `VaultTabPage`.
+    - `[x]` Refine hit-testing for "drop into folder".
+    - `[x]` Implement multi-item "wrapped" drag visualization.
+- `[x]` **Cloud FAB Implementation**
+    - `[x]` Create `CloudImportFab.kt` with logo cycling animation.
+    - `[x]` Refactor Cloud FAB to be purely image-based (no button background).
+    - `[x]` Implement 360-degree spin and fade on exit animation.
+    - `[x]` Reduce size by 30% (`40.dp`).
+    - `[x]` Align next to the left of the main "+" FAB.
+    - `[x]` Integrate `CloudImportFab` in `VaultScreen.kt`.
+    - `[x]` Remove `CloudImportBanner` component and its usage.
+- `[x]` **Verification**
+    - `[x]` Test bulk move via drag-and-drop.
+    - `[x]` Verify folder color persistence.
+    - `[x]` Verify direct picker opening.

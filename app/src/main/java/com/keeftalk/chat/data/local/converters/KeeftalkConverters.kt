@@ -80,4 +80,14 @@ class KeeftalkConverters {
 
     @TypeConverter
     fun toDecryptionState(value: String): com.keeftalk.chat.domain.model.DecryptionState = com.keeftalk.chat.domain.model.DecryptionState.valueOf(value)
+
+    @TypeConverter
+    fun fromJsonElement(value: kotlinx.serialization.json.JsonElement?): String? {
+        return value?.let { json.encodeToString(it) }
+    }
+
+    @TypeConverter
+    fun toJsonElement(value: String?): kotlinx.serialization.json.JsonElement? {
+        return value?.let { json.parseToJsonElement(it) }
+    }
 }

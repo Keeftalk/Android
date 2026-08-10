@@ -41,27 +41,19 @@ class ChatListViewModel(private val repository: ChatRepository) : ViewModel() {
         query to containerId
     }.flatMapLatest { (query, containerId) ->
         repository.getChatPager(containerId, query)
-    }.combine(typingStatuses) { pagingData, typing ->
-        pagingData.map { chat ->
-            chat.toUiModel().copy(isTyping = typing[chat.id]?.isNotEmpty() == true)
-        }
+    }.map { pagingData ->
+        pagingData.map { it.toUiModel() }
     }.flowOn(Dispatchers.Default)
     .cachedIn(viewModelScope)
 
-    // Keep activeChats for backward compatibility or direct list usage if needed
-    // But it should probably be deprecated in favor of activeChatsPager
     val activeChats: StateFlow<List<ChatListItemUiModel>> = flowOf(emptyList<ChatListItemUiModel>())
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val archivedChatsPager: Flow<androidx.paging.PagingData<ChatListItemUiModel>> = combine(
-        repository.getChatPager("archived", ""),
-        typingStatuses
-    ) { pagingData, typing ->
-        pagingData.map { chat ->
-            chat.toUiModel().copy(isTyping = typing[chat.id]?.isNotEmpty() == true)
-        }
-    }.flowOn(Dispatchers.Default)
-    .cachedIn(viewModelScope)
+    val archivedChatsPager: Flow<androidx.paging.PagingData<ChatListItemUiModel>> = repository.getChatPager("archived", "")
+        .map { pagingData ->
+            pagingData.map { it.toUiModel() }
+        }.flowOn(Dispatchers.Default)
+        .cachedIn(viewModelScope)
 
     val archivedChats: StateFlow<List<ChatListItemUiModel>> = flowOf(emptyList<ChatListItemUiModel>())
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())

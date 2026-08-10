@@ -69,7 +69,8 @@ data class AppIcons(
     val backspace: ImageVector,
     val callMissed: ImageVector,
     val callReceived: ImageVector,
-    val callMade: ImageVector
+    val callMade: ImageVector,
+    val feed: ImageVector
 )
 
 fun Modifier.fabGradientIcon(): Modifier = this
@@ -144,7 +145,8 @@ object IconProvider {
             backspace = Icons.AutoMirrored.Filled.Backspace,
             callMissed = Icons.AutoMirrored.Filled.CallMissed,
             callReceived = Icons.AutoMirrored.Filled.CallReceived,
-            callMade = Icons.AutoMirrored.Filled.CallMade
+            callMade = Icons.AutoMirrored.Filled.CallMade,
+            feed = LucideIcons.Rss
         )
     }
 }

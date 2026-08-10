@@ -49,6 +49,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import coil.compose.AsyncImage
+import com.keeftalk.chat.ui.components.EncryptedThumbnail
+import com.keeftalk.chat.domain.model.FileType
 import com.keeftalk.chat.domain.model.Message
 import com.keeftalk.chat.domain.model.MessageStatus
 import com.keeftalk.chat.domain.model.MessageType
@@ -270,19 +272,24 @@ fun FileMessageContent(
     isMe: Boolean,
     contentColor: Color,
     onFileClick: () -> Unit,
+    onPdfClick: () -> Unit = {},
     onCodeClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
     onToggleMediaLock: () -> Unit = {}
 ) {
     val fileName = message.fileName?.lowercase() ?: ""
+    val isPdf = fileName.endsWith(".pdf")
     val isCode = fileName.endsWith(".java") || fileName.endsWith(".kt") || fileName.endsWith(".txt") ||
                  fileName.endsWith(".py") || fileName.endsWith(".js") || fileName.endsWith(".html") ||
                  fileName.endsWith(".css") || fileName.endsWith(".json") || fileName.endsWith(".xml") ||
                  fileName.endsWith(".log") || fileName.endsWith(".c") || fileName.endsWith(".cpp") ||
-                 fileName.endsWith(".h") || fileName.endsWith(".sh")
+                 fileName.endsWith(".h") || fileName.endsWith(".sh") || fileName.endsWith(".ts") ||
+                 fileName.endsWith(".sql") || fileName.endsWith(".md") || fileName.endsWith(".yaml") ||
+                 fileName.endsWith(".yml") || fileName.endsWith(".toml")
 
     val isLocal = remember(message.localFilePath) {
-        message.localFilePath != null && java.io.File(message.localFilePath).exists()
+        val path = message.localFilePath
+        path != null && java.io.File(path).exists()
     }
 
     if (isCode) {
@@ -299,7 +306,9 @@ fun FileMessageContent(
                 .widthIn(max = 240.dp)
                 .pointerInput(message.id) {
                     detectTapGestures(
-                        onTap = { onFileClick() },
+                        onTap = { 
+                            if (isPdf) onPdfClick() else onFileClick()
+                        },
                         onLongPress = { onLongClick() }
                     )
                 }
@@ -393,7 +402,7 @@ fun CodeFilePreviewContent(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 200.dp)
+            .heightIn(min = 80.dp, max = 200.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black.copy(alpha = 0.05f)),
         color = Color.Transparent
@@ -595,13 +604,14 @@ fun TextMessageContent(
     contentColor: Color,
     isMe: Boolean,
     chatThemeId: String,
-    isRtl: Boolean
+    isRtl: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val textLines = remember(content) { content.lines() }
     val isTextLong = textLines.size > 9
     var isTextExpanded by remember { mutableStateOf(false) }
 
-    Column {
+    Column(modifier = modifier) {
         val parts = remember(content) { content.split("'''") }
 
         if (parts.size >= 3) {
@@ -741,10 +751,8 @@ fun ImageMessageContent(
             AsyncImage(
                 model = mediaUri, 
                 contentDescription = null, 
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp)), 
-                contentScale = ContentScale.Fit
+                modifier = Modifier.fillMaxSize(), 
+                contentScale = ContentScale.Crop
             )
         }
         
@@ -785,10 +793,10 @@ fun VideoMessageContent(
     Box(modifier = Modifier.widthIn(max = 280.dp)) {
         val isLocal = message.localFilePath != null && java.io.File(message.localFilePath!!).exists()
         if (isLocal) {
-            InlineVideoPlayer(uri = mediaUri, modifier = Modifier, onFullScreen = { pos: Long -> onMediaClick(message.id, pos) })
+            InlineVideoPlayer(uri = mediaUri, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f), onFullScreen = { pos: Long -> onMediaClick(message.id, pos) })
         } else {
             Box(
-                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.1f))
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black.copy(alpha = 0.1f))
                     .clickable { if (transferProgress == null) onDownloadClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -830,6 +838,7 @@ fun MediaMessageContent(
     onEmailClick: (String) -> Unit,
     onVaultClick: (String) -> Unit,
     onAgendaClick: (String) -> Unit,
+    onCodeClick: (String) -> Unit = {},
     onLongClick: () -> Unit,
     onDoubleTap: () -> Unit,
     onToggleMediaLock: (String, Boolean) -> Unit,
@@ -860,12 +869,54 @@ fun MediaMessageContent(
             )
         }
         MessageType.SHARED_VAULT_FILE -> {
-            SharedVaultFileBubbleContent(
-                message = message,
-                isMe = isMe,
-                contentColor = contentColor,
-                onClick = { onVaultClick(message.fileUrl ?: "") }
-            )
+            if (message.effectiveFileType == null) {
+                // Attachments are still being fetched (common for Realtime)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(contentColor.copy(alpha = 0.05f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Preparing Vault file...", style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = 0.6f))
+                    }
+                }
+            } else {
+                when (message.effectiveFileType) {
+                    FileType.IMAGE -> {
+                        ImageMessageContent(message, mediaUri ?: message.fileUrl ?: "", isMe, transferProgress, onMediaClick, onLongClick, onDoubleTap, onToggleMediaLock)
+                    }
+                    FileType.VIDEO -> {
+                        VideoMessageContent(message, mediaUri ?: message.fileUrl ?: "", isMe, transferProgress, onMediaClick, onDownloadClick, onToggleMediaLock)
+                    }
+                    FileType.DOCUMENT -> {
+                        SharedVaultFileBubbleContent(
+                            message = message,
+                            isMe = isMe,
+                            contentColor = contentColor,
+                            onVaultClick = onVaultClick,
+                            onMediaClick = onMediaClick,
+                            onPdfClick = onPdfClick,
+                            onCodeClick = onCodeClick
+                        )
+                    }
+                    else -> {
+                        SharedVaultFileBubbleContent(
+                            message = message,
+                            isMe = isMe,
+                            contentColor = contentColor,
+                            onVaultClick = onVaultClick,
+                            onMediaClick = onMediaClick,
+                            onPdfClick = onPdfClick,
+                            onCodeClick = onCodeClick
+                        )
+                    }
+                }
+            }
         }
         MessageType.SHARED_AGENDA -> {
             SharedAgendaBubbleContent(
@@ -1016,6 +1067,30 @@ fun MessageBubble(
         }
     }
 
+    val isMediaMessage = remember(message.type, message.effectiveFileType, isStackRoot) {
+        message.type == MessageType.IMAGE || 
+        message.type == MessageType.VIDEO || 
+        (message.type == MessageType.SHARED_VAULT_FILE && (message.effectiveFileType == FileType.IMAGE || message.effectiveFileType == FileType.VIDEO)) ||
+        isStackRoot
+    }
+
+    val layoutDirection = LocalLayoutDirection.current
+    val basePadding = remember(chatTheme.id) {
+        when (chatTheme.id) {
+            "rosa" -> PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+            "alpha" -> PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            else -> PaddingValues(10.dp)
+        }
+    }
+    
+    val bubblePadding = remember(isMediaMessage, basePadding) {
+        if (isMediaMessage) {
+            PaddingValues(0.dp)
+        } else {
+            basePadding
+        }
+    }
+
     val updatedOnToggleTimestamp by rememberUpdatedState(onToggleTimestamp)
 
     val horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
@@ -1126,11 +1201,7 @@ fun MessageBubble(
                                     onLongPress = { onLongClick() }
                                 )
                             }
-                            .padding(
-                                if (chatTheme.id == "rosa") PaddingValues(horizontal = 20.dp, vertical = 14.dp)
-                                else if (chatTheme.id == "alpha") PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-                                else PaddingValues(10.dp)
-                            )
+                            .padding(bubblePadding)
                     ) {
                         if (!isMe && isGroup) {
                             Text(
@@ -1138,12 +1209,19 @@ fun MessageBubble(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier
+                                    .then(if (isMediaMessage) Modifier.padding(basePadding.calculateStartPadding(layoutDirection), basePadding.calculateTopPadding(), basePadding.calculateEndPadding(layoutDirection), 4.dp) else Modifier)
+                                    .padding(bottom = 4.dp)
                             )
                         }
 
                         if (isSms && !isMe) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically, 
+                                modifier = Modifier
+                                    .then(if (isMediaMessage) Modifier.padding(basePadding.calculateStartPadding(layoutDirection), basePadding.calculateTopPadding(), basePadding.calculateEndPadding(layoutDirection), 4.dp) else Modifier)
+                                    .padding(bottom = 4.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.ChatBubble,
                                     contentDescription = null,
@@ -1182,22 +1260,24 @@ fun MessageBubble(
                                 onToggleMediaLock = onToggleMediaLock
                             )
                         } else {
-                            if (message.replyTo != null) {
-                                val isReplyRtl = remember(message.replyTo!!.content) { LanguageUtils.isRtl(message.replyTo!!.content) }
+                            val replyTo = message.replyTo
+                            if (replyTo != null) {
+                                val isReplyRtl = remember(replyTo.content) { LanguageUtils.isRtl(replyTo.content) }
                                 CompositionLocalProvider(LocalLayoutDirection provides (if (isReplyRtl) LayoutDirection.Rtl else LayoutDirection.Ltr)) {
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .then(if (isMediaMessage) Modifier.padding(basePadding.calculateStartPadding(layoutDirection), basePadding.calculateTopPadding(), basePadding.calculateEndPadding(layoutDirection), 8.dp) else Modifier)
                                             .padding(bottom = 8.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .clickable { onReplyPreviewClick(message.replyTo!!.id) },
+                                            .clickable { onReplyPreviewClick(replyTo.id) },
                                         color = contentColor.copy(alpha = 0.1f)
                                     ) {
                                         Box {
                                             Box(modifier = Modifier.matchParentSize().width(4.dp).background(if (isMe) Color.White else MaterialTheme.colorScheme.primary))
                                             Column(modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 8.dp)) {
                                                 Text(
-                                                    text = if (message.replyTo!!.senderId == currentUserId) "You" else "Peer",
+                                                    text = if (replyTo.senderId == currentUserId) "You" else "Peer",
                                                     style = MaterialTheme.typography.labelMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (isMe) Color.White else MaterialTheme.colorScheme.primary,
@@ -1205,7 +1285,7 @@ fun MessageBubble(
                                                     modifier = Modifier.fillMaxWidth()
                                                 )
                                                 Text(
-                                                    text = message.replyTo!!.content,
+                                                    text = replyTo.content,
                                                     style = MaterialTheme.typography.bodySmall,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
@@ -1243,6 +1323,7 @@ fun MessageBubble(
                                         isMe = isMe,
                                         contentColor = contentColor,
                                         onFileClick = { onMediaClick(message.id, 0L) },
+                                        onPdfClick = { onPdfClick(message.id) },
                                         onCodeClick = { onCodeClick(message.id) },
                                         onLongClick = onLongClick,
                                         onToggleMediaLock = { onToggleMediaLock(message.id, !message.mediaLocked) }
@@ -1281,10 +1362,20 @@ fun MessageBubble(
                             }
 
                             val isPlaceholderContent = message.content == "[${message.type.name}]"
+                            val isFilenameContent = remember(message.content, message.fileName, isMediaMessage) {
+                                if (!isMediaMessage) return@remember false
+                                val fname = message.fileName?.lowercase() ?: ""
+                                val content = message.content.lowercase().trim()
+                                content == fname || content.matches(Regex("^[0-9_]+\\.[a-z0-9]+$")) || (fname.isNotBlank() && content.contains(fname))
+                            }
                             
-                            if (message.content.isNotBlank() && !isPlaceholderContent) {
+                            if (message.content.isNotBlank() && !isPlaceholderContent && !isFilenameContent) {
                                 if (EmojiUtils.isSingleEmoji(message.content)) {
-                                    Box(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    Box(
+                                        modifier = Modifier.padding(
+                                            if (isMediaMessage) basePadding else PaddingValues(vertical = 4.dp)
+                                        )
+                                    ) {
                                         AnimatedEmoji(
                                             model = EmojiUtils.getAnimatedEmojiUrl(message.content),
                                             modifier = Modifier.size(chatSettings.emojiSize.dp * 2.5f)
@@ -1300,7 +1391,8 @@ fun MessageBubble(
                                             contentColor = contentColor,
                                             isMe = isMe,
                                             chatThemeId = chatTheme.id,
-                                            isRtl = isRtl
+                                            isRtl = isRtl,
+                                            modifier = if (isMediaMessage) Modifier.padding(basePadding) else Modifier
                                         )
                                     }
                                 }
@@ -1311,7 +1403,9 @@ fun MessageBubble(
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { showOriginal = !showOriginal }
+                                modifier = Modifier
+                                    .then(if (isMediaMessage) Modifier.padding(basePadding.calculateStartPadding(layoutDirection), 0.dp, basePadding.calculateEndPadding(layoutDirection), basePadding.calculateBottomPadding()) else Modifier)
+                                    .clickable { showOriginal = !showOriginal }
                             ) {
                                 Icon(
                                     Icons.Default.Translate,
@@ -1482,9 +1576,7 @@ fun MediaStackBubble(
             AsyncImage(
                 model = mediaUri,
                 contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp)),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
             
@@ -1632,7 +1724,7 @@ fun MessageStatusIcon(
         MessageStatus.FAILED -> {
             Icon(Icons.Default.Error, null, modifier = Modifier.size(12.dp), tint = Color.Red)
         }
-        else -> {}
+        MessageStatus.SENDING -> {}
     }
 }
 
@@ -1745,23 +1837,84 @@ fun SharedVaultFileBubbleContent(
     message: Message,
     isMe: Boolean,
     contentColor: Color,
-    onClick: () -> Unit
+    onVaultClick: (String) -> Unit,
+    onMediaClick: (String, Long) -> Unit,
+    onPdfClick: (String) -> Unit,
+    onCodeClick: (String) -> Unit = {}
 ) {
+    val file = message.attachments.firstOrNull()
+    
+    val onClick = {
+        val f = message.attachments.firstOrNull()
+        val fname = f?.fileName?.lowercase() ?: ""
+        val isPdf = fname.endsWith(".pdf")
+        val isCode = fname.endsWith(".java") || fname.endsWith(".kt") || fname.endsWith(".txt") ||
+                     fname.endsWith(".py") || fname.endsWith(".js") || fname.endsWith(".html") ||
+                     fname.endsWith(".css") || fname.endsWith(".json") || fname.endsWith(".xml") ||
+                     fname.endsWith(".log") || fname.endsWith(".c") || fname.endsWith(".cpp") ||
+                     fname.endsWith(".h") || fname.endsWith(".sh") || fname.endsWith(".ts") ||
+                     fname.endsWith(".sql") || fname.endsWith(".md") || fname.endsWith(".yaml") ||
+                     fname.endsWith(".yml") || fname.endsWith(".toml")
+
+        when {
+            f?.fileType == FileType.IMAGE || f?.fileType == FileType.VIDEO -> onMediaClick(message.id, 0L)
+            isPdf -> onPdfClick(message.id)
+            isCode -> onCodeClick(message.id)
+            else -> onVaultClick(message.fileUrl ?: "")
+        }
+    }
+
     Surface(
         onClick = onClick,
-        color = contentColor.copy(alpha = 0.1f),
+        color = contentColor.copy(alpha = 0.05f),
         shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.1f)),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Lock, null, tint = Color(0xFFFF9800), modifier = Modifier.size(32.dp))
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text("Shared Vault File", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
-                Text(message.content, style = MaterialTheme.typography.bodyMedium, color = contentColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            EncryptedThumbnail(
+                file = file,
+                modifier = Modifier.size(52.dp),
+                chatId = message.chatId
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = message.content, 
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), 
+                    color = contentColor, 
+                    maxLines = 1, 
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.CloudQueue, 
+                        contentDescription = null, 
+                        tint = contentColor.copy(alpha = 0.5f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Vault • ${file?.fileSize?.let { formatSize(it) } ?: "E2EE"}", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = contentColor.copy(alpha = 0.6f)
+                    )
+                }
             }
+            Icon(
+                Icons.Default.ChevronRight, 
+                contentDescription = null, 
+                tint = contentColor.copy(alpha = 0.3f),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
+}
+
+private fun formatSize(size: Long): String {
+    val kb = size / 1024.0
+    val mb = kb / 1024.0
+    return if (mb >= 1) "%.1f MB".format(mb) else "%.0f KB".format(kb)
 }
 
 @Composable

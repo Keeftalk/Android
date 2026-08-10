@@ -22,6 +22,7 @@ data class ProfileEntity(
     val joinDate: Long,
     val isVerified: Boolean,
     val lastSeen: Long,
+    val viewsCount: Long,
     // Privacy settings flattened
     val avatarVisibility: String,
     val coverVisibility: String,
@@ -47,6 +48,7 @@ fun ProfileEntity.toDomain() = Profile(
     joinDate = joinDate,
     isVerified = isVerified,
     lastSeen = lastSeen,
+    viewsCount = viewsCount,
     privacy = PrivacySettings(
         avatarVisibility = avatarVisibility,
         coverVisibility = coverVisibility,
@@ -77,6 +79,7 @@ fun Profile.toEntity() = ProfileEntity(
     joinDate = joinDate,
     isVerified = isVerified,
     lastSeen = lastSeen,
+    viewsCount = viewsCount,
     avatarVisibility = privacy.avatarVisibility,
     coverVisibility = privacy.coverVisibility,
     phoneVisibility = privacy.phoneVisibility,

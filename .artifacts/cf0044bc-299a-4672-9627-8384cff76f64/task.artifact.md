@@ -1,0 +1,11 @@
+- `[x]` Update `AvatarUtils.kt` for first-letter initials and premium colors
+- `[x]` Modify `KeeftalkAvatar.kt` to add the white border ("white environment")
+- `[x]` Update `layout_chat_item.xml` and `ChatListFragment.kt` for consistent avatars in `RecyclerView`
+- `[x]` Update `ChatItem` typography in `ChatListScreen.kt` to match the screenshot
+- `[x]` Clean up duplicate `getInitials` logic in `EmailDetailScreen.kt` and `EmailScreen.kt`
+- `[x]` Ensure dark/light theme compatibility for all UI changes
+- `[x]` Fix Profile page avatar border (Black -> White)
+- `[x]` Fix trimmed avatar borders in `layout_chat_item.xml`
+- `[x]` Update tiny seen avatar styling in `ChatMessageBubbles.kt`
+- `[x]` Remove border from SENT/DELIVERED icons in `ChatListFragment.kt`
+- `[x]` Verify consistency across all screens

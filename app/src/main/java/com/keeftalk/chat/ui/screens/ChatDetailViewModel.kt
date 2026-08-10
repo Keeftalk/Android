@@ -124,9 +124,12 @@ class ChatDetailViewModel(
 
     val readReceipts = chatMembers.map { members ->
         members.filter { it.userId != userPreferences.value.userId }
-            .associate { it.userId to (it.lastReadMessageId to (it.lastReadAt ?: 0L)) }
-            .filterValues { it.first != null }
-            .mapValues { it.value as Pair<String, Long> }
+            .mapNotNull { member ->
+                val lastId = member.lastReadMessageId
+                if (lastId != null) {
+                    member.userId to (lastId to (member.lastReadAt ?: 0L))
+                } else null
+            }.toMap()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val lastSeenByPeerId = userPreferences.flatMapLatest { prefs ->

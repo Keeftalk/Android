@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.keeftalk.chat.domain.repository.ChatRepository
 import com.keeftalk.chat.domain.repository.CalendarRepository
+import com.keeftalk.chat.domain.repository.VaultRepository
 import com.keeftalk.chat.util.PerformanceProfiler
 import kotlinx.coroutines.*
 import kotlinx.coroutines.cancel
@@ -15,7 +16,8 @@ private const val TAG = "BackgroundSyncManager"
 class BackgroundSyncManager(
     private val context: Context,
     private val chatRepository: ChatRepository,
-    private val calendarRepository: CalendarRepository
+    private val calendarRepository: CalendarRepository,
+    private val vaultRepository: VaultRepository
 ) {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
@@ -40,8 +42,13 @@ class BackgroundSyncManager(
                 PerformanceProfiler.startStage("Sync: Calendar")
                 calendarRepository.syncCalendar()
                 PerformanceProfiler.endStage("Sync: Calendar", category = PerformanceProfiler.Category.NETWORK)
+
+                // 3. Sync Vault
+                PerformanceProfiler.startStage("Sync: Vault")
+                vaultRepository.sync()
+                PerformanceProfiler.endStage("Sync: Vault", category = PerformanceProfiler.Category.NETWORK)
                 
-                // 3. Sync Other components (Stubs for future implementation)
+                // 4. Sync Other components (Stubs for future implementation)
                 syncContacts()
                 syncProfiles()
                 syncCalls()

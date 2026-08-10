@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -132,6 +134,7 @@ fun NotificationItem(
         NotificationType.BROADCAST -> icons.sparkles to Color(0xFFFF9800)
         NotificationType.REMINDER -> icons.clock to Color(0xFF009688)
         NotificationType.NOTE_SHARE -> icons.note to Color(0xFF6C63FF)
+        NotificationType.NUDGE -> Icons.Default.NotificationsActive to MaterialTheme.colorScheme.primary
     }
     
     Surface(

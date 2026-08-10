@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keeftalk محفوظ والٹ - ڈیٹا پروٹیکشن ایپلی کیشن</title>
+    <meta name="description" content="Keeftalk ایپلی کیشن کے اندر ایک انکرپٹڈ ڈیجیٹل والٹ میں حساس دستاویزات اور میڈیا فائلوں کو اسٹور اور محفوظ کریں۔ ہم محفوظ تصدیق کے لیے Google Sign-In کا استعمال کرتے ہیں۔">
+    <link rel="canonical" href="https://keeftalk.com/ur/features/vault.html">
+    <link rel="icon" type="image/png" href="../../favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../css/styles.css">
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            primary: '#6C63FF',
+                            secondary: '#00CCCC',
+                            accent: '#7D5CFF',
+                            online: '#2ECC71',
+                            text: { light: '#1E1E2F', dark: '#ECECF0' },
+                            bg: { light: '#F2F4F8', dark: '#000000' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-brand-bg-light dark:bg-brand-bg-dark text-brand-text-light dark:text-brand-text-dark font-['Inter']">
+
+    <nav class="fixed w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-slate-200 dark:border-white/10 text-right">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <a href="../index.html" class="flex items-center space-x-2 space-x-reverse">
+                    <div class="p-1">
+                        <img src="../../keeftalk_logo.png" alt="Keeftalk Logo" class="w-10 h-10 object-contain">
+                    </div>
+                    <span class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
+                </a>
+
+                <div class="hidden md:flex items-center space-x-8 space-x-reverse">
+                    <div class="relative group">
+                        <button class="flex items-center space-x-1 space-x-reverse text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">
+                            <span>خصوصیات</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div class="grid grid-cols-1 divide-y divide-slate-50 dark:divide-white/5 divide-y-reverse">
+                                <a href="messaging.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary rounded-t-xl text-right">پیغام رسانی اور ایس ایم ایس</a>
+                                <a href="calls.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">آواز اور ویڈیو</a>
+                                <a href="email.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">محفوظ ای میل</a>
+                                <a href="notes.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">متحدہ نوٹس</a>
+                                <a href="agenda.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">اسمارٹ ایجنڈا</a>
+                                <a href="vault.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">محفوظ والٹ</a>
+                                <a href="wallet.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary rounded-b-xl flex justify-between items-center text-right">
+                                    <span>ڈیجیٹل والٹ</span>
+                                    <span class="text-[10px] bg-slate-100 dark:bg-white/10 text-slate-500 px-1.5 py-0.5 rounded">جلد</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="../security.html" class="text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">سیکیورٹی</a>
+                    <a href="../about.html" class="text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">ہمارے بارے میں</a>
+
+                    <div class="flex items-center space-x-6 space-x-reverse border-r border-slate-200 dark:border-white/10 pr-8">
+                        <button id="theme-toggle" class="text-slate-500 dark:text-slate-400 hover:text-brand-primary transition">
+                            <i class="fas fa-moon dark:hidden"></i>
+                            <i class="fas fa-sun hidden dark:block"></i>
+                        </button>
+
+                        <!-- Language Switcher -->
+                        <div class="relative group">
+                            <button class="flex items-center space-x-1 space-x-reverse text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">
+                                <i class="fas fa-globe text-sm"></i>
+                                <span>اردو</span>
+                                <i class="fas fa-chevron-down text-xs"></i>
+                            </button>
+                            <div class="absolute left-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div class="py-2">
+                                    <a href="../../features/vault.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">English</a>
+                                    <a href="../../zh/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">中文 (Mandarin)</a>
+                                    <a href="../../hi/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">हिन्दी (Hindi)</a>
+                                    <a href="../../es/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">Español</a>
+                                    <a href="../../fr/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">Français</a>
+                                    <a href="../../ar/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right" dir="rtl">العربية (Arabic)</a>
+                                    <a href="../../bn/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">বাংলা (Bengali)</a>
+                                    <a href="../../pt/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">Português</a>
+                                    <a href="../../ru/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right">Русский (Russian)</a>
+                                    <a href="vault.html" class="block px-4 py-2 text-sm font-bold text-brand-primary bg-slate-50 dark:bg-white/5 text-right">اردو (Urdu)</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="relative group">
+                            <button class="text-slate-400 dark:text-slate-500 font-medium transition flex items-center cursor-not-allowed">
+                                لاگ ان <span class="mr-1.5 text-[9px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-400 font-bold">جلد</span>
+                            </button>
+                            <div class="absolute right-0 mt-2 w-48 bg-slate-900 text-white text-[10px] p-3 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none text-right">
+                                ہمارا ویب پورٹل جلد آرہا ہے! آپ کسی بھی براؤزر سے اپنے اکاؤنٹ کا انتظام کر سکیں گے۔
+                            </div>
+                        </div>
+                        <a href="../index.html#about" class="bg-gradient-brand text-white px-6 py-2.5 rounded-full font-semibold shadow-md hover:opacity-90 transition whitespace-nowrap">ایپ حاصل کریں</a>
+                    </div>
+                </div>
+
+                <div class="md:hidden flex items-center space-x-4 space-x-reverse">
+                    <button id="theme-toggle-mobile" class="text-slate-500 dark:text-slate-400">
+                         <i class="fas fa-moon dark:hidden"></i>
+                         <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                    <button id="mobile-menu-btn" class="text-slate-600 dark:text-slate-300 focus:outline-none">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-black border-b border-slate-200 dark:border-white/10 px-4 py-6 space-y-4 max-h-[80vh] overflow-y-auto text-right">
+            <a href="../index.html" class="block text-lg font-medium text-slate-800 dark:text-white">ہوم</a>
+            <div class="space-y-2 pr-4 border-r-2 border-slate-100 dark:border-white/10">
+                <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">خصوصیات</p>
+                <a href="messaging.html" class="block text-slate-600 dark:text-slate-400 py-1">پیغام رسانی اور ایس ایم ایس</a>
+                <a href="calls.html" class="block text-slate-600 dark:text-slate-400 py-1">آواز اور ویڈیو</a>
+                <a href="email.html" class="block text-slate-600 dark:text-slate-400 py-1">محفوظ ای میل</a>
+                <a href="notes.html" class="block text-slate-600 dark:text-slate-400 py-1">متحدہ نوٹس</a>
+                <a href="agenda.html" class="block text-slate-600 dark:text-slate-400 py-1">اسمارٹ ایجنڈا</a>
+                <a href="vault.html" class="block text-slate-600 dark:text-slate-400 py-1">محفوظ والٹ</a>
+                <a href="wallet.html" class="block text-slate-600 dark:text-slate-400 py-1 opacity-50">والٹ (جلد)</a>
+            </div>
+            <a href="../security.html" class="block text-lg font-medium text-slate-800 dark:text-white">سیکیورٹی</a>
+            <a href="../about.html" class="block text-lg font-medium text-slate-800 dark:text-white">ہمارے بارے میں</a>
+
+            <!-- Mobile Language Selection -->
+            <div class="pt-4 border-t border-slate-100 dark:border-white/10">
+                <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">زبان منتخب کریں</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <a href="../../features/vault.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">English</span>
+                    </a>
+                    <a href="../../zh/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">中文 (ZH)</span>
+                    </a>
+                    <a href="../../hi/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">हिन्दी (HI)</span>
+                    </a>
+                    <a href="../../es/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Español (ES)</span>
+                    </a>
+                    <a href="../../fr/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Français (FR)</span>
+                    </a>
+                    <a href="../../ar/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">العربية (AR)</span>
+                    </a>
+                    <a href="../../bn/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">বাংলা (BN)</span>
+                    </a>
+                    <a href="../../pt/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Português (PT)</span>
+                    </a>
+                    <a href="../../ru/index.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Русский (RU)</span>
+                    </a>
+                    <a href="vault.html" class="flex items-center space-x-2 space-x-reverse p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-brand-primary/30">
+                        <span class="text-xs font-bold text-brand-primary">اردو (UR)</span>
+                    </a>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-slate-100 dark:border-white/10">
+                <button class="w-full bg-slate-50 dark:bg-white/5 text-slate-400 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 space-x-reverse cursor-not-allowed">
+                    <i class="fas fa-globe"></i>
+                    <span>براؤزر لاگ ان (جلد)</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="pt-40 pb-32 relative overflow-hidden bg-slate-900 dark:bg-black text-white text-right">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
+                <div class="lg:w-1/2">
+                    <h1 class="text-5xl md:text-7xl font-extrabold mb-8">
+                        Keeftalk <span class="gradient-text">محفوظ والٹ</span>
+                    </h1>
+                    <p class="text-xl text-slate-400 leading-relaxed mb-10 max-w-xl">
+                        حساس دستاویزات اور میڈیا فائلوں کے لیے ایک وقف ڈیجیٹل اسٹوریج کی جگہ۔ محفوظ انتظام کا ماحول فراہم کرنے کے لیے براہ راست Keeftalk ایپلی کیشن میں بنایا گیا ہے۔ ہم صارفین کی محفوظ طریقے سے تصدیق کرنے اور ان کے والٹ کے لیے انکرپٹڈ رسائی قائم کرنے کے لیے Google Sign-In کا استعمال کرتے ہیں۔
+                    </p>
+                    <div class="flex space-x-6 space-x-reverse text-sm font-bold">
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-white mb-1">AES-256</div>
+                            <div class="text-slate-500 uppercase tracking-widest text-[10px]">ڈیٹا انکرپشن</div>
+                        </div>
+                        <div class="w-px h-12 bg-slate-800"></div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-white mb-1">Zero</div>
+                            <div class="text-slate-500 uppercase tracking-widest text-[10px]">زیرو نالج رسائی</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:w-1/2">
+                    <div class="relative">
+                        <div class="bg-slate-800 dark:bg-brand-primary/10 rounded-3xl p-1 shadow-2xl border border-slate-700 dark:border-brand-primary/20">
+                            <div class="bg-slate-900 dark:bg-black rounded-[1.4rem] p-10">
+                                <i class="fas fa-lock text-6xl text-brand-primary mb-8 block text-center"></i>
+                                <div class="space-y-6 opacity-40">
+                                    <div class="h-4 bg-slate-800 dark:bg-white/5 rounded-full w-3/4"></div>
+                                    <div class="h-4 bg-slate-800 dark:bg-white/5 rounded-full w-full"></div>
+                                    <div class="h-4 bg-slate-800 dark:bg-white/5 rounded-full w-1/2"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="absolute -top-10 -left-10 w-40 h-40 bg-brand-primary rounded-full blur-[100px] opacity-30"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Deep Dive -->
+    <section class="py-24 bg-brand-bg-light dark:bg-brand-bg-dark border-t border-slate-100 dark:border-white/5 text-right">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div class="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/10 shadow-sm">
+                    <i class="fas fa-fingerprint text-3xl text-brand-secondary mb-6"></i>
+                    <h4 class="text-2xl font-bold mb-4">ڈیوائس کی توثیق</h4>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        محفوظ ڈیوائس کی تصدیق کے طریقوں کا استعمال کرتے ہوئے اپنے والٹ تک رسائی حاصل کریں، جس سے انکرپشن کیز کے مقامی انتظام کو یقینی بنایا جاتا ہے۔
+                    </p>
+                </div>
+                <div class="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/10 shadow-sm">
+                    <i class="fas fa-eye-slash text-3xl text-brand-accent mb-6"></i>
+                    <h4 class="text-2xl font-bold mb-4">معلومات کا کنٹرول</h4>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        پوشیدہ ڈائرکٹری اسٹرکچرز جیسی خصوصیات آپ کی انتہائی حساس ڈیجیٹل فائلوں کے انتظام اور تحفظ میں مدد کرتی ہیں۔
+                    </p>
+                </div>
+                <div class="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/10 shadow-sm">
+                    <i class="fas fa-file-shield text-3xl text-brand-online mb-6"></i>
+                    <h4 class="text-2xl font-bold mb-4">انکرپٹڈ اسٹوریج</h4>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        محفوظ ٹرانسمیشن اور انکرپٹڈ اسٹوریج انفراسٹرکچر کا استعمال کرتے ہوئے تمام آلات پر والٹ ڈیٹا کو ہم آہنگ کریں۔
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-white dark:bg-black py-16 border-t border-slate-200 dark:border-white/10 text-right">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="flex items-center space-x-2 space-x-reverse mb-6">
+                        <img src="../../keeftalk_logo.png" alt="Keeftalk Logo" class="w-8 h-8 object-contain">
+                        <span class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+                        محفوظ مواصلات اور پیداوری کی ایپلی کیشن۔
+                    </p>
+                    <p class="mt-4 text-xs text-slate-400 dark:text-slate-500 uppercase tracking-widest font-bold">مقام</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Keeftalk LLC، منزہ 6، تیونس، تیونس</p>
+                    <div class="mt-6 flex items-center space-x-2 space-x-reverse text-brand-online text-sm font-semibold">
+                        <i class="fas fa-sync-alt animate-spin-slow"></i>
+                        <span>محفوظ ڈیٹا ہینڈلنگ اور مطابقت پذیری۔</span>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-6 text-slate-800">پروڈکٹ</h4>
+                    <ul class="space-y-4 text-slate-500 dark:text-slate-400">
+                        <li><a href="messaging.html" class="hover:text-brand-primary transition">پیغام رسانی</a></li>
+                        <li><a href="calls.html" class="hover:text-brand-primary transition">کالز</a></li>
+                        <li><a href="email.html" class="hover:text-brand-primary transition">ای میل</a></li>
+                        <li><a href="notes.html" class="hover:text-brand-primary transition">نوٹس</a></li>
+                        <li><a href="agenda.html" class="hover:text-brand-primary transition">ایجنڈا</a></li>
+                        <li><a href="vault.html" class="hover:text-brand-primary transition font-bold">الخزنة</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-6 text-slate-800">کمپنی</h4>
+                    <ul class="space-y-4 text-slate-500 dark:text-slate-400">
+                        <li><a href="../about.html" class="hover:text-brand-primary transition">حول Keeftalk</a></li>
+                        <li><a href="../security.html" class="hover:text-brand-primary transition">معايير الأمان</a></li>
+                        <li><a href="../contact.html" class="hover:text-brand-primary transition">اتصل بفريق Keeftalk</a></li>
+                        <li><a href="../legal/privacy.html" class="hover:text-brand-primary transition">سياسة الخصوصية</a></li>
+                        <li><a href="../legal/terms.html" class="hover:text-brand-primary transition">شروط الخدمة</a></li>
+                        <li><a href="../legal/licenses.html" class="hover:text-brand-primary transition">تراخيص المصدر المفتوح</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-slate-100 dark:border-white/5">
+                <div class="text-slate-400 dark:text-slate-600 text-sm mb-6 md:mb-0">
+                    &copy; 2026 Keeftalk. جميع الحقوق محفوظة.
+                </div>
+                <div class="flex space-x-6 space-x-reverse">
+                    <a href="https://x.com/keeftalkapp" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-x-twitter"></i></a>
+                    <a href="https://facebook.com/keeftalk" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-facebook"></i></a>
+                    <a href="https://github.com/Keeftalk" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-github"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../../js/components.js"></script>
+</body>
+</html>

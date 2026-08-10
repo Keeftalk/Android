@@ -8,12 +8,23 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
+import android.webkit.MimeTypeMap
 import com.keeftalk.chat.domain.model.*
 import com.keeftalk.chat.domain.repository.FileRepository
 import com.keeftalk.chat.security.crypto.*
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.storage.UploadData
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.writeFully
+import io.ktor.utils.io.writer
+import java.util.Base64
+import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.scale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -27,10 +38,10 @@ import javax.crypto.Mac
 class FileUploadManager(
     private val context: Context,
     private val fileRepository: FileRepository,
-    private val cryptoManager: CryptoManager,
-    private val supabaseProvider: suspend () -> SupabaseClient
+    private val supabaseProvider: suspend () -> SupabaseClient,
 ) {
-    private val TAG = "FileUploadManager"
+    private val tag = "FileUploadManager"
+    private val CHUNK_SIZE = 1024 * 1024 // 1 MiB
 
     suspend fun uploadFile(
         file: File,
@@ -38,12 +49,13 @@ class FileUploadManager(
         ownerId: String,
         onProgress: (Float) -> Unit = {}
     ): Result<com.keeftalk.chat.domain.model.File> = withContext(Dispatchers.IO) {
+        val fileId = UUID.randomUUID().toString()
         try {
-            Log.d(TAG, "Starting secure upload for file: ${file.absolutePath}, sourceType: $sourceType")
+            Log.i("FILE_PIPELINE", "ORIGINAL_UPLOAD_START | fileId=$fileId | localPath=${file.absolutePath} | sourceType=$sourceType")
             
-            // 1. Pre-processing
+            // 1. Pre-processing (Memory-efficient compression)
             val processedFile = compressIfNeeded(file)
-            val thumbnailPath = generateThumbnail(processedFile)
+            val plaintextSize = processedFile.length()
             
             // 2. Per-User Deduplication (HMAC)
             if (!KeyManager.isInitialized()) {
@@ -51,47 +63,130 @@ class FileUploadManager(
             }
             val fpk = KeyManager.getFileProtectionKey()
             val hash = calculateHMAC(processedFile, fpk)
-            Log.d(TAG, "File HMAC: $hash")
             
             // 3. Deduplication Check
             val existingFile = fileRepository.getFileByHash(hash)
-            var targetId = UUID.randomUUID().toString()
-
             if (existingFile != null) {
-                Log.d(TAG, "File exists via HMAC, verifying remote: ${existingFile.id}")
+                Log.i("FILE_PIPELINE", "DEDUPLICATION MATCH | fileId=${existingFile.id}")
                 val supabase = supabaseProvider()
                 val bucket = supabase.storage["files"]
                 
-                val remoteRecord = try {
-                    supabase.postgrest["files"].select {
-                        filter { eq("id", existingFile.id) }
-                    }.decodeSingleOrNull<JsonObject>()
-                } catch (e: Exception) { null }
-
-                val isRemotePresent = if (remoteRecord != null) {
-                    try {
-                        val path = existingFile.storagePath.substringAfter("files/")
-                        bucket.info(path)
-                        true
-                    } catch (e: Exception) { false }
-                } else false
+                val isRemotePresent = try {
+                    val path = "$ownerId/${existingFile.id}/original"
+                    bucket.info(path)
+                    true
+                } catch (_: Exception) { false }
 
                 if (isRemotePresent) {
-                    Log.d(TAG, "Remote file present, reusing.")
+                    Log.i("FILE_PIPELINE", "REMOTE PRESENT | Reusing fileId=${existingFile.id}")
                     fileRepository.incrementReferenceCount(existingFile.id)
                     return@withContext Result.success(existingFile)
-                } else {
-                    targetId = existingFile.id
                 }
             }
 
-            // 4. Secure Encryption (Random FEK)
-            val fileBytes = processedFile.readBytes()
+            // 4. Secure Encryption Setup (v2)
+            Log.d("FILE_PIPELINE", "ENCRYPTION_SETUP_V2")
             val fek = StorageCryptoService.generateRandomKey()
-            val encryptedObj = StorageCryptoService.encrypt(fileBytes, fek)
-            val encryptedBytes = java.util.Base64.getDecoder().decode(encryptedObj.ciphertext)
+            val baseIv = StorageCryptoService.generateBaseIv()
             
-            // 5. Envelope Creation (OWNER)
+            val numFullChunks = (plaintextSize / CHUNK_SIZE).toInt()
+            val lastChunkSize = (plaintextSize % CHUNK_SIZE).toInt()
+            val totalChunks = if (lastChunkSize > 0) numFullChunks + 1 else numFullChunks
+            
+            // Ciphertext size = Plaintext + (16 bytes tag per chunk)
+            val ciphertextSize = plaintextSize + (totalChunks * 16)
+            
+            // 5. Cloud Upload via Streaming Channel
+            val supabase = supabaseProvider()
+            val bucket = supabase.storage["files"]
+            val remotePath = "${ownerId}/$fileId/original"
+            
+            val channel = CoroutineScope(Dispatchers.IO).writer {
+                val buffer = ByteArray(CHUNK_SIZE)
+                processedFile.inputStream().use { input ->
+                    var chunkIndex = 0
+                    var totalRead = 0L
+                    
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        
+                        val dataToEncrypt = if (read == CHUNK_SIZE) buffer else buffer.copyOf(read)
+                        val encryptedChunk = StorageCryptoService.encryptChunk(
+                            data = dataToEncrypt,
+                            key = fek,
+                            baseIv = baseIv,
+                            chunkIndex = chunkIndex,
+                            fileId = fileId
+                        )
+                        
+                        channel.writeFully(encryptedChunk)
+                        
+                        totalRead += read
+                        chunkIndex++
+                        onProgress(totalRead.toFloat() / plaintextSize)
+                    }
+                }
+            }.channel
+
+            bucket.upload(remotePath, UploadData(channel, ciphertextSize)) { upsert = true }
+            
+            // VERIFY ORIGINAL
+            try {
+                bucket.info(remotePath)
+                Log.i("FILE_PIPELINE", "ORIGINAL_UPLOAD_SUCCESS | remotePath=$remotePath")
+            } catch (e: Exception) {
+                Log.e("FILE_PIPELINE", "FAILED stage=VERIFY_ORIGINAL reason=Remote object not found after upload")
+                throw Exception("Upload verification failed")
+            }
+
+            // 6. Thumbnail Generation (Memory efficient)
+            var thumbnailRemotePath: String? = null
+            var thumbnailSize: Long? = null
+            var thumbnailWidth: Int? = null
+            var thumbnailHeight: Int? = null
+            var thumbnailIv: String? = null
+            var thumbnailLocalPath: String? = null
+            var thumbnailPlaintextSize: Long? = null
+
+            try {
+                val thumbBitmap = generateThumbnailBitmap(processedFile)
+                if (thumbBitmap != null) {
+                    Log.d("FILE_PIPELINE", "THUMBNAIL_GENERATION_SUCCESS")
+                    thumbnailWidth = thumbBitmap.width
+                    thumbnailHeight = thumbBitmap.height
+                    
+                    val thumbFile = File(context.cacheDir, "thumb_${fileId}.jpg")
+                    FileOutputStream(thumbFile).use { out ->
+                        thumbBitmap.compress(Bitmap.CompressFormat.JPEG, 70, out)
+                    }
+                    thumbnailLocalPath = thumbFile.absolutePath
+                    val thumbBytes = thumbFile.readBytes()
+                    thumbnailPlaintextSize = thumbBytes.size.toLong()
+                    
+                    // Encrypt Thumbnail (v2)
+                    val thumbBaseIv = StorageCryptoService.generateBaseIv()
+                    val encryptedThumb = StorageCryptoService.encryptChunk(
+                        data = thumbBytes,
+                        key = fek,
+                        baseIv = thumbBaseIv,
+                        chunkIndex = 0,
+                        fileId = fileId + "_thumb"
+                    )
+                    thumbnailSize = encryptedThumb.size.toLong()
+                    thumbnailIv = Base64.getEncoder().encodeToString(thumbBaseIv)
+                    
+                    val thumbRemotePath = "${ownerId}/$fileId/thumbnail"
+                    bucket.upload(thumbRemotePath, encryptedThumb) { upsert = true }
+                    
+                    thumbnailRemotePath = bucket.publicUrl(thumbRemotePath)
+                    Log.i("FILE_PIPELINE", "THUMBNAIL_UPLOAD_SUCCESS | remotePath=$thumbnailRemotePath")
+                }
+            } catch (e: Exception) {
+                Log.w("FILE_PIPELINE", "THUMBNAIL_FAILED | reason=${e.message}")
+            }
+
+            // 7. Metadata & Envelopes
             val wrappedFek = StorageCryptoService.wrapKey(fek, fpk)
             val ownerEnvelope = EncryptionEnvelope(
                 recipientId = "OWNER",
@@ -99,13 +194,14 @@ class FileUploadManager(
                 type = EnvelopeType.OWNER
             )
 
-            // 6. Encrypted Metadata
             val mimeType = context.contentResolver.getType(Uri.fromFile(processedFile)) ?: getMimeTypeFromFile(processedFile)
             val attributes = FileAttributes(
                 fileName = processedFile.name,
                 mimeType = mimeType,
                 originalName = file.name
             )
+            
+            // Attributes are still small, can use v1 style root encryption
             val encryptedAttributes = StorageCryptoService.encrypt(
                 Json.encodeToString(attributes).toByteArray(Charsets.UTF_8),
                 fek
@@ -113,38 +209,38 @@ class FileUploadManager(
 
             val fileMeta = FileEncryptionMetadata(
                 envelopes = listOf(ownerEnvelope),
-                fileIv = encryptedObj.iv,
-                encryptedAttributes = encryptedAttributes
+                fileIv = Base64.getEncoder().encodeToString(baseIv),
+                thumbnailIv = thumbnailIv,
+                encryptedAttributes = encryptedAttributes,
+                cryptoVersion = 2,
+                chunkSize = CHUNK_SIZE,
+                plaintextSize = plaintextSize,
+                thumbnailPlaintextSize = thumbnailPlaintextSize
             )
-
-            // 7. Cloud Upload (Opaque Path)
-            val supabase = supabaseProvider()
-            val bucket = supabase.storage["files"]
-            val storageUuid = UUID.randomUUID().toString()
-            val remotePath = "${ownerId}/$storageUuid" // Opaque random path
-            
-            bucket.upload(remotePath, encryptedBytes) {
-                upsert = true
-            }
-            val storagePath = bucket.publicUrl(remotePath)
 
             // 8. Database Record
             val dimensions = MediaUtils.getDimensions(context, Uri.fromFile(processedFile).toString())
+            val storagePath = bucket.publicUrl(remotePath)
             
             val newFile = com.keeftalk.chat.domain.model.File(
-                id = targetId,
+                id = fileId,
                 ownerId = ownerId,
                 storagePath = storagePath,
                 fileHash = hash,
                 fileName = null,
                 mimeType = null,
-                fileSize = encryptedBytes.size.toLong(),
+                fileSize = ciphertextSize, // Use ciphertext size for database column
                 fileType = getFileType(mimeType),
                 sourceType = sourceType,
                 width = dimensions?.width,
                 height = dimensions?.height,
                 duration = dimensions?.duration?.toInt(),
-                thumbnailPath = thumbnailPath,
+                thumbnailPath = thumbnailLocalPath,
+                thumbnailRemotePath = thumbnailRemotePath,
+                thumbnailLocalPath = thumbnailLocalPath,
+                thumbnailSize = thumbnailSize,
+                thumbnailWidth = thumbnailWidth,
+                thumbnailHeight = thumbnailHeight,
                 localPath = file.absolutePath,
                 encryptionMetadata = Json.encodeToString(fileMeta),
                 referenceCount = 1,
@@ -156,21 +252,31 @@ class FileUploadManager(
             )
 
             fileRepository.saveFile(newFile)
+            Log.i("FILE_PIPELINE", "COMPLETE | fileId=$fileId | plaintextSize=$plaintextSize | ciphertextSize=$ciphertextSize")
             Result.success(newFile)
         } catch (e: Exception) {
-            Log.e(TAG, "Secure upload failed", e)
+            Log.e("FILE_PIPELINE", "FAILED stage=uploadFile fileId=$fileId reason=${e.message}", e)
             Result.failure(e)
         }
     }
 
     private fun compressIfNeeded(file: File): File {
-        val mimeType = context.contentResolver.getType(Uri.fromFile(file))
-        if (mimeType?.startsWith("image") == true) {
+        val mimeType = getMimeTypeFromFile(file)
+        if ((mimeType?.startsWith("image") == true) && file.length() > (1024 * 1024)) { // Only compress images > 1MB
             try {
-                val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return file
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeFile(file.absolutePath, options)
+                
+                // Target around 1600px for "original" if it's huge
+                options.inSampleSize = calculateInSampleSize(options, 1600, 1600)
+                options.inJustDecodeBounds = false
+                
+                val bitmap = BitmapFactory.decodeFile(file.absolutePath, options) ?: return file
                 val compressedFile = File(context.cacheDir, "compressed_${file.name}")
                 FileOutputStream(compressedFile).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
                 }
                 return compressedFile
             } catch (e: Exception) { return file }
@@ -178,27 +284,95 @@ class FileUploadManager(
         return file
     }
 
-    private fun generateThumbnail(file: File): String? {
+    fun generateThumbnail(file: File): String? {
         return try {
-            val mimeType = context.contentResolver.getType(Uri.fromFile(file))
-            val bitmap = if (mimeType?.startsWith("video") == true) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    ThumbnailUtils.createVideoThumbnail(file, Size(200, 200), null)
-                } else {
-                    ThumbnailUtils.createVideoThumbnail(file.absolutePath, MediaStore.Video.Thumbnails.MINI_KIND)
-                }
-            } else if (mimeType?.startsWith("image") == true) {
-                ThumbnailUtils.extractThumbnail(BitmapFactory.decodeFile(file.absolutePath), 200, 200)
-            } else null
+            val bitmap = generateThumbnailBitmap(file) ?: return null
+            val thumbFile = File(context.cacheDir, "thumb_${UUID.randomUUID()}.jpg")
+            FileOutputStream(thumbFile).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, out)
+            }
+            thumbFile.absolutePath
+        } catch (e: Exception) { null }
+    }
 
-            bitmap?.let {
-                val thumbFile = File(context.cacheDir, "thumb_${file.name}.jpg")
-                FileOutputStream(thumbFile).use { out ->
-                    it.compress(Bitmap.CompressFormat.JPEG, 70, out)
+    private fun generateThumbnailBitmap(file: File): Bitmap? {
+        val maxThumbSize = 700
+        return try {
+            val mimeType = getMimeTypeFromFile(file)
+            val rawBitmap = when {
+                mimeType?.startsWith("video") == true -> {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        ThumbnailUtils.createVideoThumbnail(file, Size(maxThumbSize, maxThumbSize), null)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        ThumbnailUtils.createVideoThumbnail(file.absolutePath, MediaStore.Video.Thumbnails.MINI_KIND)
+                    }
                 }
-                thumbFile.absolutePath
+                mimeType?.startsWith("image") == true -> {
+                    val options = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                    }
+                    BitmapFactory.decodeFile(file.absolutePath, options)
+                    options.inSampleSize = calculateInSampleSize(options, maxThumbSize, maxThumbSize)
+                    options.inJustDecodeBounds = false
+                    BitmapFactory.decodeFile(file.absolutePath, options)
+                }
+                mimeType == "application/pdf" -> {
+                    generatePdfThumbnail(file)
+                }
+                else -> null
+            }
+
+            // Strictly enforce 700px max dimension while preserving aspect ratio
+            rawBitmap?.let { bmp ->
+                val width = bmp.width
+                val height = bmp.height
+                if (width > maxThumbSize || height > maxThumbSize) {
+                    val scale = maxThumbSize.toFloat() / maxOf(width, height)
+                    val newWidth = (width * scale).toInt()
+                    val newHeight = (height * scale).toInt()
+                    bmp.scale(newWidth, newHeight, true)
+                } else {
+                    bmp
+                }
+            }
+        } catch (e: Exception) { 
+            Log.w(tag, "generateThumbnailBitmap failed: ${e.message}")
+            null 
+        }
+    }
+
+    private fun generatePdfThumbnail(file: File): Bitmap? {
+        return try {
+            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(pfd)
+            if (renderer.pageCount > 0) {
+                val page = renderer.openPage(0)
+                val bitmap = Bitmap.createBitmap(page.width / 2, page.height / 2, Bitmap.Config.ARGB_8888)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                page.close()
+                renderer.close()
+                pfd.close()
+                bitmap
+            } else {
+                renderer.close()
+                pfd.close()
+                null
             }
         } catch (e: Exception) { null }
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.outHeight to options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     private fun calculateHMAC(file: File, key: javax.crypto.SecretKey): String {
@@ -216,17 +390,24 @@ class FileUploadManager(
     }
 
     private fun getFileType(mimeType: String?): FileType {
+        val type = mimeType?.lowercase() ?: ""
         return when {
-            mimeType?.startsWith("image") == true -> FileType.IMAGE
-            mimeType?.startsWith("video") == true -> FileType.VIDEO
-            mimeType?.startsWith("audio") == true -> FileType.AUDIO
-            mimeType?.contains("pdf") == true || mimeType?.contains("document") == true -> FileType.DOCUMENT
-            else -> FileType.OTHER
+            type.startsWith("image") -> FileType.IMAGE
+            type.startsWith("video") -> FileType.VIDEO
+            type.startsWith("audio") -> FileType.AUDIO
+            type.contains("pdf") || 
+            type.contains("msword") || 
+            type.contains("officedocument") || 
+            type.contains("text/plain") ||
+            type.contains("javascript") ||
+            type.contains("python") ||
+            type.contains("json") -> FileType.DOCUMENT
+            else -> FileType.OTHER // Includes zip, rar, etc.
         }
     }
 
     private fun getMimeTypeFromFile(file: File): String? {
         val extension = file.extension.lowercase()
-        return android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
     }
 }

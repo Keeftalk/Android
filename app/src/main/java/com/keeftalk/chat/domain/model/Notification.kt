@@ -8,7 +8,8 @@ enum class NotificationType {
     CONTACT_JOINED,
     BROADCAST,
     REMINDER,
-    NOTE_SHARE
+    NOTE_SHARE,
+    NUDGE
 }
 
 enum class NotificationPriority {
@@ -29,6 +30,7 @@ data class AppNotification(
     val data: NotificationData? = null,
     val expiresAt: Long? = null,
     val sourceId: String? = null,
+    val nudgeCount: Int = 1,
     val imageUrl: String? = null,
     val actionText: String? = null,
     val actionUrl: String? = null

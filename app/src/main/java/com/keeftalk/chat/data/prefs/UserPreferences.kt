@@ -65,6 +65,7 @@ data class UserPreferences(
     val phoneVisibility: String = "EVERYONE",
     val lastSeenVisibility: String = "EVERYONE",
     val onlineStatusVisibility: String = "EVERYONE",
+    val connectionsVisibility: String = "EVERYONE",
     val readReceiptsEnabled: Boolean = true,
     val typingIndicatorsEnabled: Boolean = true,
     val profileViewHistoryEnabled: Boolean = false,
@@ -87,5 +88,9 @@ data class UserPreferences(
     val lastChatSyncTimestamp: Long = 0L,
 
     // App Customization
-    val appCustomization: AppCustomization = AppCustomization()
+    val appCustomization: AppCustomization = AppCustomization(),
+
+    // Weather Settings
+    val weatherLocationMode: String = "AUTO", // "AUTO" or "MANUAL"
+    val weatherManualLocation: String? = null
 )

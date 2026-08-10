@@ -8,7 +8,7 @@
     <link rel="canonical" href="https://keeftalk.com/about.html">
     <link rel="icon" type="image/png" href="favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
     <script>
@@ -44,7 +44,7 @@
             <div class="flex justify-between h-20 items-center">
                 <a href="index.html" class="flex items-center space-x-2">
                     <div class="p-1">
-                        <img src="favicon.png" alt="Keeftalk Logo" class="w-10 h-10 object-contain">
+                        <img src="keeftalk_logo.png" alt="Keeftalk Logo" class="w-10 h-10 object-contain">
                     </div>
                     <span class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
                 </a>
@@ -78,6 +78,29 @@
                             <i class="fas fa-moon dark:hidden"></i>
                             <i class="fas fa-sun hidden dark:block"></i>
                         </button>
+
+                        <!-- Language Switcher -->
+                        <div class="relative group">
+                            <button class="flex items-center space-x-1 text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">
+                                <i class="fas fa-globe text-sm"></i>
+                                <span>English</span>
+                                <i class="fas fa-chevron-down text-xs"></i>
+                            </button>
+                            <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div class="py-2">
+                                    <a href="about.html" class="block px-4 py-2 text-sm font-bold text-brand-primary bg-slate-50 dark:bg-white/5">English</a>
+                                    <a href="zh/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">中文 (Mandarin)</a>
+                                    <a href="hi/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">हिन्दी (Hindi)</a>
+                                    <a href="es/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Español</a>
+                                    <a href="fr/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Français</a>
+                                    <a href="ar/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right" dir="rtl">العربية (Arabic)</a>
+                                    <a href="bn/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">বাংলা (Bengali)</a>
+                                    <a href="pt/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Português</a>
+                                    <a href="ru/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Русский (Russian)</a>
+                                    <a href="ur/index.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right" dir="rtl">اردو (Urdu)</a>
+                                </div>
+                            </div>
+                        </div>
                         <div class="relative group">
                             <button class="text-slate-400 dark:text-slate-500 font-medium transition flex items-center cursor-not-allowed">
                                 Login <span class="ml-1.5 text-[9px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-400 font-bold">SOON</span>
@@ -116,6 +139,43 @@
             </div>
             <a href="security.html" class="block text-lg font-medium text-slate-800 dark:text-white">Security</a>
             <a href="about.html" class="block text-lg font-medium text-slate-800 dark:text-white">About</a>
+
+            <!-- Mobile Language Selection -->
+            <div class="pt-4 border-t border-slate-100 dark:border-white/10">
+                <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Select Language</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <a href="about.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-brand-primary/30">
+                        <span class="text-xs font-bold text-brand-primary">English</span>
+                    </a>
+                    <a href="zh/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">中文 (ZH)</span>
+                    </a>
+                    <a href="hi/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">हिन्दी (HI)</span>
+                    </a>
+                    <a href="es/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Español (ES)</span>
+                    </a>
+                    <a href="fr/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Français (FR)</span>
+                    </a>
+                    <a href="ar/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">العربية (AR)</span>
+                    </a>
+                    <a href="bn/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">বাংলা (BN)</span>
+                    </a>
+                    <a href="pt/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Português (PT)</span>
+                    </a>
+                    <a href="ru/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Русский (RU)</span>
+                    </a>
+                    <a href="ur/index.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">اردو (UR)</span>
+                    </a>
+                </div>
+            </div>
             <div class="pt-4 border-t border-slate-100 dark:border-white/10">
                 <button class="w-full bg-slate-50 dark:bg-white/5 text-slate-400 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 cursor-not-allowed">
                     <i class="fas fa-globe"></i>
@@ -189,7 +249,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                 <div class="col-span-1 md:col-span-2">
                     <div class="flex items-center space-x-2 mb-6">
-                        <img src="favicon.png" alt="Keeftalk Logo" class="w-8 h-8 object-contain">
+                        <img src="keeftalk_logo.png" alt="Keeftalk Logo" class="w-8 h-8 object-contain">
                         <span class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
                     </div>
                     <p class="text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
@@ -230,9 +290,9 @@
                     &copy; 2026 Keeftalk. All rights reserved.
                 </div>
                 <div class="flex space-x-6">
-                    <a href="#" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-twitter"></i></a>
-                    <a href="#" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-github"></i></a>
-                    <a href="#" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-linkedin"></i></a>
+                    <a href="https://x.com/keeftalkapp" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-x-twitter"></i></a>
+                    <a href="https://facebook.com/keeftalk" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-facebook"></i></a>
+                    <a href="https://github.com/Keeftalk" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-github"></i></a>
                 </div>
             </div>
         </div>

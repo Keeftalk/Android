@@ -143,6 +143,7 @@ fun ChatContainersRow(
 @Composable
 fun ChatListContent(
     chatsPager: Flow<androidx.paging.PagingData<com.keeftalk.chat.domain.model.ChatListItemUiModel>>,
+    typingStatuses: Flow<Map<String, Set<String>>>,
     displayChats: List<com.keeftalk.chat.domain.model.ChatListItemUiModel>,
     currentUserId: String,
     onChatClick: (String) -> Unit,
@@ -338,6 +339,7 @@ fun ChatListContent(
                     ) {
                         ChatListRecyclerView(
                             chatsPager = chatsPager,
+                            typingStatuses = typingStatuses,
                             currentUserId = currentUserId,
                             onChatClick = onChatClick,
                             onChatLongClick = { selectedChatForMenu = it },
@@ -389,6 +391,7 @@ fun ChatListContent(
 @Composable
 fun ChatListRecyclerView(
     chatsPager: Flow<androidx.paging.PagingData<com.keeftalk.chat.domain.model.ChatListItemUiModel>>,
+    typingStatuses: Flow<Map<String, Set<String>>>,
     currentUserId: String,
     onChatClick: (String) -> Unit,
     onChatLongClick: (com.keeftalk.chat.domain.model.ChatListItemUiModel) -> Unit,
@@ -407,9 +410,15 @@ fun ChatListRecyclerView(
         )
     }
 
-    LaunchedEffect(chatsPager) {
+    LaunchedEffect(chatsPager, adapter) {
         chatsPager.collectLatest { 
             adapter.submitData(lifecycle, it)
+        }
+    }
+
+    LaunchedEffect(typingStatuses, adapter) {
+        typingStatuses.collectLatest {
+            adapter.updateTypingStatuses(it)
         }
     }
 
@@ -555,9 +564,10 @@ fun ChatItem(
                     Text(
                         text = chat.name,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = if (chat.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
-                            fontSize = 17.sp,
-                            letterSpacing = (-0.1).sp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            letterSpacing = (-0.2).sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -592,7 +602,7 @@ fun ChatItem(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp
+                                fontSize = 15.sp
                             )
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -610,8 +620,9 @@ fun ChatItem(
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = if (chat.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                fontWeight = if (chat.unreadCount > 0) FontWeight.Medium else FontWeight.Normal,
-                                fontSize = 14.sp
+                                fontWeight = FontWeight.Normal,
+                                fontSize = 15.sp,
+                                letterSpacing = 0.sp
                             ),
                             modifier = Modifier.weight(1f)
                         )

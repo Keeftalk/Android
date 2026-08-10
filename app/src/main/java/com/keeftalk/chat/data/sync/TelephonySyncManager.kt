@@ -15,6 +15,10 @@ import com.keeftalk.chat.domain.repository.ChatRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+
 class TelephonySyncManager(
     private val context: Context,
     private val smsDao: SmsDao,
@@ -43,6 +47,10 @@ class TelephonySyncManager(
     }
 
     fun syncThreads() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            Log.w("TelephonySyncManager", "Missing READ_SMS permission, skipping sync")
+            return
+        }
         scope.launch {
             try {
                 val threads = fetchThreadsFromProvider()

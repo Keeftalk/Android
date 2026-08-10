@@ -22,6 +22,7 @@ data class NotificationDto(
     @Serializable(with = TimestampSerializer::class)
     @SerialName("expires_at") val expiresAt: Long? = null,
     @SerialName("source_id") val sourceId: String? = null,
+    @SerialName("nudge_count") val nudgeCount: Int = 1,
     @Serializable(with = TimestampSerializer::class)
     @SerialName("created_at") val createdAt: Long = 0
 ) {
@@ -46,7 +47,8 @@ data class NotificationDto(
             isRead = isRead,
             data = dataObj,
             expiresAt = expiresAt,
-            sourceId = sourceId
+            sourceId = sourceId,
+            nudgeCount = nudgeCount
         )
     }
 }

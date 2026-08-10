@@ -61,15 +61,15 @@ interface MessageDao {
     fun getMessagesForChatWithReactionsPaging(chatId: String): androidx.paging.PagingSource<Int, MessageWithReactions>
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE chatId = :chatId AND decryptionState = 'SUCCESS' AND type IN ('IMAGE', 'VIDEO', 'VOICE', 'FILE', 'PDF') ORDER BY timestamp DESC")
+    @Query("SELECT * FROM messages WHERE chatId = :chatId AND decryptionState = 'SUCCESS' AND (type IN ('IMAGE', 'VIDEO', 'VOICE', 'FILE', 'PDF') OR type = 'SHARED_VAULT_FILE') ORDER BY timestamp DESC")
     fun getMediaMessagesForChatPaging(chatId: String): androidx.paging.PagingSource<Int, MessageWithReactions>
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE decryptionState = 'SUCCESS' AND type IN ('FILE', 'PDF') ORDER BY timestamp DESC")
+    @Query("SELECT * FROM messages WHERE decryptionState = 'SUCCESS' AND (type IN ('FILE', 'PDF') OR type = 'SHARED_VAULT_FILE') ORDER BY timestamp DESC")
     fun getAllSharedDocumentsPaging(): androidx.paging.PagingSource<Int, MessageWithReactions>
 
     @Transaction
-    @Query("SELECT * FROM messages WHERE decryptionState = 'SUCCESS' AND type IN ('FILE', 'PDF') ORDER BY timestamp DESC LIMIT 50")
+    @Query("SELECT * FROM messages WHERE decryptionState = 'SUCCESS' AND (type IN ('FILE', 'PDF') OR type = 'SHARED_VAULT_FILE') ORDER BY timestamp DESC LIMIT 50")
     fun getAllSharedDocumentsOnce(): List<MessageWithReactions>
 
     @Transaction
@@ -84,7 +84,7 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE chatId = :chatId AND decryptionState = 'SUCCESS' ORDER BY timestamp DESC, id DESC LIMIT :limit")
     suspend fun getLatestMessagesWithReactionsOnce(chatId: String, limit: Int): List<MessageWithReactions>
 
-    @Query("SELECT id FROM messages WHERE chatId = :chatId AND decryptionState = 'SUCCESS' AND type IN ('IMAGE', 'VIDEO', 'VOICE', 'FILE', 'PDF') ORDER BY timestamp DESC")
+    @Query("SELECT id FROM messages WHERE chatId = :chatId AND decryptionState = 'SUCCESS' AND (type IN ('IMAGE', 'VIDEO', 'VOICE', 'FILE', 'PDF') OR type = 'SHARED_VAULT_FILE') ORDER BY timestamp DESC")
     suspend fun getMediaMessageIds(chatId: String): List<String>
 
     @Query("SELECT id FROM messages WHERE chatId = :chatId AND senderId = :senderId AND status = 'SEEN' ORDER BY timestamp DESC LIMIT 1")

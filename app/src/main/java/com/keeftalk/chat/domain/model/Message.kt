@@ -29,9 +29,11 @@ data class Message(
     val fileName: String? get() = attachments.firstOrNull()?.fileName
     val fileSize: Long? get() = attachments.firstOrNull()?.fileSize
     val localFilePath: String? get() = attachments.firstOrNull()?.localPath
-    val thumbnailUrl: String? get() = attachments.firstOrNull()?.thumbnailPath
+    val thumbnailUrl: String? get() = attachments.firstOrNull()?.thumbnailLocalPath ?: attachments.firstOrNull()?.thumbnailRemotePath
     val width: Int? get() = attachments.firstOrNull()?.width
     val height: Int? get() = attachments.firstOrNull()?.height
+
+    val effectiveFileType: FileType? get() = attachments.firstOrNull()?.fileType
 }
 
 @Stable

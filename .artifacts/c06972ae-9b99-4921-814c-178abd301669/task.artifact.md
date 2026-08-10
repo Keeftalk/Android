@@ -1,0 +1,4 @@
+- `[x]` Add Early Access Testing button to Hero section in `index.html`
+- `[x]` Create "Join Early Access" section in `index.html`
+- `[x]` Update "Get App" link in navbar
+- `[x]` Verify responsiveness and links

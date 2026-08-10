@@ -11,7 +11,8 @@ enum class KeeftalkModule {
     NOTES,
     EMAIL,
     VAULT,
-    WALLET
+    WALLET,
+    FEED
 }
 
 @Serializable
@@ -39,7 +40,8 @@ data class AppCustomization(
     ),
     val bottomNavTabs: List<KeeftalkModule> = listOf(
         KeeftalkModule.CHATS,
-        KeeftalkModule.CALLS
+        KeeftalkModule.CALLS,
+        KeeftalkModule.VAULT
     ),
     val enabledFabActions: Set<FabAction> = setOf(
         FabAction.NEW_CHAT,
@@ -62,7 +64,7 @@ data class AppCustomization(
                 KeeftalkModule.AGENDA,
                 KeeftalkModule.NOTES,
                 KeeftalkModule.EMAIL,
-                KeeftalkModule.VAULT
+                KeeftalkModule.VAULT,
             )
         )
         
@@ -80,6 +82,7 @@ fun KeeftalkModule.toLabel(): String = when(this) {
     KeeftalkModule.EMAIL -> "Email"
     KeeftalkModule.VAULT -> "Vault"
     KeeftalkModule.WALLET -> "Wallet"
+    KeeftalkModule.FEED -> "Feed"
 }
 
 fun KeeftalkModule.toIcon(icons: com.keeftalk.chat.ui.theme.AppIcons, chatTab: Int = 0): androidx.compose.ui.graphics.vector.ImageVector = when(this) {
@@ -91,6 +94,7 @@ fun KeeftalkModule.toIcon(icons: com.keeftalk.chat.ui.theme.AppIcons, chatTab: I
     KeeftalkModule.EMAIL -> icons.email
     KeeftalkModule.VAULT -> icons.lock
     KeeftalkModule.WALLET -> icons.wallet
+    KeeftalkModule.FEED -> icons.feed
 }
 
 fun KeeftalkModule.toAppScreen(): com.keeftalk.chat.AppScreen = when(this) {
@@ -102,4 +106,5 @@ fun KeeftalkModule.toAppScreen(): com.keeftalk.chat.AppScreen = when(this) {
     KeeftalkModule.EMAIL -> com.keeftalk.chat.AppScreen.Email
     KeeftalkModule.VAULT -> com.keeftalk.chat.AppScreen.Vault
     KeeftalkModule.WALLET -> com.keeftalk.chat.AppScreen.Wallet
+    KeeftalkModule.FEED -> com.keeftalk.chat.AppScreen.Feed
 }

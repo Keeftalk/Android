@@ -393,7 +393,7 @@ fun EmailDrawerContent(
                 icon = { 
                     KeeftalkAvatar(
                         avatarUrl = account.profilePicUrl,
-                        initials = getInitials(account.displayName),
+                        initials = com.keeftalk.chat.util.AvatarUtils.getInitials(account.displayName),
                         seed = account.emailAddress,
                         size = 24.dp
                     )
@@ -681,7 +681,7 @@ fun EmailItem(
                 Box(contentAlignment = Alignment.Center) {
                     KeeftalkAvatar(
                         avatarUrl = message.senderProfilePicUrl,
-                        initials = getInitials(message.senderName),
+                        initials = com.keeftalk.chat.util.AvatarUtils.getInitials(message.senderName),
                         seed = message.senderEmail,
                         size = 40.dp
                     )
@@ -812,15 +812,6 @@ fun EmailItemPlaceholder() {
             }
         }
     }
-}
-
-private fun getInitials(name: String): String {
-    return name.split(" ")
-        .filter { it.isNotEmpty() }
-        .mapNotNull { it.firstOrNull() }
-        .take(2)
-        .joinToString("")
-        .uppercase()
 }
 
 private fun formatTimestamp(timestamp: Long): String {

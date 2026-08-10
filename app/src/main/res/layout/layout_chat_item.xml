@@ -11,22 +11,27 @@
 
     <FrameLayout
         android:id="@+id/avatar_container"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
         android:layout_centerVertical="true">
 
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/avatar"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:padding="2dp"
             android:scaleType="centerCrop"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.Keeftalk.Circle"
+            app:strokeColor="@android:color/white"
+            app:strokeWidth="2dp"
             tools:src="@tools:sample/avatars" />
 
         <TextView
             android:id="@+id/avatar_initials"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
             android:gravity="center"
             android:textColor="@android:color/white"
             android:textSize="20sp"
@@ -152,8 +157,11 @@
                 android:id="@+id/status_indicator"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:padding="1dp"
                 android:scaleType="centerCrop"
                 app:shapeAppearanceOverlay="@style/ShapeAppearance.Keeftalk.Circle"
+                app:strokeColor="@android:color/white"
+                app:strokeWidth="1dp"
                 tools:src="@drawable/ic_status_sent_eye"
                 tools:visibility="visible" />
 

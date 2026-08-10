@@ -13,6 +13,7 @@ data class UserPrivacySettings(
     val profileViewHistoryEnabled: Boolean = false,
     val callPermission: PrivacyVisibility = PrivacyVisibility.EVERYONE,
     val groupPermission: PrivacyVisibility = PrivacyVisibility.EVERYONE,
+    val connectionsVisibility: PrivacyVisibility = PrivacyVisibility.EVERYONE,
     val screenshotProtectionEnabled: Boolean = false,
     val biometricLockEnabled: Boolean = false,
     val biometricTimeoutMinutes: Int = 0

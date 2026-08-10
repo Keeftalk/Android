@@ -19,6 +19,7 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.serialization.kotlinx.json.json
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.keeftalk.chat.util.PerformanceProfiler
 import android.os.SystemClock
@@ -113,6 +114,9 @@ object AppModule {
     private var emailAuthManager: com.keeftalk.chat.feature.email.auth.EmailAuthManager? = null
 
     @Volatile
+    private var cloudAuthManager: com.keeftalk.chat.data.auth.CloudAuthManager? = null
+
+    @Volatile
     @set:android.annotation.SuppressLint("StaticFieldLeak")
     private var telephonySyncManager: com.keeftalk.chat.data.sync.TelephonySyncManager? = null
 
@@ -130,6 +134,32 @@ object AppModule {
 
     @Volatile
     private var fileDownloadManager: com.keeftalk.chat.util.FileDownloadManager? = null
+
+    @Volatile
+    private var relationshipRepository: com.keeftalk.chat.domain.repository.RelationshipRepository? = null
+
+    @Volatile
+    private var cloudImportCoordinator: com.keeftalk.chat.util.CloudImportCoordinator? = null
+
+    @Volatile
+    private var cloudSecureStore: com.keeftalk.chat.data.local.CloudSecureStore? = null
+
+    @Volatile
+    private var googlePhotosService: com.keeftalk.chat.data.cloud.GooglePhotosService? = null
+
+    @Volatile
+    private var googleDriveService: com.keeftalk.chat.data.cloud.GoogleDriveService? = null
+
+    val cloudImportResultFlow = kotlinx.coroutines.flow.MutableSharedFlow<List<String>>(extraBufferCapacity = 1)
+
+    @Volatile
+    private var dropboxService: com.keeftalk.chat.data.cloud.DropboxService? = null
+
+    @Volatile
+    private var feedRepository: com.keeftalk.chat.domain.repository.FeedRepository? = null
+
+    @Volatile
+    private var locationService: com.keeftalk.chat.domain.service.LocationService? = null
 
     @Volatile
     private var supabaseClient: SupabaseClient? = null
@@ -345,7 +375,20 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_71_72,
                             KeeftalkDatabase.MIGRATION_72_73,
                             KeeftalkDatabase.MIGRATION_73_74,
-                            KeeftalkDatabase.MIGRATION_82_83
+                            KeeftalkDatabase.MIGRATION_82_83,
+                            KeeftalkDatabase.MIGRATION_83_84,
+                            KeeftalkDatabase.MIGRATION_84_85,
+                            KeeftalkDatabase.MIGRATION_85_86,
+                            KeeftalkDatabase.MIGRATION_86_87,
+                            KeeftalkDatabase.MIGRATION_87_88,
+                            KeeftalkDatabase.MIGRATION_88_89,
+                            KeeftalkDatabase.MIGRATION_89_90,
+                            KeeftalkDatabase.MIGRATION_90_91,
+                            KeeftalkDatabase.MIGRATION_91_92,
+                            KeeftalkDatabase.MIGRATION_92_93,
+                            KeeftalkDatabase.MIGRATION_93_94,
+                            KeeftalkDatabase.MIGRATION_94_95,
+                            KeeftalkDatabase.MIGRATION_95_96
                         )
                         .openHelperFactory(factory)
                         .addCallback(object : RoomDatabase.Callback() {
@@ -371,8 +414,11 @@ object AppModule {
                     Log.i("AppModule", "Database opened successfully.")
                 } catch (e: Exception) {
                     val msg = e.message ?: ""
-                    if (msg.contains("file is not a database") || msg.contains("corrupt")) {
-                        Log.e("AppModule", "Database corruption detected! Attempting recovery by clearing database.", e)
+                    val isCorrupt = msg.contains("file is not a database") || msg.contains("corrupt")
+                    val isMigrationError = e is IllegalStateException && msg.contains("Migration didn't properly handle")
+                    
+                    if (isCorrupt || isMigrationError) {
+                        Log.e("AppModule", "Database error detected (Corrupt=$isCorrupt, MigrationError=$isMigrationError). Attempting recovery by clearing database.", e)
                         newDb.close()
                         context.deleteDatabase(dbName)
                         // Re-build a fresh one
@@ -530,11 +576,13 @@ object AppModule {
                 chatSettingsRepository?.shutdown()
                 appCustomizationRepository?.shutdown()
                 privacyRepository?.shutdown()
+                relationshipRepository?.shutdown()
                 securityRepository?.shutdown()
                 calendarRepository?.shutdown()
                 noteRepository?.shutdown()
                 vaultRepository?.shutdown()
                 emailRepository?.shutdown()
+                feedRepository?.shutdown()
                 callLogManager?.shutdown()
                 backgroundSyncManager?.shutdown()
                 telephonySyncManager?.stopSync()
@@ -609,6 +657,7 @@ object AppModule {
             chatSettingsRepository = null
             appCustomizationRepository = null
             mediaRepository = null
+            relationshipRepository = null
             mediaExportPipeline = null
             noteRepository = null
             vaultRepository = null
@@ -619,6 +668,8 @@ object AppModule {
             walletRepository = null
             emailRepository = null
             emailAuthManager = null
+            feedRepository = null
+            locationService = null
             telephonySyncManager = null
             backgroundSyncManager = null
             conversationKeyManager = null
@@ -827,6 +878,12 @@ object AppModule {
         }
     }
 
+    fun provideCloudAuthManager(context: Context): com.keeftalk.chat.data.auth.CloudAuthManager {
+        return cloudAuthManager ?: synchronized(this) {
+            cloudAuthManager ?: com.keeftalk.chat.data.auth.CloudAuthManager(context.applicationContext).also { cloudAuthManager = it }
+        }
+    }
+
     fun provideTelephonySyncManager(context: Context): com.keeftalk.chat.data.sync.TelephonySyncManager {
         return telephonySyncManager ?: synchronized(this) {
             telephonySyncManager ?: com.keeftalk.chat.data.sync.TelephonySyncManager(
@@ -842,7 +899,8 @@ object AppModule {
             backgroundSyncManager ?: com.keeftalk.chat.data.sync.BackgroundSyncManager(
                 context.applicationContext,
                 provideChatRepository(context),
-                provideCalendarRepository(context)
+                provideCalendarRepository(context),
+                provideVaultRepository(context)
             ).also { backgroundSyncManager = it }
         }
     }
@@ -873,7 +931,6 @@ object AppModule {
             fileUploadManager ?: com.keeftalk.chat.util.FileUploadManager(
                 context.applicationContext,
                 provideFileRepository(context),
-                provideCryptoManager(context),
                 { provideSupabaseClientAsync(context) }
             ).also { fileUploadManager = it }
         }
@@ -886,6 +943,88 @@ object AppModule {
                 provideCryptoManager(context),
                 { provideSupabaseClientAsync(context) }
             ).also { fileDownloadManager = it }
+        }
+    }
+
+    fun provideRelationshipRepository(context: Context): com.keeftalk.chat.domain.repository.RelationshipRepository {
+        return relationshipRepository ?: synchronized(this) {
+            relationshipRepository ?: com.keeftalk.chat.data.repository.RelationshipRepositoryImpl(
+                context.applicationContext,
+                provideChatRepository(context),
+                providePrivacyRepository(context),
+                provideDatabase(context).relationshipDao()
+            ).also { relationshipRepository = it }
+        }
+    }
+
+    fun provideCloudImportCoordinator(context: Context): com.keeftalk.chat.util.CloudImportCoordinator {
+        return cloudImportCoordinator ?: synchronized(this) {
+            cloudImportCoordinator ?: com.keeftalk.chat.util.CloudImportCoordinator(
+                context.applicationContext,
+                provideVaultRepository(context)
+            ).also { cloudImportCoordinator = it }
+        }
+    }
+
+    fun provideCloudSecureStore(context: Context): com.keeftalk.chat.data.local.CloudSecureStore {
+        return cloudSecureStore ?: synchronized(this) {
+            cloudSecureStore ?: com.keeftalk.chat.data.local.CloudSecureStore(context.applicationContext).also { cloudSecureStore = it }
+        }
+    }
+
+    fun provideGooglePhotosService(context: Context): com.keeftalk.chat.data.cloud.GooglePhotosService {
+        return googlePhotosService ?: synchronized(this) {
+            googlePhotosService ?: run {
+                val client = io.ktor.client.HttpClient(io.ktor.client.engine.okhttp.OkHttp) {
+                    install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                        json(kotlinx.serialization.json.Json { ignoreUnknownKeys = true })
+                    }
+                }
+                com.keeftalk.chat.data.cloud.GooglePhotosService(client)
+            }.also { googlePhotosService = it }
+        }
+    }
+
+    fun provideGoogleDriveService(context: Context): com.keeftalk.chat.data.cloud.GoogleDriveService {
+        return googleDriveService ?: synchronized(this) {
+            googleDriveService ?: run {
+                val client = io.ktor.client.HttpClient(io.ktor.client.engine.okhttp.OkHttp) {
+                    install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                        json(kotlinx.serialization.json.Json { ignoreUnknownKeys = true })
+                    }
+                }
+                com.keeftalk.chat.data.cloud.GoogleDriveService(client)
+            }.also { googleDriveService = it }
+        }
+    }
+
+    fun provideDropboxService(): com.keeftalk.chat.data.cloud.DropboxService {
+        return dropboxService ?: synchronized(this) {
+            dropboxService ?: com.keeftalk.chat.data.cloud.DropboxService().also { dropboxService = it }
+        }
+    }
+
+    fun provideFeedRepository(context: Context): com.keeftalk.chat.domain.repository.FeedRepository {
+        return feedRepository ?: synchronized(this) {
+            feedRepository ?: run {
+                val db = provideDatabase(context)
+                com.keeftalk.chat.data.repository.FeedRepositoryImpl(
+                    context.applicationContext,
+                    db.feedDao(),
+                    okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(30, TimeUnit.SECONDS)
+                        .readTimeout(30, TimeUnit.SECONDS)
+                        .build(),
+                    provideLocationService(context),
+                    provideUserPreferencesRepository(context)
+                )
+            }.also { feedRepository = it }
+        }
+    }
+
+    fun provideLocationService(context: Context): com.keeftalk.chat.domain.service.LocationService {
+        return locationService ?: synchronized(this) {
+            locationService ?: com.keeftalk.chat.data.service.LocationServiceImpl(context.applicationContext).also { locationService = it }
         }
     }
 }

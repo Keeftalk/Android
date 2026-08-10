@@ -563,11 +563,20 @@ fun ChatDetailBottomSheets(
         }
         DocumentPickerBottomSheet(
             viewModel = docViewModel,
-            onDismiss = onDismissDocumentPicker,
+            onDismiss = {
+                docViewModel.clearSelection()
+                onDismissDocumentPicker()
+            },
             onUnlockFullAccess = onUnlockFullAccess,
             onBrowseSystem = onBrowseSystemDocuments,
-            onNext = { onReviewDocuments(it.toList()) },
-            onSend = { onSendDocuments(listOf(it.uri)) }
+            onNext = { 
+                onReviewDocuments(it.toList())
+                docViewModel.clearSelection()
+            },
+            onSend = { 
+                onSendDocuments(listOf(it.uri))
+                docViewModel.clearSelection()
+            }
         )
     }
 }
@@ -867,10 +876,18 @@ fun ChatDetailContent(
         }
 
         if (showMessageContextMenu && selectedMessageForInteractions != null) {
-            val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+            val clipboard = androidx.compose.ui.platform.LocalClipboard.current
             MessageContextMenu(
                 onDismiss = { showMessageContextMenu = false },
-                onCopy = { clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedMessageForInteractions!!.content)) },
+                onCopy = { 
+                    val content = selectedMessageForInteractions?.content ?: ""
+                    scope.launch {
+                        clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(
+                            android.content.ClipData.newPlainText("text", content)
+                        ))
+                    }
+                    showMessageContextMenu = false
+                },
                 onForward = { showForwardDialog = true },
                 onReply = { replyingToMessage = selectedMessageForInteractions },
                 onTranslate = { onTranslateMessage(selectedMessageForInteractions!!.id) },

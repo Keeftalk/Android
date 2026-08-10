@@ -1,8 +1,9 @@
 package com.keeftalk.chat.ui.vault
 
+import androidx.compose.ui.graphics.toArgb
+
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,13 +31,115 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.keeftalk.chat.domain.model.VaultItem
-import com.keeftalk.chat.domain.model.VaultStorageInfo
-import com.keeftalk.chat.domain.model.FileType
+import com.keeftalk.chat.R
+import com.keeftalk.chat.domain.model.*
+import com.keeftalk.chat.ui.components.EncryptedThumbnail
+
+fun getIconForTab(tab: VaultTab): ImageVector {
+    return when (tab) {
+        VaultTab.HOME -> Icons.Default.Dashboard
+        VaultTab.FOLDERS -> Icons.Default.Folder
+        VaultTab.CHATS -> Icons.AutoMirrored.Filled.Chat
+        VaultTab.NOTES -> Icons.AutoMirrored.Filled.StickyNote2
+        VaultTab.AGENDA -> Icons.Default.Event
+        VaultTab.DOCUMENTS -> Icons.Default.Description
+        VaultTab.FAVORITES -> Icons.Default.Star
+        VaultTab.SHARED -> Icons.Default.Share
+        VaultTab.TRASH -> Icons.Default.Delete
+    }
+}
+
+@Composable
+fun VaultBreadcrumbs(
+    path: List<VaultFolder>,
+    onBreadcrumbClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Vault Root
+        Text(
+            text = "Vault",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (path.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (path.isEmpty()) FontWeight.Bold else FontWeight.Medium,
+            modifier = Modifier.clickable { onBreadcrumbClick(-1) }
+        )
+        
+        path.forEachIndexed { index, folder ->
+            Icon(
+                Icons.Default.ChevronRight, 
+                null, 
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                modifier = Modifier.size(16.dp).padding(horizontal = 4.dp)
+            )
+            Text(
+                text = folder.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (index == path.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (index == path.size - 1) FontWeight.Bold else FontWeight.Medium,
+                modifier = Modifier.clickable { onBreadcrumbClick(index) },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+
+
+@Composable
+fun RecentSectionHeader(
+    title: String,
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Surface(
+            onClick = onToggleSelection,
+            shape = CircleShape,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.size(24.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (isSelected) {
+                    Icon(
+                        Icons.Default.Check, 
+                        null, 
+                        tint = Color.White, 
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun VaultCategoryChip(
@@ -77,7 +180,6 @@ fun VaultStorageCard(
     info: VaultStorageInfo?,
     onAnalyzeClick: () -> Unit
 ) {
-    val limit = 5L * 1024 * 1024 * 1024 // 5GB
     Surface(
         modifier = Modifier
             .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -99,13 +201,13 @@ fun VaultStorageCard(
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Storage, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.CloudQueue, null, tint = MaterialTheme.colorScheme.primary)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("Cloud Storage", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                         Text(
-                            text = formatVaultSize(info?.totalUsed ?: 0),
+                            text = formatVaultSize(info?.cloudBytesUsed ?: 0),
                             color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black)
                         )
@@ -124,7 +226,8 @@ fun VaultStorageCard(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            val progress = (info?.totalUsed?.toFloat() ?: 0f) / limit.toFloat()
+            val limit = info?.cloudBytesLimit ?: 5L * 1024 * 1024 * 1024
+            val progress = (info?.cloudBytesUsed?.toFloat() ?: 0f) / limit.toFloat()
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -134,7 +237,7 @@ fun VaultStorageCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(progress.coerceIn(0.05f, 1f))
+                        .fillMaxWidth(progress.coerceIn(0f, 1f)) // Accurate progress, no minimum 0.05f
                         .fillMaxHeight()
                         .background(Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)))
                 )
@@ -144,11 +247,16 @@ fun VaultStorageCard(
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    text = "${formatVaultSize(info?.totalUsed ?: 0)} of ${formatVaultSize(limit)} used",
+                    text = "${formatVaultSize(info?.cloudBytesUsed ?: 0)} of ${formatVaultSize(limit)} used",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
-                Text("Upgrade Plan", color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.clickable { })
+                Text(
+                    text = "%.1f%%".format(progress * 100),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
             }
         }
     }
@@ -246,11 +354,11 @@ fun VaultBottomNavigation(
 @Composable
 fun VaultPieChart(
     info: VaultStorageInfo?,
-    limit: Long,
     modifier: Modifier = Modifier
 ) {
+    val limit = info?.cloudBytesLimit ?: VAULT_STORAGE_LIMIT
     val categories = info?.categories ?: emptyMap()
-    val totalUsed = info?.totalUsed ?: 0L
+    val totalUsed = info?.cloudBytesUsed ?: 0L
     val usedPercentage = (totalUsed.toFloat() / limit.toFloat() * 100).coerceIn(0f, 100f)
 
     val animatedProgress = remember { Animatable(0f) }
@@ -275,7 +383,9 @@ fun VaultPieChart(
             var startAngle = -90f
             
             // Sort categories to have a consistent visual order
-            val sortedCategories = categories.toList().sortedByDescending { it.second }
+            val sortedCategories = categories.asSequence()
+                .sortedByDescending { it.value }
+                .toList()
 
             sortedCategories.forEach { (type, size) ->
                 val sweepAngle = (size.toFloat() / limit.toFloat() * 360f) * animatedProgress.value
@@ -311,7 +421,7 @@ fun VaultPieChart(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "OF 5 GB USED",
+                text = "OF ${formatVaultSize(limit).uppercase()} USED",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
@@ -323,10 +433,12 @@ fun VaultPieChart(
 @Composable
 fun VaultStorageAnalyzer(
     info: VaultStorageInfo?,
+    tips: List<VaultStorageTip> = emptyList(),
+    onReviewTip: (VaultStorageTip) -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    val limit = 5L * 1024 * 1024 * 1024 // 5GB
-    val totalUsed = info?.totalUsed ?: 0L
+    val limit = info?.cloudBytesLimit ?: VAULT_STORAGE_LIMIT
+    val totalUsed = info?.cloudBytesUsed ?: 0L
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -337,7 +449,8 @@ fun VaultStorageAnalyzer(
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 48.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -347,13 +460,13 @@ fun VaultStorageAnalyzer(
                 modifier = Modifier.align(Alignment.Start)
             )
             Text(
-                text = "Detailed breakdown of your secured data",
+                text = "Detailed breakdown of your cloud storage",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 24.dp).align(Alignment.Start)
             )
 
-            VaultPieChart(info = info, limit = limit, modifier = Modifier.padding(vertical = 16.dp))
+            VaultPieChart(info = info, modifier = Modifier.padding(vertical = 16.dp))
             
             Spacer(modifier = Modifier.height(24.dp))
             
@@ -371,6 +484,14 @@ fun VaultStorageAnalyzer(
                 }
                 
                 StorageBreakdownRow(
+                    label = "Trash",
+                    size = info?.trashBytesUsed ?: 0L,
+                    limit = limit,
+                    color = MaterialTheme.colorScheme.error,
+                    icon = Icons.Default.DeleteOutline
+                )
+
+                StorageBreakdownRow(
                     label = "Free Space",
                     size = (limit - totalUsed).coerceAtLeast(0),
                     limit = limit,
@@ -379,30 +500,71 @@ fun VaultStorageAnalyzer(
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Smart Recommendation
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
-            ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.secondary)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Storage Tip", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Move large videos to the cloud to free up 1.2 GB", 
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    TextButton(onClick = { }) {
-                        Text("Review")
-                    }
+            if (tips.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(32.dp))
+                Text(
+                    text = "RECOMMENDATIONS",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start).padding(bottom = 12.dp)
+                )
+                
+                tips.forEach { tip ->
+                    VaultStorageTipItem(tip = tip) { onReviewTip(tip) }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun VaultStorageTipItem(
+    tip: VaultStorageTip,
+    onReviewClick: () -> Unit
+) {
+    val backgroundColor = when(tip.severity) {
+        TipSeverity.CRITICAL -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        TipSeverity.WARNING -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+        TipSeverity.INFO -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        else -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+    }
+    
+    val iconColor = when(tip.severity) {
+        TipSeverity.CRITICAL -> MaterialTheme.colorScheme.error
+        TipSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
+        TipSeverity.INFO -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.secondary
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = backgroundColor,
+        border = BorderStroke(1.dp, iconColor.copy(alpha = 0.2f))
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = when(tip.severity) {
+                    TipSeverity.CRITICAL -> Icons.Default.Report
+                    TipSeverity.WARNING -> Icons.Default.Warning
+                    TipSeverity.INFO -> Icons.Default.AutoAwesome
+                    else -> Icons.Default.AutoAwesome
+                },
+                contentDescription = null,
+                tint = iconColor
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(tip.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    tip.description, 
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onReviewClick) {
+                Text(tip.actionLabel, color = iconColor, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -454,7 +616,7 @@ fun StorageBreakdownRow(
 
 private fun getFileTypeFromVaultType(type: com.keeftalk.chat.domain.model.VaultItemType): FileType {
     return when(type) {
-        com.keeftalk.chat.domain.model.VaultItemType.PHOTO -> FileType.IMAGE
+        VaultItemType.PHOTO -> FileType.IMAGE
         com.keeftalk.chat.domain.model.VaultItemType.VIDEO -> FileType.VIDEO
         com.keeftalk.chat.domain.model.VaultItemType.AUDIO -> FileType.AUDIO
         com.keeftalk.chat.domain.model.VaultItemType.DOCUMENT -> FileType.DOCUMENT
@@ -463,46 +625,146 @@ private fun getFileTypeFromVaultType(type: com.keeftalk.chat.domain.model.VaultI
 }
 
 @Composable
-fun VaultItemGrid(
+fun VaultItemSimpleGrid(
     item: VaultItem,
-    onClick: () -> Unit
+    isSelected: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "scale")
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clickable(interactionSource = interactionSource, indication = null) { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+            .combinedClickable(
+                interactionSource = interactionSource, 
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(16.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(
+            1.dp, 
+            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.05f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (item.metadata["isFolder"] == "true") {
+                            val colorInt = item.metadata["color"]?.toIntOrNull()
+                            if (colorInt != null) Color(colorInt).copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f)
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (item.metadata["isFolder"] == "true") {
+                    val colorInt = item.metadata["color"]?.toIntOrNull()
+                    Icon(
+                        Icons.Default.Folder, 
+                        contentDescription = null, 
+                        modifier = Modifier.size(32.dp),
+                        tint = if (colorInt != null) Color(colorInt) else MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    EncryptedThumbnail(
+                        file = item.file,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = item.title,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun VaultItemGrid(
+    item: VaultItem,
+    isSelected: Boolean = false,
+    showMetadata: Boolean = true,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "scale")
+
+    // Use actual aspect ratio if available, otherwise default to 1f
+    val width = item.file?.width?.toFloat() ?: 1f
+    val height = item.file?.height?.toFloat() ?: 1f
+    val ratio = (width / height).coerceIn(0.6f, 2.5f)
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .combinedClickable(
+                interactionSource = interactionSource, 
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(if (showMetadata) 24.dp else 12.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) 
+                else if (showMetadata) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                else Color.Transparent,
+        border = BorderStroke(
+            1.dp, 
+            if (isSelected) MaterialTheme.colorScheme.primary 
+            else if (showMetadata) MaterialTheme.colorScheme.outline.copy(alpha = 0.05f)
+            else Color.Transparent
+        )
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .let { 
+                        if (showMetadata) it.aspectRatio(ratio)
+                        else it.fillMaxWidth().aspectRatio(ratio) 
+                    }
+                    .padding(if (showMetadata) 8.dp else 0.dp)
+                    .clip(RoundedCornerShape(if (showMetadata) 18.dp else 24.dp))
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (item.file?.thumbnailPath != null) {
-                    AsyncImage(
-                        model = item.file.thumbnailPath,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                if (item.metadata["isFolder"] == "true") {
+                    val colorInt = item.metadata["color"]?.toIntOrNull()
+                    Icon(
+                        Icons.Default.Folder, 
+                        contentDescription = null, 
+                        modifier = Modifier.size(56.dp),
+                        tint = if (colorInt != null) Color(colorInt) else MaterialTheme.colorScheme.primary
                     )
                 } else {
-                    Icon(
-                        imageVector = getVaultIconForType(item.file?.fileType), 
-                        contentDescription = null, 
-                        modifier = Modifier.size(44.dp),
-                        tint = getVaultIconColorForType(item.file?.fileType)
+                    EncryptedThumbnail(
+                        file = item.file,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop // Tightly packed gallery requirement
                     )
                 }
                 
@@ -519,19 +781,40 @@ fun VaultItemGrid(
                     }
                 }
             }
-            Column(modifier = Modifier.padding(start = 16.dp, end = 12.dp, bottom = 16.dp, top = 4.dp)) {
-                Text(
-                    text = item.title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = formatVaultSize(item.file?.fileSize ?: 0),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall
-                )
+            
+            if (showMetadata) {
+                Column(modifier = Modifier.padding(start = 16.dp, end = 12.dp, bottom = 16.dp, top = 4.dp)) {
+                    Text(
+                        text = item.title,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (item.metadata["isFolder"] == "true") {
+                        val itemCount = item.metadata["itemCount"]?.toIntOrNull()
+                        val totalSize = item.metadata["totalSize"]?.toLongOrNull() ?: 0L
+                        
+                        Text(
+                            text = buildString {
+                                itemCount?.let { append("$it items") }
+                                if (totalSize > 0) {
+                                    if (isNotEmpty()) append(" • ")
+                                    append(formatVaultSize(totalSize))
+                                }
+                                if (isEmpty()) append("Folder")
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    } else {
+                        Text(
+                            text = formatVaultSize(item.file?.fileSize ?: 0),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
             }
         }
     }
@@ -540,17 +823,26 @@ fun VaultItemGrid(
 @Composable
 fun VaultItemList(
     item: VaultItem,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
-    onMoreClick: () -> Unit
+    onLongClick: () -> Unit = {},
+    onMoreClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .fillMaxWidth()
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(
+            1.dp, 
+            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.05f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -560,15 +852,31 @@ fun VaultItemList(
                 modifier = Modifier
                     .size(54.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f)),
+                    .background(
+                        if (item.metadata["isFolder"] == "true") {
+                            val colorInt = item.metadata["color"]?.toIntOrNull()
+                            if (colorInt != null) Color(colorInt).copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f)
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = getVaultIconForType(item.file?.fileType),
-                    contentDescription = null,
-                    modifier = Modifier.size(26.dp),
-                    tint = getVaultIconColorForType(item.file?.fileType)
-                )
+                if (item.metadata["isFolder"] == "true") {
+                    val colorInt = item.metadata["color"]?.toIntOrNull()
+                    Icon(
+                        Icons.Default.Folder, 
+                        contentDescription = null, 
+                        modifier = Modifier.size(28.dp),
+                        tint = if (colorInt != null) Color(colorInt) else MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    EncryptedThumbnail(
+                        file = item.file,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -577,11 +885,25 @@ fun VaultItemList(
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                 )
-                Text(
-                    text = "${item.file?.fileType?.name ?: "UNKNOWN"} • ${formatVaultSize(item.file?.fileSize ?: 0)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall
-                )
+                if (item.metadata["isFolder"] == "true") {
+                    val itemCount = item.metadata["itemCount"]?.toIntOrNull()
+                    val totalSize = item.metadata["totalSize"]?.toLongOrNull() ?: 0L
+                    Text(
+                        text = buildString {
+                            append("Folder")
+                            if (itemCount != null) append(" • $itemCount items")
+                            if (totalSize > 0) append(" • ${formatVaultSize(totalSize)}")
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                } else {
+                    Text(
+                        text = "${item.file?.fileType?.name ?: "UNKNOWN"} • ${formatVaultSize(item.file?.fileSize ?: 0)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
             IconButton(onClick = onMoreClick) {
                 Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -615,65 +937,13 @@ fun formatVaultSize(size: Long): String {
     val mb = kb / 1024.0
     val gb = mb / 1024.0
     return when {
-        gb >= 1 -> "%.1f GB".format(gb)
-        mb >= 1 -> "%.1f MB".format(mb)
+        gb >= 1 -> "%.2f GB".format(gb)
+        mb >= 1 -> "%.2f MB".format(mb)
         else -> "%.0f KB".format(kb)
     }
 }
 
-@Composable
-fun PremiumSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { 
-                    Text(
-                        "Search vault...", 
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    ) 
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                ),
-                singleLine = true
-            )
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-    }
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -752,6 +1022,45 @@ enum class VaultAction {
     OPEN, SEND_INTERNAL, COPY, CUT, DOWNLOAD, TOGGLE_FAVORITE, SHARE, MOVE_TO_TRASH, RENAME, INFO, RESTORE, DELETE_PERMANENT
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VaultFolderActionsBottomSheet(
+    folder: VaultFolder,
+    onDismiss: () -> Unit,
+    onAction: (VaultAction) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(bottom = 32.dp, start = 20.dp, end = 20.dp)
+                .fillMaxWidth()
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 24.dp)) {
+                Box(
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(folder.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Folder", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            VaultActionItem("Open", Icons.AutoMirrored.Filled.OpenInNew, MaterialTheme.colorScheme.onSurface) { onAction(VaultAction.OPEN) }
+            VaultActionItem("Rename", Icons.Default.Edit, MaterialTheme.colorScheme.onSurface) { onAction(VaultAction.RENAME) }
+            VaultActionItem("Move", Icons.AutoMirrored.Filled.DriveFileMove, MaterialTheme.colorScheme.onSurface) { onAction(VaultAction.CUT) } // Reusing CUT as Move trigger
+            VaultActionItem("Delete", Icons.Default.Delete, MaterialTheme.colorScheme.error) { onAction(VaultAction.MOVE_TO_TRASH) }
+        }
+    }
+}
+
 @Composable
 fun VaultFileInfoDialog(
     item: VaultItem,
@@ -785,88 +1094,126 @@ fun InfoRow(label: String, value: String) {
     }
 }
 
-@Composable
-fun CloudImportBanner(
-    onImportClick: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "bannerGlow")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "glow"
-    )
 
-    Surface(
+@Composable
+fun EmptyFolderState(
+    onUploadClick: () -> Unit,
+    onCreateFolderClick: () -> Unit
+) {
+    Column(
         modifier = Modifier
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = alpha))
+            .fillMaxWidth()
+            .padding(top = 80.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box {
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(32.dp)
-            ) {
+        Surface(
+            modifier = Modifier.size(80.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Dismiss",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    modifier = Modifier.size(18.dp)
+                    imageVector = Icons.Default.FolderOpen,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
                 )
             }
-            
-            Row(
-                modifier = Modifier.padding(24.dp),
-                verticalAlignment = Alignment.CenterVertically
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "This folder is empty",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Upload files or create a new folder to get started.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Button(
+                onClick = onUploadClick,
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .background(
-                            Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)), 
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.CloudQueue, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                }
-                
-                Spacer(modifier = Modifier.width(20.dp))
-                
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Bring your souvenirs to life",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Securely import from Google Photos",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Surface(
-                    onClick = onImportClick,
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.height(44.dp)
-                ) {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
-                        Text("Import", fontWeight = FontWeight.ExtraBold, color = Color.White)
-                    }
-                }
+                Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Upload")
+            }
+            
+            OutlinedButton(
+                onClick = onCreateFolderClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.CreateNewFolder, null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("New Folder")
             }
         }
+    }
+}
+
+@Composable
+fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 80.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            modifier = Modifier.size(80.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = when {
+                        tab == VaultTab.TRASH -> Icons.Default.Delete
+                        selectedCategory == FileType.IMAGE -> Icons.Default.PhotoLibrary
+                        selectedCategory == FileType.VIDEO -> Icons.Default.VideoLibrary
+                        selectedCategory == FileType.DOCUMENT -> Icons.Default.Description
+                        tab == VaultTab.HOME -> Icons.Default.History
+                        else -> Icons.Default.FolderOpen
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        val title = when {
+            tab == VaultTab.TRASH -> "Trash is empty"
+            selectedCategory != null -> "No ${selectedCategory.name.lowercase()}s found"
+            tab == VaultTab.HOME -> "No recent files"
+            else -> "No files found"
+        }
+        
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        val description = when {
+            tab == VaultTab.TRASH -> "Deleted items will appear here for 30 days."
+            selectedCategory != null -> "Try clearing the category filter to see all files."
+            tab == VaultTab.HOME -> "Your recently uploaded files will appear here."
+            else -> "Files you secure in ${tab.name.lowercase()} will appear here."
+        }
+        
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }
 
@@ -908,7 +1255,7 @@ fun ChatPickerDialog(
 
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     val filteredChats = chats.filter { it.displayName.contains(searchQuery, ignoreCase = true) }
-                    val filteredContacts = contacts.filter { (it.name ?: it.username).contains(searchQuery, ignoreCase = true) }
+                    val filteredContacts = contacts.filter { it.name.contains(searchQuery, ignoreCase = true) }
 
                     if (filteredChats.isNotEmpty()) {
                         item {
@@ -945,7 +1292,7 @@ fun ChatPickerDialog(
                         filteredContacts.forEach { user ->
                             item(key = "user_${user.id}") {
                                 ChatPickerItem(
-                                    title = user.name ?: user.username,
+                                    title = user.name,
                                     isSelected = selectedChats.contains(user.id), // In this app, chat id for DMs often equals user id or maps to it
                                     onClick = {
                                         if (selectedChats.contains(user.id)) selectedChats.remove(user.id)
@@ -1077,6 +1424,272 @@ fun VaultSortItem(
             )
             if (isSelected) {
                 Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+val PREMIUM_FOLDER_COLORS = listOf(
+    Color(0xFF2E7D32), // Emerald
+    Color(0xFF1565C0), // Midnight Blue
+    Color(0xFFC62828), // Ruby
+    Color(0xFF6A1B9A), // Amethyst
+    Color(0xFFAD1457), // Rose
+    Color(0xFFEF6C00), // Amber
+    Color(0xFF37474F), // Slate
+    Color(0xFF00695C), // Teal
+    Color(0xFF5D4037)  // Coffee
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VaultNewFolderDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, Color) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    var selectedColor by remember { mutableStateOf(PREMIUM_FOLDER_COLORS.random()) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 48.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = "New Folder",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Secure your items with zero-knowledge encryption",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Folder Name") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = selectedColor,
+                    focusedLabelColor = selectedColor
+                )
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "PREMIUM COLOR",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                PREMIUM_FOLDER_COLORS.forEach { color ->
+                    val isSelected = color == selectedColor
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .clickable { selectedColor = color }
+                            .let {
+                                if (isSelected) it.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                else it
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = { onConfirm(text, selectedColor) },
+                enabled = text.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = selectedColor)
+            ) {
+                Text("Create Secure Folder", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VaultEditFolderDialog(
+    folder: VaultFolder,
+    onDismiss: () -> Unit,
+    onConfirm: (String, Color) -> Unit
+) {
+    var text by remember { mutableStateOf(folder.name) }
+    var selectedColor by remember { 
+        mutableStateOf(folder.color?.let { Color(it) } ?: PREMIUM_FOLDER_COLORS.random()) 
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 48.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = "Edit Folder",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Update folder name or change its premium color",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Folder Name") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = selectedColor,
+                    focusedLabelColor = selectedColor
+                )
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "CHANGE COLOR",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                PREMIUM_FOLDER_COLORS.forEach { color ->
+                    val isSelected = color == selectedColor
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .clickable { selectedColor = color }
+                            .let {
+                                if (isSelected) it.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                else it
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = { onConfirm(text, selectedColor) },
+                enabled = text.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = selectedColor)
+            ) {
+                Text("Save Changes", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VaultCloudImportBottomSheet(
+    onDismiss: () -> Unit,
+    onOptionSelected: (String) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 48.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = "Cloud Import",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            val options: List<Pair<String, Int>> = listOf(
+                "Google Drive" to R.drawable.igoogle_drive_96,
+                "Google Photos" to R.drawable.google_photos_96,
+                "Device Files" to R.drawable.icloud_96, // Use a generic file icon or something similar
+                "Dropbox" to R.drawable.dropbox_96,
+                "OneDrive" to R.drawable.microsoft_onedrive_96
+            )
+
+            options.forEach { (name, iconRes) ->
+                Surface(
+                    onClick = { onOptionSelected(name) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = iconRes,
+                            contentDescription = name,
+                            modifier = Modifier.size(32.dp).clip(CircleShape),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.weight(1f))
+                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                    }
+                }
             }
         }
     }

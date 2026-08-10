@@ -23,6 +23,7 @@ data class NotificationEntity(
     val noteId: String? = null,
     val expiresAt: Long? = null,
     val sourceId: String? = null,
+    val nudgeCount: Int = 1,
     val imageUrl: String? = null,
     val actionText: String? = null,
     val actionUrl: String? = null
@@ -45,6 +46,7 @@ data class NotificationEntity(
             ),
             expiresAt = expiresAt,
             sourceId = sourceId,
+            nudgeCount = nudgeCount,
             imageUrl = imageUrl,
             actionText = actionText,
             actionUrl = actionUrl
@@ -68,6 +70,7 @@ data class NotificationEntity(
                 noteId = notification.data?.noteId,
                 expiresAt = notification.expiresAt,
                 sourceId = notification.sourceId,
+                nudgeCount = notification.nudgeCount,
                 imageUrl = notification.imageUrl,
                 actionText = notification.actionText,
                 actionUrl = notification.actionUrl

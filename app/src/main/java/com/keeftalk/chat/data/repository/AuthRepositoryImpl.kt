@@ -226,6 +226,9 @@ class AuthRepositoryImpl(
         val supabase = getSupabase()
         supabase.auth.refreshCurrentSession()
         Result.success(Unit)
+    } catch (e: IllegalStateException) {
+        Log.w(TAG, "Failed to refresh session: ${e.message}")
+        Result.failure(e)
     } catch (e: Exception) {
         Log.e(TAG, "Failed to refresh session", e)
         Result.failure(e)

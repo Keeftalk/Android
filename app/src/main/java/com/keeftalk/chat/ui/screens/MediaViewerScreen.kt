@@ -254,6 +254,13 @@ fun MediaItemView(
         MessageType.VIDEO -> VideoViewer(uri = mediaUri, onToggleControls = onToggleControls, initialPlaybackPosition = initialPlaybackPosition)
         MessageType.VOICE -> AudioViewer(uri = mediaUri)
         MessageType.FILE -> FileViewer(message = message)
+        MessageType.SHARED_VAULT_FILE -> {
+            when (message.effectiveFileType) {
+                com.keeftalk.chat.domain.model.FileType.IMAGE -> ImageViewer(uri = mediaUri, onToggleControls = onToggleControls)
+                com.keeftalk.chat.domain.model.FileType.VIDEO -> VideoViewer(uri = mediaUri, onToggleControls = onToggleControls, initialPlaybackPosition = initialPlaybackPosition)
+                else -> FileViewer(message = message)
+            }
+        }
         else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Unsupported media type", color = Color.White)
         }

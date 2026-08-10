@@ -63,7 +63,7 @@ data class FileDto(
     @SerialName("file_type") val fileType: String? = null,
     val width: Int? = null,
     val height: Int? = null,
-    @SerialName("encryption_metadata") val encryptionMetadata: String? = null
+    @SerialName("encryption_metadata") val encryptionMetadata: kotlinx.serialization.json.JsonElement? = null
 )
 
 @Serializable

@@ -322,7 +322,14 @@ class CallListViewModel(
             val currentInput = _dialerInput.value
             if (currentInput.isEmpty()) return@launch
 
-            if (android.telephony.PhoneNumberUtils.isEmergencyNumber(currentInput)) {
+            val isEmergency = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                app.getSystemService(android.telephony.TelephonyManager::class.java).isEmergencyNumber(currentInput)
+            } else {
+                @Suppress("DEPRECATION")
+                android.telephony.PhoneNumberUtils.isEmergencyNumber(currentInput)
+            }
+
+            if (isEmergency) {
                 _events.emit(DialerEvent.LaunchGsmCall(currentInput))
                 return@launch
             }

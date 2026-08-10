@@ -13,8 +13,11 @@ import com.keeftalk.chat.data.local.CallLogManager
 import com.keeftalk.chat.domain.repository.SmsMessage
 import com.keeftalk.chat.domain.repository.SmsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 private const val TAG = "KEEFTALK_PROFILE"
 
@@ -26,6 +29,7 @@ class ProfileViewModel(
     private val phoneNumberService: PhoneNumberService,
     private val callLogManager: CallLogManager,
     private val smsRepository: SmsRepository,
+    private val relationshipRepository: com.keeftalk.chat.domain.repository.RelationshipRepository,
     private val userId: String? = null
 ) : ViewModel() {
 
@@ -34,7 +38,7 @@ class ProfileViewModel(
 
     val callHistory: Flow<List<CallLogEntry>> = combine(profile, callLogManager.getUnifiedCallLog()) { p, logs ->
         if (p == null) emptyList()
-        else logs.filter { it.peerId == p.id || it.number == p.phone }
+        else logs.filter { (it.peerId == p.id) || (it.number == p.phone) }
     }
 
     val smsHistory: Flow<List<SmsMessage>> = profile.flatMapLatest { p ->
@@ -48,7 +52,7 @@ class ProfileViewModel(
         }
     }
 
-    private val _isEditing = MutableStateFlow(false)
+    private val _isEditing = MutableStateFlow(value = false)
     val isEditing: StateFlow<Boolean> = _isEditing.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
@@ -59,8 +63,15 @@ class ProfileViewModel(
 
     private val _usernameAvailable = MutableStateFlow<Boolean?>(null)
     val usernameAvailable: StateFlow<Boolean?> = _usernameAvailable.asStateFlow()
+
+    val relationship: StateFlow<com.keeftalk.chat.domain.model.Relationship?> = 
+        if (userId == null) MutableStateFlow(null).asStateFlow()
+        else relationshipRepository.getCachedRelationship(userId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     
     private var currentUserId: String? = null
+    private var nudgeBatchJob: Job? = null
+    private var pendingNudgeCount = 0
 
     val currentCountry = countryService.currentRegion
 
@@ -73,6 +84,8 @@ class ProfileViewModel(
         if (userId != null) {
             viewModelScope.launch {
                 chatRepository.reportProfileView(userId)
+                // Fetch in background to update cache
+                relationshipRepository.getRelationship(userId)
             }
         }
         loadProfile()
@@ -211,6 +224,27 @@ class ProfileViewModel(
             authRepository.checkUsernameAvailability(username).onSuccess {
                 _usernameAvailable.value = it
             }
+        }
+    }
+
+    fun onNudgeClick() {
+        val targetId = userId ?: _profile.value?.id ?: return
+        
+        pendingNudgeCount++
+        nudgeBatchJob?.cancel()
+        
+        nudgeBatchJob = viewModelScope.launch {
+            delay(2.seconds) // Wait for 2 seconds of inactivity
+            val countToUpload = pendingNudgeCount
+            pendingNudgeCount = 0
+            
+            _isLoading.value = true
+            relationshipRepository.sendNudge(targetId, countToUpload).onSuccess {
+                relationshipRepository.getRelationship(targetId)
+            }.onFailure {
+                _error.value = "Failed to nudge user: ${it.message}"
+            }
+            _isLoading.value = false
         }
     }
 

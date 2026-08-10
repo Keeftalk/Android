@@ -35,6 +35,7 @@ fun ArchivedChatsScreen(
     ) { innerPadding ->
         ChatListContent(
             chatsPager = viewModel.archivedChatsPager,
+            typingStatuses = viewModel.typingStatuses,
             displayChats = archivedChats,
             currentUserId = myId,
             onChatClick = onChatClick,

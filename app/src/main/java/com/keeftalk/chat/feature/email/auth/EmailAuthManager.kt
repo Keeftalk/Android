@@ -19,18 +19,23 @@ class EmailAuthManager(private val context: Context) {
 
     // --- Google OAuth ---
 
-    fun getGoogleSignInIntent(): Intent {
+    fun getGoogleSignInIntent(extraScopes: List<String> = emptyList()): Intent {
         android.util.Log.d("EmailAuthManager", "Building GoogleSignInOptions with Web Client ID: $GMAIL_WEB_CLIENT_ID")
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        val builder = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .requestProfile()
             .requestServerAuthCode(GMAIL_WEB_CLIENT_ID)
             .requestIdToken(GMAIL_WEB_CLIENT_ID)
-            .requestScopes(Scope("https://www.googleapis.com/auth/gmail.readonly"))
-            .requestScopes(Scope("https://www.googleapis.com/auth/gmail.send"))
-            .requestScopes(Scope("https://www.googleapis.com/auth/gmail.modify"))
-            .build()
 
+        if (extraScopes.isEmpty()) {
+            builder.requestScopes(Scope("https://www.googleapis.com/auth/gmail.readonly"))
+            builder.requestScopes(Scope("https://www.googleapis.com/auth/gmail.send"))
+            builder.requestScopes(Scope("https://www.googleapis.com/auth/gmail.modify"))
+        } else {
+            extraScopes.forEach { builder.requestScopes(Scope(it)) }
+        }
+
+        val gso = builder.build()
         val client = GoogleSignIn.getClient(context, gso)
         // Ensure we sign out first to force account picker for testing
         client.signOut()

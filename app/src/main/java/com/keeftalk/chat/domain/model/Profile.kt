@@ -28,6 +28,8 @@ data class Profile(
     @Serializable(with = TimestampSerializer::class)
     @SerialName("last_seen")
     val lastSeen: Long = 0L,
+    @SerialName("views_count")
+    val viewsCount: Long = 0L,
     val privacy: PrivacySettings = PrivacySettings(),
     @SerialName("notification_settings")
     val notifications: com.keeftalk.chat.data.prefs.NotificationPreferences = com.keeftalk.chat.data.prefs.NotificationPreferences()

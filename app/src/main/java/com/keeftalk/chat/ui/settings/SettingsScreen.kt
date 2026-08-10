@@ -39,6 +39,7 @@ fun SettingsScreen(
     onAccessibilityClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     onHelpClick: () -> Unit = {},
+    onTestScreensPreviewClick: () -> Unit = {},
     title: String = "Settings"
 ) {
     val prefs by viewModel.userPreferences.collectAsState()
@@ -193,6 +194,18 @@ fun SettingsScreen(
                         subtitle = "Sign out of your account",
                         contentColor = MaterialTheme.colorScheme.error,
                         onClick = { showLogoutDialog = true },
+                        showDivider = false
+                    )
+                }
+            }
+
+            item {
+                SettingsSection(title = "Development") {
+                    SettingsItem(
+                        icon = Icons.Default.Science,
+                        title = "Test Screens Preview",
+                        subtitle = "Preview new UI components",
+                        onClick = onTestScreensPreviewClick,
                         showDivider = false
                     )
                 }

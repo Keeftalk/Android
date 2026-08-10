@@ -9,6 +9,9 @@ interface FileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFile(file: FileEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFiles(files: List<FileEntity>)
+
     @Update
     suspend fun updateFile(file: FileEntity)
 
@@ -49,13 +52,13 @@ interface FileDao {
     @Query("DELETE FROM message_attachment WHERE message_id = :messageId AND file_id = :fileId")
     suspend fun deleteMessageAttachment(messageId: String, fileId: String)
 
-    @Query("SELECT * FROM files INNER JOIN message_attachment ON files.id = message_attachment.file_id WHERE message_attachment.message_id = :messageId")
+    @Query("SELECT files.* FROM files INNER JOIN message_attachment ON files.id = message_attachment.file_id WHERE message_attachment.message_id = :messageId")
     suspend fun getFilesForMessage(messageId: String): List<FileEntity>
     
-    @Query("SELECT * FROM files INNER JOIN note_attachment ON files.id = note_attachment.file_id WHERE note_attachment.note_id = :noteId")
+    @Query("SELECT files.* FROM files INNER JOIN note_attachment ON files.id = note_attachment.file_id WHERE note_attachment.note_id = :noteId")
     suspend fun getFilesForNote(noteId: String): List<FileEntity>
 
-    @Query("SELECT * FROM files INNER JOIN agenda_attachment ON files.id = agenda_attachment.file_id WHERE agenda_attachment.agenda_event_id = :eventId")
+    @Query("SELECT files.* FROM files INNER JOIN agenda_attachment ON files.id = agenda_attachment.file_id WHERE agenda_attachment.agenda_event_id = :eventId")
     suspend fun getFilesForAgendaEvent(eventId: String): List<FileEntity>
 
     @Query("SELECT COUNT(*) FROM message_attachment WHERE file_id = :fileId")
@@ -76,6 +79,18 @@ interface FileDao {
     @Query("UPDATE files SET local_path = :path WHERE id = :id")
     suspend fun updateLocalPath(id: String, path: String)
 
+    @Query("UPDATE files SET thumbnail_local_path = :path WHERE id = :id")
+    suspend fun updateThumbnailLocalPath(id: String, path: String)
+
+    @Query("UPDATE files SET thumbnail_remote_path = :path, thumbnail_size = :size, thumbnail_width = :width, thumbnail_height = :height WHERE id = :id")
+    suspend fun updateThumbnailRemoteMetadata(id: String, path: String, size: Long, width: Int?, height: Int?)
+
+    @Query("UPDATE files SET file_name = :fileName, mime_type = :mimeType WHERE id = :id")
+    suspend fun updateFileDetails(id: String, fileName: String?, mimeType: String?)
+
     @Query("SELECT id FROM files")
     suspend fun getAllFileIds(): List<String>
+
+    @Query("SELECT SUM(file_size + IFNULL(thumbnail_size, 0)) FROM files WHERE owner_id = :userId AND status != 'DELETED'")
+    fun getAccountCloudBytesFlow(userId: String): Flow<Long?>
 }

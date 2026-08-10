@@ -1,13 +1,6 @@
-- [x] Update `KeyManager.kt` for context-based restoration
-- [x] Initialize `KeyManager` in `KeeftalkApplication.kt`
-- [x] Add proactive restoration in `ConversationKeyManager.kt`
-- [x] Add proactive restoration in `FileUploadManager.kt`
-- [x] Update `fix_security_rls.sql` with `verification_tag` column
-- [x] Add robust AEK initialization in `AuthRepositoryImpl.kt`
-- [x] Add `isPersisted` to `KeyManager.kt`
-- [x] Add `user_id` to `ConversationKeyEntity.kt` and update index
-- [x] Update `ConversationKeyDao.kt` for user isolation
-- [x] Update `ConversationKeyManager.kt` to sync with `user_id`
-- [x] Implement Room migration 82 -> 83 in `KeeftalkDatabase.kt`
-- [x] Update SQL schema files
-- [x] Verify AEK restoration & login logic
+- [x] Fix decryption by preferring authenticated downloads in `FileRepositoryImpl`
+- [x] Add `refresh()` and auto-fetch logic to `VaultViewModel`
+- [x] Add `PullToRefreshBox` to `VaultScreen`
+- [x] Improve error handling and logging in `ChatRepositoryImpl.shareVaultFileToChat`
+- [ ] Verify Vault thumbnails and refresh
+- [ ] Verify Shared Vault file appearance in Chat

@@ -43,13 +43,14 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.*
 import java.util.*
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.time.Duration.Companion.milliseconds
 import android.os.Environment
 import android.net.Uri
+import javax.crypto.SecretKey
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import io.github.jan.supabase.postgrest.query.Order
@@ -82,6 +83,7 @@ class ChatRepositoryImpl(
     private val typingUsers = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     
     private var messagesChannel: RealtimeChannel? = null
+    private var isObservingRealtime = false
 
     private suspend fun getSupabase(): SupabaseClient {
         return AppModule.provideSupabaseClientAsync(context)
@@ -110,6 +112,12 @@ class ChatRepositoryImpl(
 
     override val allChats: StateFlow<List<Chat>> = chatDao.getAllChats()
         .map { entities -> entities.map { it.toDomainInternal() } }
+        .distinctUntilChangedBy { it.map { c -> c.id + c.lastTimestamp + (c.avatarUrl ?: "") + c.displayName } }
+        .onEach { chats ->
+            // Use a small delay to avoid spamming the system during rapid activity
+            delay(200)
+            com.keeftalk.chat.util.SharingShortcutsManager.updateShortcuts(context, chats)
+        }
         .stateIn(repositoryScope, SharingStarted.Eagerly, emptyList())
 
     override fun startBackgroundTasks() {
@@ -186,6 +194,9 @@ class ChatRepositoryImpl(
     }
 
     private fun observeRealtimeChanges() {
+        if (isObservingRealtime) return
+        isObservingRealtime = true
+        
         repositoryScope.launch {
             try {
                 Log.i("CHAT_PIPELINE", "REALTIME_SUBSCRIBE_START")
@@ -273,6 +284,39 @@ class ChatRepositoryImpl(
                     }
                 }.launchIn(this)
                 membersChannel.subscribe()
+
+                // Observe notifications for internal bell icon updates
+                val notifChannel = supabase.realtime.channel("public:notifications")
+                notifChannel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                    table = "notifications"
+                }.onEach { action ->
+                    try {
+                        when (action) {
+                            is PostgresAction.Insert -> {
+                                val recipientId = action.record["user_id"]?.jsonPrimitive?.content ?: return@onEach
+                                if (recipientId != userId) return@onEach
+                                val dto = action.decodeRecord<NotificationDto>()
+                                notificationDao.insertNotification(NotificationEntity.fromDomain(dto.toDomain()))
+                                Log.d("CHAT_PIPELINE", "REALTIME_NOTIFICATION_INSERT | id=${dto.id}")
+                            }
+                            is PostgresAction.Update -> {
+                                val recipientId = action.record["user_id"]?.jsonPrimitive?.content ?: return@onEach
+                                if (recipientId != userId) return@onEach
+                                val dto = action.decodeRecord<NotificationDto>()
+                                notificationDao.insertNotification(NotificationEntity.fromDomain(dto.toDomain()))
+                                Log.d("CHAT_PIPELINE", "REALTIME_NOTIFICATION_UPDATE | id=${dto.id}")
+                            }
+                            is PostgresAction.Delete -> {
+                                val id = action.oldRecord["id"]?.jsonPrimitive?.content ?: return@onEach
+                                notificationDao.deleteNotification(id)
+                            }
+                            else -> {}
+                        }
+                    } catch (e: Exception) {
+                        Log.e("CHAT_PIPELINE", "REALTIME_NOTIFICATION_ERROR | error=${e.message}")
+                    }
+                }.launchIn(this)
+                notifChannel.subscribe()
 
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -473,7 +517,7 @@ class ChatRepositoryImpl(
                 }
                 if (timestampUpdated) messageDao.updateMessageTimestamp(dto.id, timestamp)
                 if (needsDecryptionUpdate) {
-                    Log.d(TAG, "[$source] Updating previously encrypted message with decrypted content: ${dto.id}")
+                    Log.d(TAG, "[$source] Updating previously encrypted message with decrypted content: ${dto.id} | prevState=${existingMessage.decryptionState}")
                     messageDao.updateMessageContent(dto.id, decryptedContent)
                     messageDao.updateDecryptionState(dto.id, DecryptionState.SUCCESS, existingMessage.retryCount)
                     
@@ -484,7 +528,7 @@ class ChatRepositoryImpl(
                             // In PART 3, we store the wrapped FEK inside the encryption_metadata JSON
                             // We need to parse existing or create new FileEncryptionMetadata
                             val currentMeta = try {
-                                file.encryptionMetadata?.let { Json.decodeFromString<FileEncryptionMetadata>(it) }
+                                file.encryptionMetadata?.let { Json.decodeFromJsonElement<FileEncryptionMetadata>(it) }
                             } catch (e: Exception) { null }
                             
                             val pck = AppModule.provideConversationKeyManager(context).getOrLoadKey(dto.chatId)
@@ -497,7 +541,7 @@ class ChatRepositoryImpl(
                                     fileIv = mediaIv,
                                     encryptedAttributes = currentMeta?.encryptedAttributes
                                 )
-                                fileDao.updateFile(file.copy(encryptionMetadata = Json.encodeToString(newFileMeta)))
+                                fileDao.updateFile(file.copy(encryptionMetadata = Json.encodeToJsonElement(newFileMeta)))
                             }
                         }
                     }
@@ -519,7 +563,7 @@ class ChatRepositoryImpl(
             }
             
             // Check if we need to fetch missing attachments for an existing message (e.g. from Sync)
-            if (normalizedType in listOf("IMAGE", "VIDEO", "VOICE", "FILE", "PDF")) {
+            if (normalizedType in listOf("IMAGE", "VIDEO", "VOICE", "FILE", "PDF", "SHARED_VAULT_FILE")) {
                 val currentAttachments = fileDao.getFilesForMessage(dto.id)
                 if (currentAttachments.isEmpty() && dto.attachments.isEmpty()) {
                     repositoryScope.launch { fetchAndSaveAttachments(dto.id, wrappedFek, mediaIv) }
@@ -544,7 +588,7 @@ class ChatRepositoryImpl(
             // Handle Attachments
             if (dto.attachments.isNotEmpty()) {
                 saveAttachmentDtos(dto.id, dto.attachments, wrappedFek, mediaIv)
-            } else if (normalizedType in listOf("IMAGE", "VIDEO", "VOICE", "FILE", "PDF")) {
+            } else if (normalizedType in listOf("IMAGE", "VIDEO", "VOICE", "FILE", "PDF", "SHARED_VAULT_FILE")) {
                 // If it's a media message but no attachments in DTO (common for Realtime), fetch them
                 repositoryScope.launch { 
                     delay(500) // Small delay to allow sender to finish attachment insert
@@ -573,7 +617,9 @@ class ChatRepositoryImpl(
         // Trigger for BOTH new and existing messages if they are successfully decrypted
         if (decryptionState == DecryptionState.SUCCESS) {
             val isPdf = normalizedType == "FILE" && dto.attachments.firstOrNull()?.files?.fileName?.lowercase()?.endsWith(".pdf") == true
-            if (normalizedType == "IMAGE" || normalizedType == "VIDEO" || normalizedType == "VOICE" || normalizedType == "PDF" || isPdf) {
+            val isVaultMedia = normalizedType == "SHARED_VAULT_FILE"
+            
+            if (normalizedType == "IMAGE" || normalizedType == "VIDEO" || normalizedType == "VOICE" || normalizedType == "PDF" || isPdf || isVaultMedia) {
                 repositoryScope.launch {
                     // Small delay to ensure DB transaction from the caller (db.withTransaction) is committed
                     delay(800) 
@@ -618,7 +664,7 @@ class ChatRepositoryImpl(
                         }
 
                         // --- AUTO-DOWNLOAD ON LATE DECRYPTION ---
-                        if (msg.type == "IMAGE" || msg.type == "VIDEO" || msg.type == "PDF" || msg.type == "VOICE") {
+                        if (msg.type == "IMAGE" || msg.type == "VIDEO" || msg.type == "PDF" || msg.type == "VOICE" || msg.type == "SHARED_VAULT_FILE") {
                             Log.i(TAG, "[AUTO_DOWNLOAD] Triggering after background decryption for message ${msg.id}")
                             messageDao.getMessageWithReactionsById(messageId).firstOrNull()?.let {
                                 ensureMediaLocal(it.toDomainInternal())
@@ -753,6 +799,8 @@ class ChatRepositoryImpl(
     }
 
     private suspend fun saveAttachmentDtos(messageId: String, attachmentDtos: List<MessageAttachmentDto>, wrappedFek: String?, mediaIv: String?) {
+        val chatId = messageDao.getMessageById(messageId)?.chatId ?: ""
+        
         attachmentDtos.forEach { attachmentDto ->
             attachmentDto.files?.let { fileDto ->
                 val fileEntity = FileEntity(
@@ -769,12 +817,12 @@ class ChatRepositoryImpl(
                     height = fileDto.height,
                     duration = null,
                     thumbnailPath = null,
-                    encryptionMetadata = fileDto.encryptionMetadata ?: if (wrappedFek != null && mediaIv != null) {
-                        val pck = AppModule.provideConversationKeyManager(context).getOrLoadKey(messageDao.getMessageById(messageId)?.chatId ?: "")
+                    encryptionMetadata = fileDto.encryptionMetadata ?: if (wrappedFek != null && mediaIv != null && chatId.isNotEmpty()) {
+                        val pck = AppModule.provideConversationKeyManager(context).getOrLoadKey(chatId)
                         if (pck != null) {
                             val wrappedFekObj = Json.decodeFromString<EncryptedObject>(wrappedFek)
-                            val envelope = EncryptionEnvelope("chat", wrappedFekObj, EnvelopeType.CONVERSATION)
-                            Json.encodeToString(FileEncryptionMetadata(listOf(envelope), mediaIv))
+                            val envelope = EncryptionEnvelope(chatId, wrappedFekObj, EnvelopeType.CONVERSATION)
+                            Json.encodeToJsonElement(FileEncryptionMetadata(listOf(envelope), mediaIv))
                         } else null
                     } else null,
                     securityMetadata = null
@@ -821,12 +869,17 @@ class ChatRepositoryImpl(
             return
         }
 
-        // Relaxed Guard: Update snippet if it's a newer message OR if we are replacing an encrypted snippet with a decrypted one at the same timestamp
+        // Relaxed Guard: Update snippet if it's a newer message OR if we are replacing an encrypted/placeholder snippet with a decrypted one
         val isNewer = timestamp > current.lastTimestamp
-        val isReplacingEncrypted = timestamp == current.lastTimestamp && (current.lastDecryptedMessage == null || current.lastMessage?.startsWith("[") == true)
+        val currentIsPlaceholder = current.lastMessage == null || 
+                current.lastMessage.startsWith("[") || 
+                current.lastMessage == "New message" ||
+                current.lastDecryptedMessage == null
         
-        if (!isNewer && !isReplacingEncrypted) {
-            Log.d(TAG, "[METADATA_GUARD] Skipping update for message ${dto.id} as it is older/duplicate.")
+        val isReplacingPlaceholder = timestamp >= current.lastTimestamp && currentIsPlaceholder
+        
+        if (!isNewer && !isReplacingPlaceholder) {
+            Log.d(TAG, "[METADATA_GUARD] Skipping update for message ${dto.id} as it is older/duplicate. timestamp=$timestamp lastTimestamp=${current.lastTimestamp}")
             return
         }
 
@@ -862,6 +915,15 @@ class ChatRepositoryImpl(
                 isGroup -> "$authorName sent a PDF"
                 else -> "You received a PDF"
             }
+            "SHARED_VAULT_FILE" -> {
+                val underlyingType = dto.attachments.firstOrNull()?.files?.fileType?.uppercase()
+                val label = when (underlyingType) {
+                    "IMAGE" -> "a picture"
+                    "VIDEO" -> "a video"
+                    else -> "a file"
+                }
+                if (isFromMe) "You shared $label from Vault" else "Shared $label from Vault"
+            }
             "LOCATION" -> when {
                 isFromMe -> "You shared a location"
                 isGroup -> "$authorName shared a location"
@@ -881,11 +943,11 @@ class ChatRepositoryImpl(
             lastMessage = snippetText,
             lastDecryptedMessage = decryptedSnippetForChat,
             lastTimestamp = if (isNewer) timestamp else current.lastTimestamp,
-            lastMessageStatus = if (isNewer || isReplacingEncrypted) normalizedStatus else current.lastMessageStatus,
-            lastMessageSenderId = if (isNewer || isReplacingEncrypted) dto.senderId else current.lastMessageSenderId,
+            lastMessageStatus = if (isNewer || isReplacingPlaceholder) normalizedStatus else current.lastMessageStatus,
+            lastMessageSenderId = if (isNewer || isReplacingPlaceholder) dto.senderId else current.lastMessageSenderId,
             unreadCount = (current.unreadCount + unreadDelta).coerceAtLeast(0),
-            snippetType = if (isNewer || isReplacingEncrypted) normalizedType else current.snippetType,
-            snippetUri = if (isNewer || isReplacingEncrypted) {
+            snippetType = if (isNewer || isReplacingPlaceholder) normalizedType else current.snippetType,
+            snippetUri = if (isNewer || isReplacingPlaceholder) {
                 fileDao.getFilesForMessage(dto.id).firstOrNull()?.storagePath
             } else current.snippetUri,
             metadata = metadata
@@ -1314,6 +1376,10 @@ class ChatRepositoryImpl(
                             val pck = AppModule.provideConversationKeyManager(context).getOrLoadKey(chatId) ?: throw Exception("PCK not found")
                             val wrappedFek = StorageCryptoService.wrapKey(fek, pck)
                             
+                            // Persist envelope to server for Zero-Copy consistency
+                            val envelope = EncryptionEnvelope(chatId, wrappedFek, EnvelopeType.CONVERSATION)
+                            AppModule.provideFileRepository(context).addEnvelopeToFile(uploaded.id, envelope)
+                            
                             textContent = buildJsonObject {
                                 put("text", content)
                                 put("wrappedFek", Json.encodeToString(EncryptedObject.serializer(), wrappedFek))
@@ -1334,7 +1400,12 @@ class ChatRepositoryImpl(
                 var finalCryptoVersion = 2
 
                 try {
-                    val (envelope, version) = cryptoManager.encryptMessage(chatId, textContent)
+                    val (envelope, version) = cryptoManager.encryptMessage(
+                        chatId = chatId,
+                        messageId = messageId,
+                        senderId = currentUserId,
+                        plaintext = textContent
+                    )
                     finalCiphertext = android.util.Base64.encodeToString(envelope.ciphertext, android.util.Base64.NO_WRAP)
                     finalEnvelopeType = envelope.type
                     finalNonce = envelope.nonce
@@ -1652,6 +1723,7 @@ class ChatRepositoryImpl(
         joinDate = joinDate,
         isVerified = isVerified,
         lastSeen = lastSeen,
+        viewsCount = viewsCount,
         avatarVisibility = privacy.avatarVisibility,
         coverVisibility = privacy.coverVisibility,
         phoneVisibility = privacy.phoneVisibility,
@@ -2029,7 +2101,7 @@ class ChatRepositoryImpl(
     override suspend fun ensureMediaLocal(message: Message): Result<File> = withContext(Dispatchers.IO) {
         val attachment = message.attachments.firstOrNull() ?: return@withContext Result.failure(Exception("No attachments"))
         val fileRepo = AppModule.provideFileRepository(context)
-        fileRepo.ensureMediaLocal(attachment)
+        fileRepo.ensureMediaLocal(attachment, message.chatId)
     }
 
     override fun shutdown() {
@@ -2043,45 +2115,119 @@ class ChatRepositoryImpl(
     override suspend fun forwardMessage(messageId: String, targetChatIds: List<String>) {
         val msgEntity = messageDao.getMessageById(messageId) ?: return
         val attachments = fileDao.getFilesForMessage(messageId)
+        val fileRepo = AppModule.provideFileRepository(context)
+        val currentUserId = userPrefsRepo.getUserIdFast() ?: ""
         
-        // 1. Decrypt source message to get FEK
-        val sourceEnvelope = EncryptedMessageEnvelope(
-            type = msgEntity.envelopeType,
-            ciphertext = java.util.Base64.getDecoder().decode(msgEntity.ciphertext!!),
-            nonce = msgEntity.nonce
-        )
-        val decryptedSource = cryptoManager.decryptMessage(msgEntity.chatId, sourceEnvelope, msgEntity.cryptoVersion)
-        val sourceJson = Json.parseToJsonElement(decryptedSource).jsonObject
-        
-        val wrappedFekJson = sourceJson["wrappedFek"]?.jsonPrimitive?.content
-        val mediaIv = sourceJson["mediaIv"]?.jsonPrimitive?.content
-        
-        if (wrappedFekJson != null && mediaIv != null) {
-            // Unwrapping FEK from source context
-            val sourcePck = AppModule.provideConversationKeyManager(context).getOrLoadKey(msgEntity.chatId)!!
-            val wrappedFekObj = Json.decodeFromString<EncryptedObject>(wrappedFekJson)
-            val fek = StorageCryptoService.unwrapKey(wrappedFekObj, sourcePck)
-            
-            // 2. Re-wrap and send to each target
-            targetChatIds.forEach { targetChatId ->
-                repositoryScope.launch {
-                    val targetPck = AppModule.provideConversationKeyManager(context).getOrLoadKey(targetChatId) 
-                        ?: AppModule.provideConversationKeyManager(context).createKey(targetChatId)
-                    
-                    val newWrappedFek = StorageCryptoService.wrapKey(fek, targetPck)
-                    val newContent = buildJsonObject {
-                        put("text", sourceJson["text"]?.jsonPrimitive?.content ?: "")
-                        put("wrappedFek", Json.encodeToString(EncryptedObject.serializer(), newWrappedFek))
-                        put("mediaIv", mediaIv)
-                    }.toString()
-                    
-                    sendMessage(targetChatId, newContent, MessageType.valueOf(msgEntity.type))
+        // 1. Decrypt source message to get FEK (if it's a media message)
+        var fek: SecretKey? = null
+        var mediaIv: String? = null
+        var originalText: String = msgEntity.content
+
+        if (msgEntity.ciphertext != null) {
+            try {
+                val sourceEnvelope = EncryptedMessageEnvelope(
+                    type = msgEntity.envelopeType,
+                    ciphertext = java.util.Base64.getDecoder().decode(msgEntity.ciphertext),
+                    nonce = msgEntity.nonce
+                )
+                val decryptedSource = cryptoManager.decryptMessage(
+                    chatId = msgEntity.chatId,
+                    messageId = msgEntity.id,
+                    senderId = msgEntity.senderId,
+                    envelope = sourceEnvelope,
+                    cryptoVersion = msgEntity.cryptoVersion
+                )
+                val sourceJson = Json.parseToJsonElement(decryptedSource).jsonObject
+                originalText = sourceJson["text"]?.jsonPrimitive?.content ?: ""
+                
+                val wrappedFekJson = sourceJson["wrappedFek"]?.jsonPrimitive?.content
+                mediaIv = sourceJson["mediaIv"]?.jsonPrimitive?.content
+                
+                if (wrappedFekJson != null) {
+                    val sourcePck = AppModule.provideConversationKeyManager(context).getOrLoadKey(msgEntity.chatId)!!
+                    val wrappedFekObj = Json.decodeFromString<EncryptedObject>(wrappedFekJson)
+                    fek = StorageCryptoService.unwrapKey(wrappedFekObj, sourcePck)
                 }
+            } catch (e: Exception) {
+                Log.e("CHAT_FORWARD", "Failed to decrypt source for forwarding", e)
+                // Fallback to simple text forwarding if decryption fails
             }
-        } else {
-            // Forwarding simple text
-            targetChatIds.forEach { targetChatId ->
-                sendMessage(targetChatId, msgEntity.content, MessageType.valueOf(msgEntity.type))
+        }
+
+        // 2. Process for each target chat
+        targetChatIds.forEach { targetChatId ->
+            repositoryScope.launch {
+                try {
+                    var finalContent = originalText
+                    
+                    // If there are attachments, we must re-wrap FEK for the target chat
+                    if (attachments.isNotEmpty() && fek != null && mediaIv != null) {
+                        val targetPck = AppModule.provideConversationKeyManager(context).getOrLoadKey(targetChatId)
+                            ?: AppModule.provideConversationKeyManager(context).createKey(targetChatId)
+                        
+                        val newWrappedFek = StorageCryptoService.wrapKey(fek, targetPck)
+                        
+                        // Add new envelope to each file
+                        attachments.forEach { fileEntity ->
+                            val envelope = EncryptionEnvelope(
+                                recipientId = targetChatId,
+                                wrappedKey = newWrappedFek,
+                                type = EnvelopeType.CONVERSATION
+                            )
+                            fileRepo.addEnvelopeToFile(fileEntity.id, envelope)
+                        }
+
+                        finalContent = buildJsonObject {
+                            put("text", originalText)
+                            put("wrappedFek", Json.encodeToString(EncryptedObject.serializer(), newWrappedFek))
+                            put("mediaIv", mediaIv)
+                        }.toString()
+                    }
+
+                    // 3. Send message (Zero-copy)
+                    val newMsgId = UUID.randomUUID().toString()
+                    val now = System.currentTimeMillis()
+                    
+                    // Local insert
+                    withContext(databaseWriteDispatcher) {
+                        messageDao.insertMessage(MessageEntity(
+                            id = newMsgId, chatId = targetChatId, senderId = currentUserId,
+                            content = originalText, timestamp = now, status = "SENT",
+                            type = msgEntity.type, decryptionState = DecryptionState.SUCCESS
+                        ))
+                        
+                        attachments.forEach { fileEntity ->
+                            fileDao.insertMessageAttachment(MessageAttachmentEntity(
+                                id = UUID.randomUUID().toString(),
+                                messageId = newMsgId,
+                                fileId = fileEntity.id
+                            ))
+                            fileRepo.incrementReferenceCount(fileEntity.id)
+                        }
+                    }
+                    
+                    // Cloud Sync
+                    val (envelope, version) = cryptoManager.encryptMessage(
+                        chatId = targetChatId, messageId = newMsgId, senderId = currentUserId, plaintext = finalContent
+                    )
+                    val dto = MessageDto(
+                        id = newMsgId, chatId = targetChatId, senderId = currentUserId,
+                        content = "[Encrypted]", createdAt = now, type = msgEntity.type, status = "SENT",
+                        ciphertext = android.util.Base64.encodeToString(envelope.ciphertext, android.util.Base64.NO_WRAP),
+                        envelopeType = envelope.type, cryptoVersion = version, nonce = envelope.nonce
+                    )
+                    getSupabase().postgrest["messages"].upsert(dto)
+                    
+                    attachments.forEach { fileEntity ->
+                        getSupabase().postgrest["message_attachment"].insert(buildJsonObject {
+                            put("id", UUID.randomUUID().toString())
+                            put("message_id", newMsgId)
+                            put("file_id", fileEntity.id)
+                        })
+                    }
+                } catch (e: Exception) {
+                    Log.e("CHAT_FORWARD", "Forwarding failed for chat $targetChatId", e)
+                }
             }
         }
     }
@@ -2102,10 +2248,10 @@ class ChatRepositoryImpl(
                 filter {
                     eq("user_id", userId)
                 }
-                order("created_at", order = Order.DESCENDING)
+                order("created_at", order = io.github.jan.supabase.postgrest.query.Order.DESCENDING)
                 limit(20)
-            }.decodeList<AppNotification>()
-            notificationDao.insertNotifications(remote.map { NotificationEntity.fromDomain(it) })
+            }.decodeList<NotificationDto>()
+            notificationDao.insertNotifications(remote.map { NotificationEntity.fromDomain(it.toDomain()) })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync notifications", e)
         }
@@ -2223,6 +2369,8 @@ class ChatRepositoryImpl(
     }
 
     override fun getSearchableProfiles(): Flow<List<Profile>> = profileDao.getAllProfiles().map { entities -> entities.map { it.toDomain() } }
+
+    override suspend fun getProfilesByIds(ids: List<String>): List<Profile> = profileDao.getProfilesByIds(ids).map { it.toDomain() }
     
     override suspend fun syncContacts() {
         val currentUserId = getCurrentUserId() ?: return
@@ -2410,11 +2558,98 @@ class ChatRepositoryImpl(
     }
 
     override suspend fun shareVaultFileToChat(vaultItemId: String, chatId: String) {
-        val vaultRepo = com.keeftalk.chat.di.AppModule.provideVaultRepository(context)
-        vaultRepo.markItemAsShared(vaultItemId)
-        val entity = vaultRepo.getItems(null).first().find { it.id == vaultItemId }
-        val title = entity?.title ?: "Shared a vault file"
-        sendMessage(chatId, title, com.keeftalk.chat.domain.model.MessageType.SHARED_VAULT_FILE, filePath = vaultItemId)
+        try {
+            val vaultRepo = com.keeftalk.chat.di.AppModule.provideVaultRepository(context)
+            val fileRepo = com.keeftalk.chat.di.AppModule.provideFileRepository(context)
+            val conversationKeyManager = com.keeftalk.chat.di.AppModule.provideConversationKeyManager(context)
+            
+            vaultRepo.markItemAsShared(vaultItemId)
+            
+            val items = vaultRepo.getItems(null).first()
+            val vaultItem = items.find { it.id == vaultItemId } ?: return
+            val fileModel = vaultItem.file ?: return
+            
+            Log.d("CHAT_SHARE", "Zero-Copy Sharing START | vaultItemId=$vaultItemId | fileId=${fileModel.id} | targetChat=$chatId")
+            
+            val currentUserId = userPrefsRepo.getUserIdFast() ?: ""
+            val messageId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+
+            // 1. Unwrap FEK using OWNER context
+            val fekResult = fileRepo.getDecryptedFEK(fileModel, null)
+            if (fekResult.isFailure) {
+                Log.e("CHAT_SHARE", "FAILED to unwrap FEK for sharing: ${fekResult.exceptionOrNull()?.message}")
+                return
+            }
+            val fek = fekResult.getOrThrow()
+
+            // 2. Wrap FEK with target Chat PCK
+            val pck = conversationKeyManager.getOrLoadKey(chatId) ?: throw Exception("PCK not found for chat $chatId")
+            val wrappedFek = StorageCryptoService.wrapKey(fek, pck)
+            
+            // 3. Add CONVERSATION envelope to the file
+            val envelope = EncryptionEnvelope(
+                recipientId = chatId,
+                wrappedKey = wrappedFek,
+                type = EnvelopeType.CONVERSATION
+            )
+            val envResult = fileRepo.addEnvelopeToFile(fileModel.id, envelope)
+            if (envResult.isFailure) {
+                Log.e("CHAT_SHARE", "FAILED to add CONVERSATION envelope: ${envResult.exceptionOrNull()?.message}")
+                return
+            }
+
+            // 4. Create the SHARED_VAULT_FILE message locally
+            withContext(databaseWriteDispatcher) {
+                messageDao.insertMessage(MessageEntity(
+                    id = messageId, 
+                    chatId = chatId, 
+                    senderId = currentUserId, 
+                    content = vaultItem.title,
+                    timestamp = now, 
+                    status = "SENT", 
+                    type = MessageType.SHARED_VAULT_FILE.name,
+                    decryptionState = DecryptionState.SUCCESS
+                ))
+                
+                // Link existing file record to this message
+                fileDao.insertMessageAttachment(MessageAttachmentEntity(
+                    id = UUID.randomUUID().toString(),
+                    messageId = messageId,
+                    fileId = fileModel.id
+                ))
+            }
+
+            // 5. Increment reference count to prevent deletion
+            fileRepo.incrementReferenceCount(fileModel.id)
+            
+            // 6. Sync message to cloud
+            repositoryScope.launch {
+                try {
+                    val dto = MessageDto(
+                        id = messageId,
+                        chatId = chatId,
+                        senderId = currentUserId,
+                        content = vaultItem.title,
+                        createdAt = now,
+                        type = MessageType.SHARED_VAULT_FILE.name,
+                        status = "SENT"
+                    )
+                    getSupabase().postgrest["messages"].upsert(dto)
+                    
+                    getSupabase().postgrest["message_attachment"].insert(buildJsonObject {
+                        put("id", UUID.randomUUID().toString())
+                        put("message_id", messageId)
+                        put("file_id", fileModel.id)
+                    })
+                    Log.i("CHAT_SHARE", "Zero-Copy Sharing COMPLETE | messageId=$messageId")
+                } catch (e: Exception) {
+                    Log.e("CHAT_SHARE", "Remote sync failed for shared vault file", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CHAT_SHARE", "Vault share failed", e)
+        }
     }
 
     override suspend fun shareAgendaToChat(calendarItemId: String, chatId: String) {

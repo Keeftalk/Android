@@ -98,6 +98,7 @@ class PrivacyRepositoryImpl(
                 profilePhotoVisibility = settings.profilePhotoVisibility.name,
                 aboutVisibility = settings.aboutVisibility.name,
                 lastSeenVisibility = settings.lastSeenVisibility.name,
+                connectionsVisibility = settings.connectionsVisibility.name,
                 readReceiptsEnabled = settings.readReceiptsEnabled,
                 typingIndicatorsEnabled = settings.typingIndicatorsEnabled,
                 profileViewHistoryEnabled = settings.profileViewHistoryEnabled,
@@ -131,6 +132,7 @@ class PrivacyRepositoryImpl(
                 "profilePhotoVisibility" -> "profile_photo_visibility"
                 "aboutVisibility" -> "about_visibility"
                 "lastSeenVisibility" -> "last_seen_visibility"
+                "connectionsVisibility" -> "connections_visibility"
                 "readReceiptsEnabled" -> "read_receipts_enabled"
                 "typingIndicatorsEnabled" -> "typing_indicators_enabled"
                 "profileViewHistoryEnabled" -> "profile_view_history_enabled"

@@ -81,6 +81,8 @@ class UserPreferencesRepository(private val context: Context) {
         val LAST_NOTES_SYNC_TIMESTAMP = longPreferencesKey("last_notes_sync_timestamp")
         val LAST_CHAT_SYNC_TIMESTAMP = longPreferencesKey("last_chat_sync_timestamp")
         val APP_CUSTOMIZATION_JSON = stringPreferencesKey("app_customization_json")
+        val WEATHER_LOCATION_MODE = stringPreferencesKey("weather_location_mode")
+        val WEATHER_MANUAL_LOCATION = stringPreferencesKey("weather_manual_location")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
@@ -126,7 +128,9 @@ class UserPreferencesRepository(private val context: Context) {
                 lastChatSyncTimestamp = preferences[PreferencesKeys.LAST_CHAT_SYNC_TIMESTAMP] ?: 0L,
                 appCustomization = preferences[PreferencesKeys.APP_CUSTOMIZATION_JSON]?.let {
                     try { Json.decodeFromString<AppCustomization>(it) } catch (_: Exception) { AppCustomization() }
-                } ?: AppCustomization()
+                } ?: AppCustomization(),
+                weatherLocationMode = preferences[PreferencesKeys.WEATHER_LOCATION_MODE] ?: "AUTO",
+                weatherManualLocation = preferences[PreferencesKeys.WEATHER_MANUAL_LOCATION]
             )
         }
 
@@ -300,6 +304,13 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun updateAppCustomization(customization: AppCustomization) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_CUSTOMIZATION_JSON] = Json.encodeToString(customization)
+        }
+    }
+
+    suspend fun updateWeatherSettings(mode: String? = null, location: String? = null) {
+        context.dataStore.edit { preferences ->
+            mode?.let { preferences[PreferencesKeys.WEATHER_LOCATION_MODE] = it }
+            location?.let { preferences[PreferencesKeys.WEATHER_MANUAL_LOCATION] = it }
         }
     }
 

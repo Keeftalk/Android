@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.RemoveRedEye
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel,
     onBack: () -> Unit,
     onChatStarted: (String) -> Unit = {},
+    onConnectionPathClick: () -> Unit = {},
     isCurrentUser: Boolean = true
 ) {
     val profile by viewModel.profile.collectAsState()
@@ -53,8 +55,8 @@ fun ProfileScreen(
     val avatarLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+        uri?.let { selectedUri ->
+            val bytes = context.contentResolver.openInputStream(selectedUri)?.readBytes()
             bytes?.let { viewModel.uploadAvatar(it) }
         }
     }
@@ -101,6 +103,7 @@ fun ProfileScreen(
                             onBack = onBack,
                             onEditClick = { viewModel.setEditing(true) },
                             onMessageClick = { viewModel.startChat(onChatStarted) },
+                            onConnectionPathClick = onConnectionPathClick,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -131,7 +134,8 @@ fun ViewProfileContent(
     onBack: () -> Unit,
     onEditClick: () -> Unit,
     onMessageClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onConnectionPathClick: () -> Unit = {}
 ) {
     val icons = LocalAppIcons.current
     val scrollState = rememberScrollState()
@@ -213,7 +217,12 @@ fun ViewProfileContent(
                             Spacer(modifier = Modifier.height(24.dp))
                         }
 
-                        ProfileInfoSection(profile)
+                        if (!isCurrentUser) {
+                            RelationshipCard(viewModel, onConnectionPathClick)
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
+
+                        ProfileInfoSection(profile, viewModel)
 
                         Spacer(modifier = Modifier.height(32.dp))
                         
@@ -221,17 +230,33 @@ fun ViewProfileContent(
 
                         if (!isCurrentUser) {
                             Spacer(modifier = Modifier.height(32.dp))
+                            val rel by viewModel.relationship.collectAsState()
+                            
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Button(
-                                    onClick = onMessageClick,
-                                    modifier = Modifier.weight(1f).height(56.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
-                                ) {
-                                    Icon(Icons.Default.Chat, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Message", fontWeight = FontWeight.Bold)
+                                if (rel?.distance == 1) {
+                                    Button(
+                                        onClick = onMessageClick,
+                                        modifier = Modifier.weight(1f).height(56.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Message", fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = { viewModel.onNudgeClick() },
+                                        modifier = Modifier.weight(1f).height(56.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Icon(Icons.Default.NotificationsActive, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Nudge", fontWeight = FontWeight.Bold)
+                                    }
                                 }
+
                                 Surface(
                                     modifier = Modifier.size(56.dp).clickable { /* Call */ },
                                     shape = RoundedCornerShape(16.dp),
@@ -259,7 +284,7 @@ fun ViewProfileContent(
                         .padding(start = 24.dp)
                         .offset(y = (-55).dp)
                         .shadow(16.dp, CircleShape)
-                        .border(4.dp, Color.Black, CircleShape)
+                        .border(4.dp, Color.White, CircleShape)
                         .zIndex(5f) // High zIndex to ensure it's on top of everything in this Box
                 )
 
@@ -304,9 +329,156 @@ fun ViewProfileContent(
 }
 
 @Composable
-fun ProfileInfoSection(profile: Profile) {
+fun RelationshipCard(viewModel: ProfileViewModel, onConnectionPathClick: () -> Unit) {
+    val relationship by viewModel.relationship.collectAsState()
+    val icons = LocalAppIcons.current
+
+    AnimatedContent(
+        targetState = relationship,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+        },
+        label = "RelationshipContent"
+    ) { rel ->
+        if (rel == null) {
+            RelationshipCardPlaceholder()
+        } else {
+            Surface(
+                color = Color.White.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                modifier = Modifier.fillMaxWidth().clickable { onConnectionPathClick() }
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Hub, 
+                                contentDescription = null, 
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = when (rel.distance) {
+                                    1 -> "1st · Direct Connection"
+                                    2 -> "2nd · Contact of contact"
+                                    3 -> "3rd · Contact of 2nd degree"
+                                    4 -> "4th · Network connection"
+                                    else -> "∞ · No known connection"
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            if (rel.mutualConnectionCount > 0) {
+                                val details = listOfNotNull(
+                                    "${rel.mutualConnectionCount} mutual connections",
+                                    rel.strengthLabel,
+                                    rel.densityLabel?.let { "$it density" }
+                                ).joinToString(" · ")
+                                
+                                Text(
+                                    text = details,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.5f)
+                                )
+                            } else if (rel.strengthLabel != null || rel.densityLabel != null) {
+                                 val details = listOfNotNull(
+                                    rel.strengthLabel,
+                                    rel.densityLabel?.let { "$it density" }
+                                ).joinToString(" · ")
+                                
+                                Text(
+                                    text = details,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = onConnectionPathClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    
+                    if (rel.mutualConnectionPreview.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                rel.mutualConnectionPreview.take(3).forEachIndexed { index, profile ->
+                                    KeeftalkAvatar(
+                                        avatarUrl = profile.avatarUrl,
+                                        initials = AvatarUtils.getInitials(profile.fullName ?: profile.username),
+                                        seed = profile.id,
+                                        size = 28.dp,
+                                        modifier = Modifier
+                                            .padding(start = (index * 16).dp)
+                                            .border(2.dp, Color.Black, CircleShape)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(if (rel.mutualConnectionPreview.size > 1) (16 * (rel.mutualConnectionPreview.size - 1) + 32).dp else 12.dp))
+                            val names = rel.mutualConnectionPreview.take(2).joinToString(", ") { it.fullName ?: it.username }
+                            Text(
+                                text = if (rel.mutualConnectionCount > 2) "Connected through $names and ${rel.mutualConnectionCount - 2} others"
+                                       else "Connected through $names",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RelationshipCardPlaceholder() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.05f,
+        targetValue = 0.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Surface(
+        color = Color.White.copy(alpha = alpha),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+        modifier = Modifier.fillMaxWidth().height(80.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.size(40.dp).background(Color.White.copy(alpha = 0.1f), CircleShape))
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.fillMaxWidth(0.6f).height(16.dp).background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)))
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth(0.4f).height(12.dp).background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)))
+            }
+        }
+    }
+}
+
+@Composable
+fun ProfileInfoSection(profile: Profile, viewModel: ProfileViewModel) {
     val icons = LocalAppIcons.current
     val context = LocalContext.current
+    val relationship by viewModel.relationship.collectAsState()
     val phoneNumberService = remember { com.keeftalk.chat.di.AppModule.providePhoneNumberService(context) }
     
     val formattedPhone = remember(profile.phone, profile.countryCode) {
@@ -322,6 +494,12 @@ fun ProfileInfoSection(profile: Profile) {
         InfoRow(icons.phone, "Phone", formattedPhone)
         InfoRow(icons.place, "Location", profile.country ?: "Not set")
         InfoRow(icons.calendar, "Joined", "Member since ${formatJoinDate(profile.joinDate)}")
+        
+        InfoRow(Icons.Default.RemoveRedEye, "Profile Views", "${profile.viewsCount} views")
+
+        relationship?.let {
+            InfoRow(Icons.Default.NotificationsActive, "Nudges", "${it.nudgesReceived} times nudged")
+        }
     }
 }
 
@@ -621,9 +799,9 @@ fun CallHistoryItem(entry: com.keeftalk.chat.data.local.CallLogEntry) {
     ) {
         Icon(
             imageVector = when (entry.type) {
-                com.keeftalk.chat.data.local.CallLogType.MISSED -> Icons.Filled.CallMissed
-                com.keeftalk.chat.data.local.CallLogType.OUTGOING -> Icons.Filled.CallMade
-                else -> Icons.Filled.CallReceived
+                com.keeftalk.chat.data.local.CallLogType.MISSED -> Icons.AutoMirrored.Filled.CallMissed
+                com.keeftalk.chat.data.local.CallLogType.OUTGOING -> Icons.AutoMirrored.Filled.CallMade
+                else -> Icons.AutoMirrored.Filled.CallReceived
             },
             contentDescription = null,
             modifier = Modifier.size(16.dp),

@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.TimeZone
 
 object TimestampSerializer : KSerializer<Long> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Timestamp", PrimitiveKind.LONG)
@@ -36,6 +37,7 @@ object TimestampSerializer : KSerializer<Long> {
 
     fun formatTimestamp(value: Long): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
         return sdf.format(java.util.Date(value))
     }
 

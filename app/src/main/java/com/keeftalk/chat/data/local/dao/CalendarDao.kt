@@ -118,9 +118,11 @@ interface CalendarDao {
     @Query("DELETE FROM calendar_invitations WHERE id = :id")
     suspend fun deleteInvitation(id: String)
 
+    @Transaction
     @Query("SELECT * FROM calendar_items WHERE pendingSync = 1")
     suspend fun getPendingItems(): List<CalendarItemWithDetails>
 
+    @Transaction
     @Query("SELECT * FROM habits WHERE pendingSync = 1")
     suspend fun getPendingHabits(): List<HabitWithLogs>
 

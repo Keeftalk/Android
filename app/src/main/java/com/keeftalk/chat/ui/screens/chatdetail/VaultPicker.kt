@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keeftalk.chat.domain.model.VaultItem
 import com.keeftalk.chat.ui.components.KeeftalkFeatureTopBar
+import com.keeftalk.chat.ui.components.EncryptedThumbnail
 
 @Composable
 fun VaultPicker(
@@ -54,13 +55,26 @@ fun VaultPickerItem(item: VaultItem, onClick: () -> Unit) {
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Lock, null, tint = Color(0xFFFF9800))
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            EncryptedThumbnail(
+                file = item.file,
+                modifier = Modifier.size(48.dp)
+            )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text(item.file?.fileType?.name ?: "OTHER", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                Text(
+                    text = "${item.file?.fileType?.name ?: "OTHER"} • ${formatSize(item.file?.fileSize ?: 0)}",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 12.sp
+                )
             }
         }
     }
+}
+
+private fun formatSize(size: Long): String {
+    val kb = size / 1024.0
+    val mb = kb / 1024.0
+    return if (mb >= 1) "%.1f MB".format(mb) else "%.0f KB".format(kb)
 }

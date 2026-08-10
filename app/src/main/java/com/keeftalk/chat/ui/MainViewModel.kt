@@ -27,7 +27,12 @@ sealed class NotificationNavigationEvent {
     data class NavigateToChat(val chatId: String) : NotificationNavigationEvent()
     data class NavigateToNote(val noteId: String) : NotificationNavigationEvent()
     data object NavigateToCalls : NotificationNavigationEvent()
-    data class ShowSystemDialog(val title: String, val message: String) : NotificationNavigationEvent()
+    data class ShowSystemDialog(
+        val title: String, 
+        val message: String,
+        val type: com.keeftalk.chat.domain.model.NotificationType = com.keeftalk.chat.domain.model.NotificationType.SYSTEM,
+        val sourceId: String? = null
+    ) : NotificationNavigationEvent()
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -188,10 +193,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 NotificationType.PROFILE_VIEW,
                 NotificationType.CONTACT_JOINED,
                 NotificationType.BROADCAST,
-                NotificationType.REMINDER -> {
+                NotificationType.REMINDER,
+                NotificationType.NUDGE -> {
                     _navigationEvent.emit(NotificationNavigationEvent.ShowSystemDialog(
-                        notification.title,
-                        notification.data?.fullMessage ?: notification.message
+                        title = notification.title,
+                        message = notification.data?.fullMessage ?: notification.message,
+                        type = notification.type,
+                        sourceId = notification.sourceId
                     ))
                 }
             }

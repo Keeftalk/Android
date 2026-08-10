@@ -1,5 +1,6 @@
 package com.keeftalk.chat.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -48,7 +50,6 @@ fun KeeftalkAvatar(
     isSkeleton: Boolean = false
 ) {
     val context = LocalContext.current
-    val icons = com.keeftalk.chat.ui.theme.LocalAppIcons.current
     val avatarColor = remember(seed, initials) { AvatarUtils.getAvatarColor(seed ?: initials) }
     val textColor = remember(avatarColor) { AvatarUtils.getTextColorForBackground(avatarColor) }
     
@@ -57,51 +58,56 @@ fun KeeftalkAvatar(
         mutableStateOf(seed?.let { PersistentAvatarManager.getLocalAvatarFile(context, it) }) 
     }
 
+    val borderWidth = if (size < 20.dp) 1.dp else 2.dp
+
     Box(modifier = modifier.size(size)) {
         // Avatar circular container
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-                .background(avatarColor),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = CircleShape,
+            color = avatarColor,
+            border = BorderStroke(borderWidth, Color.White)
         ) {
-            if (!isSkeleton && (!avatarUrl.isNullOrBlank() || localAvatarFile != null)) {
-                val model = remember(avatarUrl, localAvatarFile) {
-                    ImageRequest.Builder(context)
-                        .data(localAvatarFile ?: avatarUrl)
-                        .crossfade(true)
-                        .size(width = 256, height = 256)
-                        .transformations(CircleCropTransformation())
-                        .listener(
-                            onSuccess = { _, result ->
-                                // If we successfully loaded from network, save it locally for persistence
-                                if (result.dataSource == DataSource.NETWORK && seed != null) {
-                                    val drawable = result.drawable
-                                    if (drawable is android.graphics.drawable.BitmapDrawable) {
-                                        val bitmap = drawable.bitmap
-                                        val stream = java.io.ByteArrayOutputStream()
-                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, stream)
-                                        PersistentAvatarManager.saveAvatar(context, seed, stream.toByteArray())
-                                        // Update local file state so next time we might use it (though Coil cache is usually enough for the current session)
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!isSkeleton && (!avatarUrl.isNullOrBlank() || localAvatarFile != null)) {
+                    val model = remember(avatarUrl, localAvatarFile) {
+                        ImageRequest.Builder(context)
+                            .data(localAvatarFile ?: avatarUrl)
+                            .crossfade(true)
+                            .size(width = 256, height = 256)
+                            .transformations(CircleCropTransformation())
+                            .listener(
+                                onSuccess = { _, result ->
+                                    // If we successfully loaded from network, save it locally for persistence
+                                    if (result.dataSource == DataSource.NETWORK && seed != null) {
+                                        val drawable = result.drawable
+                                        if (drawable is android.graphics.drawable.BitmapDrawable) {
+                                            val bitmap = drawable.bitmap
+                                            val stream = java.io.ByteArrayOutputStream()
+                                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, stream)
+                                            PersistentAvatarManager.saveAvatar(context, seed, stream.toByteArray())
+                                        }
                                     }
                                 }
-                            }
-                        )
-                        .build()
+                            )
+                            .build()
+                    }
+                    
+                    AsyncImage(
+                        model = model,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.Center
+                    )
+                } else {
+                    InitialsAvatar(initials, fontSize, textColor)
                 }
-                
-                AsyncImage(
-                    model = model,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center
-                )
-            } else {
-                InitialsAvatar(initials, fontSize, textColor)
             }
         }
         
@@ -124,10 +130,10 @@ fun KeeftalkAvatar(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icons.chat,
+                    painter = painterResource(id = com.keeftalk.chat.R.drawable.ic_app_logo),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    tint = Color.Unspecified
                 )
             }
         }

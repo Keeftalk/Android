@@ -29,6 +29,10 @@
     <uses-permission android:name="android.permission.WRITE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
@@ -111,6 +115,23 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="keeftalk" android:host="reset-password" />
             </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <activity
+            android:name="com.dropbox.core.android.AuthActivity"
+            android:configChanges="orientation|keyboard"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <data android:scheme="db-94qq780h7ci3de5" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <service
@@ -126,6 +147,45 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.share.ShareHandlerActivity"
+            android:exported="true"
+            android:label="@string/share_to_keeftalk"
+            android:theme="@style/Theme.App.Starting">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="com.keeftalk.chat.category.DIRECT_SHARE" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="com.keeftalk.chat.category.DIRECT_SHARE" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <activity-alias
+            android:name=".ui.share.VaultShareTarget"
+            android:exported="true"
+            android:label="@string/save_to_vault"
+            android:targetActivity=".ui.share.ShareHandlerActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
             android:name=".ui.call.CallActivity"
             android:exported="false"
             android:launchMode="singleInstance"
@@ -136,7 +196,8 @@
             android:name=".ui.call.IncomingCallActivity"
             android:exported="false"
             android:launchMode="singleInstance"
-            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:theme="@style/Theme.Keeftalk" />
 
         <activity

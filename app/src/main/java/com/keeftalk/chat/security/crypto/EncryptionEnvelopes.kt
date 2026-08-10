@@ -23,8 +23,13 @@ enum class EnvelopeType {
 @Serializable
 data class FileEncryptionMetadata(
     val envelopes: List<EncryptionEnvelope>,
-    val fileIv: String, // IV used for the physical file
-    val encryptedAttributes: EncryptedObject? = null // Encrypted JSON of FileName, MimeType, etc.
+    val fileIv: String, // IV used for the physical file (BaseIV for v2)
+    val thumbnailIv: String? = null, // Mandatory unique IV for thumbnail
+    val encryptedAttributes: EncryptedObject? = null, // Encrypted JSON of FileName, MimeType, etc.
+    val cryptoVersion: Int = 1,
+    val chunkSize: Int? = null,
+    val plaintextSize: Long? = null,
+    val thumbnailPlaintextSize: Long? = null
 )
 
 @Serializable

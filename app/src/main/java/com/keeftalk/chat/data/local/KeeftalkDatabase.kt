@@ -53,8 +53,12 @@ import com.keeftalk.chat.data.local.entities.*
         MessageAttachmentEntity::class,
         NoteAttachmentEntity::class,
         AgendaAttachmentEntity::class,
+        RelationshipCacheEntity::class,
+        FeedSourceEntity::class,
+        FeedArticleEntity::class,
+        WeatherCacheEntity::class,
     ],
-    version = 83,
+    version = 96,
     exportSchema = false
 )
 @TypeConverters(KeeftalkConverters::class)
@@ -77,6 +81,8 @@ abstract class KeeftalkDatabase : RoomDatabase() {
     abstract fun mailDao(): MailDao
     abstract fun callLogDao(): CallLogDao
     abstract fun fileDao(): FileDao
+    abstract fun relationshipDao(): RelationshipDao
+    abstract fun feedDao(): FeedDao
 
     companion object {
         val CALLBACK = object : RoomDatabase.Callback() {
@@ -373,6 +379,195 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                 
                 // 3. Create a new unique composite index on (conversationId, user_id)
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_conversation_keys_conversationId_user_id ON conversation_keys (conversationId, user_id)")
+
+                // 4. Add user_id column to vault_folders (Fix for crash)
+                db.execSQL("ALTER TABLE vault_folders ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
+
+                // 5. Add missing indices and column to vault_items
+                try {
+                    db.execSQL("ALTER TABLE vault_items ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {
+                    // Column might already exist if added manually or in a skipped migration
+                }
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_file_id ON vault_items (file_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_folder_id ON vault_items (folder_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_user_id ON vault_items (user_id)")
+            }
+        }
+
+        val MIGRATION_83_84 = object : Migration(83, 84) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE files ADD COLUMN thumbnail_remote_path TEXT")
+                db.execSQL("ALTER TABLE files ADD COLUMN thumbnail_local_path TEXT")
+                db.execSQL("ALTER TABLE files ADD COLUMN thumbnail_size INTEGER")
+                db.execSQL("ALTER TABLE files ADD COLUMN thumbnail_width INTEGER")
+                db.execSQL("ALTER TABLE files ADD COLUMN thumbnail_height INTEGER")
+                db.execSQL("ALTER TABLE files ADD COLUMN thumbnail_hmac TEXT")
+            }
+        }
+
+        val MIGRATION_84_85 = object : Migration(84, 85) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Fix vault_items missing user_id and indices
+                try {
+                    db.execSQL("ALTER TABLE vault_items ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {
+                    // Column might already exist
+                }
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_file_id ON vault_items (file_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_folder_id ON vault_items (folder_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_user_id ON vault_items (user_id)")
+            }
+        }
+
+        val MIGRATION_85_86 = object : Migration(85, 86) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Fix vault_items missing user_id and indices
+                try {
+                    db.execSQL("ALTER TABLE vault_items ADD COLUMN user_id TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {
+                    // Column might already exist
+                }
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_file_id ON vault_items (file_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_folder_id ON vault_items (folder_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vault_items_user_id ON vault_items (user_id)")
+            }
+        }
+
+        val MIGRATION_86_87 = object : Migration(86, 87) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Fix message_attachment missing indices
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_message_attachment_message_id ON message_attachment (message_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_message_attachment_file_id ON message_attachment (file_id)")
+                
+                // Fix note_attachment missing indices
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_attachment_note_id ON note_attachment (note_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_attachment_file_id ON note_attachment (file_id)")
+                
+                // Fix agenda_attachment missing indices
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_agenda_attachment_agenda_event_id ON agenda_attachment (agenda_event_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_agenda_attachment_file_id ON agenda_attachment (file_id)")
+            }
+        }
+
+        val MIGRATION_87_88 = object : Migration(87, 88) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS relationship_cache (
+                        targetUserId TEXT NOT NULL, 
+                        distance INTEGER, 
+                        mutualConnectionCount INTEGER NOT NULL, 
+                        strengthLabel TEXT, 
+                        densityLabel TEXT, 
+                        nudgesReceived INTEGER NOT NULL DEFAULT 0,
+                        updatedAt INTEGER NOT NULL, 
+                        PRIMARY KEY(targetUserId)
+                    )
+                """.trimIndent())
+            }
+        }
+
+        val MIGRATION_88_89 = object : Migration(88, 89) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE relationship_cache ADD COLUMN nudgesReceived INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_89_90 = object : Migration(89, 90) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notifications ADD COLUMN nudgeCount INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
+        val MIGRATION_90_91 = object : Migration(90, 91) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE profiles ADD COLUMN viewsCount INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_91_92 = object : Migration(91, 92) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS feed_sources (
+                        id TEXT NOT NULL, 
+                        url TEXT NOT NULL, 
+                        title TEXT NOT NULL, 
+                        type TEXT NOT NULL, 
+                        iconUrl TEXT, 
+                        lastUpdated INTEGER NOT NULL, 
+                        PRIMARY KEY(id)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS feed_articles (
+                        id TEXT NOT NULL, 
+                        sourceId TEXT NOT NULL, 
+                        title TEXT NOT NULL, 
+                        description TEXT, 
+                        link TEXT NOT NULL, 
+                        pubDate INTEGER NOT NULL, 
+                        thumbnailUrl TEXT, 
+                        content TEXT, 
+                        PRIMARY KEY(id), 
+                        FOREIGN KEY(sourceId) REFERENCES feed_sources(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_articles_sourceId ON feed_articles (sourceId)")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS weather_cache (
+                        id TEXT NOT NULL, 
+                        locationName TEXT NOT NULL, 
+                        temperature REAL NOT NULL, 
+                        condition TEXT NOT NULL, 
+                        iconCode TEXT NOT NULL, 
+                        humidity INTEGER NOT NULL, 
+                        windSpeed REAL NOT NULL, 
+                        apparentTemperature REAL NOT NULL DEFAULT 0.0,
+                        uvIndex REAL NOT NULL DEFAULT 0.0,
+                        visibility REAL NOT NULL DEFAULT 0.0,
+                        pressure REAL NOT NULL DEFAULT 0.0,
+                        sunrise TEXT NOT NULL DEFAULT '',
+                        sunset TEXT NOT NULL DEFAULT '',
+                        isDay INTEGER NOT NULL DEFAULT 1,
+                        cloudCover INTEGER NOT NULL DEFAULT 0,
+                        precipitation REAL NOT NULL DEFAULT 0.0,
+                        timestamp INTEGER NOT NULL, 
+                        PRIMARY KEY(id)
+                    )
+                """.trimIndent())
+            }
+        }
+
+        val MIGRATION_92_93 = object : Migration(92, 93) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN apparentTemperature REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN uvIndex REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN visibility REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN pressure REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN sunrise TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN sunset TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN isDay INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN cloudCover INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_93_94 = object : Migration(93, 94) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE weather_cache ADD COLUMN precipitation REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
+        val MIGRATION_94_95 = object : Migration(94, 95) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE feed_articles ADD COLUMN category TEXT")
+                db.execSQL("ALTER TABLE feed_articles ADD COLUMN readingTimeMinutes INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_95_96 = object : Migration(95, 96) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE feed_articles ADD COLUMN author TEXT")
+                db.execSQL("ALTER TABLE feed_articles ADD COLUMN isExtracted INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

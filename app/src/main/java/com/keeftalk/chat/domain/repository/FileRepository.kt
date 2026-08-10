@@ -14,8 +14,10 @@ interface FileRepository {
     suspend fun incrementReferenceCount(fileId: String)
     suspend fun decrementReferenceCount(fileId: String)
     suspend fun deleteFilePermanently(fileId: String)
+    suspend fun addEnvelopeToFile(fileId: String, envelope: com.keeftalk.chat.security.crypto.EncryptionEnvelope): Result<Unit>
     suspend fun reconcileReferenceCounts()
     suspend fun syncFiles()
-    suspend fun ensureMediaLocal(file: File): Result<java.io.File>
-    suspend fun getDecryptedFEK(file: File): Result<javax.crypto.SecretKey>
+    suspend fun ensureMediaLocal(file: File, chatId: String? = null): Result<java.io.File>
+    suspend fun ensureThumbnailLocal(file: File, chatId: String? = null): Result<java.io.File>
+    suspend fun getDecryptedFEK(file: File, chatId: String? = null): Result<javax.crypto.SecretKey>
 }

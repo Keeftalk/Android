@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="hi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keeftalk नोट्स - सुरक्षित सूचना प्रबंधन अनुप्रयोग</title>
+    <meta name="description" content="Keeftalk में रिच-टेक्स्ट फ़ॉर्मेटिंग और मीडिया एकीकरण के साथ सुरक्षित रूप से व्यक्तिगत नोट्स बनाएं, व्यवस्थित करें और प्रबंधित करें।">
+    <link rel="canonical" href="https://keeftalk.com/hi/features/notes.html">
+    <link rel="icon" type="image/png" href="../../favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../css/styles.css">
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            primary: '#6C63FF',
+                            secondary: '#00CCCC',
+                            accent: '#7D5CFF',
+                            online: '#2ECC71',
+                            text: { light: '#1E1E2F', dark: '#ECECF0' },
+                            bg: { light: '#F2F4F8', dark: '#000000' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-brand-bg-light dark:bg-brand-bg-dark text-brand-text-light dark:text-brand-text-dark font-['Inter']">
+
+    <nav class="fixed w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-slate-200 dark:border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <a href="../index.html" class="flex items-center space-x-2">
+                    <div class="p-1">
+                        <img src="../../keeftalk_logo.png" alt="Keeftalk Logo" class="w-10 h-10 object-contain">
+                    </div>
+                    <span class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
+                </a>
+
+                <div class="hidden md:flex items-center space-x-8">
+                    <div class="relative group">
+                        <button class="flex items-center space-x-1 text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">
+                            <span>विशेषताएं</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div class="absolute left-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div class="grid grid-cols-1 divide-y divide-slate-50 dark:divide-white/5">
+                                <a href="messaging.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary rounded-t-xl">मेसेजिंग और SMS</a>
+                                <a href="calls.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">वॉयस और वीडियो</a>
+                                <a href="email.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">सुरक्षित ईमेल</a>
+                                <a href="notes.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">एकीकृत नोट्स</a>
+                                <a href="agenda.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">स्मार्ट एजेंडा</a>
+                                <a href="vault.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">सुरक्षित वॉल्ट</a>
+                                <a href="wallet.html" class="block px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary rounded-b-xl flex justify-between items-center">
+                                    <span>डिजिटल वॉलेट</span>
+                                    <span class="text-[10px] bg-slate-100 dark:bg-white/10 text-slate-500 px-1.5 py-0.5 rounded">जल्द ही</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="../security.html" class="text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">सुरक्षा</a>
+                    <a href="../about.html" class="text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">के बारे में</a>
+
+                    <div class="flex items-center space-x-6 border-l border-slate-200 dark:border-white/10 pl-8">
+                        <button id="theme-toggle" class="text-slate-500 dark:text-slate-400 hover:text-brand-primary transition">
+                            <i class="fas fa-moon dark:hidden"></i>
+                            <i class="fas fa-sun hidden dark:block"></i>
+                        </button>
+
+                        <!-- Language Switcher -->
+                        <div class="relative group">
+                            <button class="flex items-center space-x-1 text-slate-600 dark:text-slate-400 hover:text-brand-primary font-medium transition">
+                                <i class="fas fa-globe text-sm"></i>
+                                <span>हिन्दी (Hindi)</span>
+                                <i class="fas fa-chevron-down text-xs"></i>
+                            </button>
+                            <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div class="py-2">
+                                    <a href="../../features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">English</a>
+                                    <a href="../../zh/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">中文 (Mandarin)</a>
+                                    <a href="notes.html" class="block px-4 py-2 text-sm font-bold text-brand-primary bg-slate-50 dark:bg-white/5">हिन्दी (Hindi)</a>
+                                    <a href="../../es/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Español</a>
+                                    <a href="../../fr/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Français</a>
+                                    <a href="../../ar/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right" dir="rtl">العربية (Arabic)</a>
+                                    <a href="../../bn/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">বাংলা (Bengali)</a>
+                                    <a href="../../pt/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Português</a>
+                                    <a href="../../ru/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary">Русский (Russian)</a>
+                                    <a href="../../ur/features/notes.html" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-brand-primary text-right" dir="rtl">اردो (Urdu)</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="relative group">
+                            <button class="text-slate-400 dark:text-slate-500 font-medium transition flex items-center cursor-not-allowed">
+                                लॉगिन <span class="ml-1.5 text-[9px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-400 font-bold">जल्द ही</span>
+                            </button>
+                            <div class="absolute right-0 mt-2 w-48 bg-slate-900 text-white text-[10px] p-3 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                                हमारा वेब पोर्टल जल्द ही आ रहा है! आप किसी भी ब्राउज़र से अपना खाता प्रबंधित कर पाएंगे।
+                            </div>
+                        </div>
+                        <a href="../index.html#about" class="bg-gradient-brand text-white px-6 py-2.5 rounded-full font-semibold shadow-md hover:opacity-90 transition whitespace-nowrap">ऐप प्राप्त करें</a>
+                    </div>
+                </div>
+
+                <div class="md:hidden flex items-center space-x-4">
+                    <button id="theme-toggle-mobile" class="text-slate-500 dark:text-slate-400">
+                         <i class="fas fa-moon dark:hidden"></i>
+                         <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                    <button id="mobile-menu-btn" class="text-slate-600 dark:text-slate-300 focus:outline-none">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-black border-b border-slate-200 dark:border-white/10 px-4 py-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <a href="../index.html" class="block text-lg font-medium text-slate-800 dark:text-white">होम</a>
+            <div class="space-y-2 pl-4 border-l-2 border-slate-100 dark:border-white/10">
+                <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">विशेषताएं</p>
+                <a href="messaging.html" class="block text-slate-600 dark:text-slate-400 py-1">मेसेजिंग और SMS</a>
+                <a href="calls.html" class="block text-slate-600 dark:text-slate-400 py-1">वॉयस और वीडियो</a>
+                <a href="email.html" class="block text-slate-600 dark:text-slate-400 py-1">सुरक्षित ईमेल</a>
+                <a href="notes.html" class="block text-slate-600 dark:text-slate-400 py-1">एकीकृत नोट्स</a>
+                <a href="agenda.html" class="block text-slate-600 dark:text-slate-400 py-1">स्मार्ट एजेंडा</a>
+                <a href="vault.html" class="block text-slate-600 dark:text-slate-400 py-1">सुरक्षित वॉल्ट</a>
+                <a href="wallet.html" class="block text-slate-600 dark:text-slate-400 py-1 opacity-50">वॉलेट (जल्द ही)</a>
+            </div>
+            <a href="../security.html" class="block text-lg font-medium text-slate-800 dark:text-white">सुरक्षा</a>
+            <a href="../about.html" class="block text-lg font-medium text-slate-800 dark:text-white">के बारे में</a>
+
+            <!-- Mobile Language Selection -->
+            <div class="pt-4 border-t border-slate-100 dark:border-white/10">
+                <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">भाषा चुनें</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <a href="../../features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">English</span>
+                    </a>
+                    <a href="../../zh/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">中文 (ZH)</span>
+                    </a>
+                    <a href="notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-brand-primary/30">
+                        <span class="text-xs font-bold text-brand-primary">हिन्दी (HI)</span>
+                    </a>
+                    <a href="../../es/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Español (ES)</span>
+                    </a>
+                    <a href="../../fr/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Français (FR)</span>
+                    </a>
+                    <a href="../../ar/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">العربية (AR)</span>
+                    </a>
+                    <a href="../../bn/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">বাংলা (BN)</span>
+                    </a>
+                    <a href="../../pt/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Português (PT)</span>
+                    </a>
+                    <a href="../../ru/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">Русский (RU)</span>
+                    </a>
+                    <a href="../../ur/features/notes.html" class="flex items-center space-x-2 p-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                        <span class="text-xs text-slate-600 dark:text-slate-400">اردو (UR)</span>
+                    </a>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-slate-100 dark:border-white/10">
+                <button class="w-full bg-slate-50 dark:bg-white/5 text-slate-400 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 cursor-not-allowed">
+                    <i class="fas fa-globe"></i>
+                    <span>ब्राउज़र लॉगिन (जल्द ही)</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="pt-32 pb-20 bg-white dark:bg-black">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center gap-16">
+                <div class="md:w-1/2">
+                    <h1 class="text-4xl md:text-6xl font-extrabold mb-6 text-slate-900 dark:text-white">
+                        Keeftalk <span class="text-orange-600">सुरक्षित नोट्स</span>
+                    </h1>
+                    <p class="text-xl text-slate-600 dark:text-slate-400 leading-relaxed mb-8">
+                        Keeftalk नोट्स व्यक्तिगत डिजिटल जानकारी को सुरक्षित रूप से प्रबंधित करने का एक उपकरण है। उपयोगकर्ता एप्लिकेशन के भीतर टेक्स्ट और मीडिया सामग्री बना सकते हैं, साझा कर सकते हैं और व्यवस्थित कर सकते हैं।
+                    </p>
+                    <div class="flex items-center space-x-4 text-orange-700 dark:text-orange-500 font-bold">
+                        <div class="flex items-center"><i class="fas fa-check-circle mr-2"></i>रिच टेक्स्ट</div>
+                        <div class="flex items-center"><i class="fas fa-check-circle mr-2"></i>सुरक्षित साझाकरण</div>
+                        <div class="flex items-center"><i class="fas fa-check-circle mr-2"></i>सिंक किया गया डेटा</div>
+                    </div>
+                </div>
+                <div class="md:w-1/2">
+                    <div class="relative mx-auto max-w-[280px]">
+                        <div class="rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-slate-900 dark:border-white/10 aspect-[9/19] bg-slate-800">
+                            <img src="../../img/screenshots/notes.png" alt="Keeftalk नोट्स इंटरफ़ेस" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -z-10 -bottom-10 -right-10 w-40 h-40 bg-orange-600 rounded-full blur-3xl opacity-20"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Details -->
+    <section class="py-24 bg-brand-bg-light dark:bg-brand-bg-dark border-t border-slate-100 dark:border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-20">
+                <div>
+                    <h2 class="text-3xl font-bold mb-6 text-slate-900 dark:text-white">सूचना संगठन</h2>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                        एक संरचित प्रणाली का उपयोग करके अपने व्यक्तिगत विचारों या प्रोजेक्ट दस्तावेज़ों को व्यवस्थित करें। Keeftalk यह सुनिश्चित करता है कि सभी नोट डेटा सुरक्षित ट्रांसमिशन और स्टोरेज विधियों का उपयोग करके संभाला जाए।
+                    </p>
+                    <ul class="space-y-4 text-slate-700 dark:text-slate-300">
+                        <li><i class="fas fa-users mr-3 text-orange-500"></i> बहु-उपयोगकर्ता सहयोग उपकरण</li>
+                        <li><i class="fas fa-lock mr-3 text-orange-500"></i> नियंत्रित पहुंच अनुमतियां</li>
+                        <li><i class="fas fa-history mr-3 text-orange-500"></i> संस्करण इतिहास प्रबंधन</li>
+                    </ul>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold mb-6 text-slate-900 dark:text-white">सामग्री प्रबंधन</h2>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                        Keeftalk नोट्स साधारण टेक्स्ट के अलावा विभिन्न डेटा प्रकारों का समर्थन करता है, जिसमें मीडिया फ़ाइलें, संरचित टेबल और डिजिटल जानकारी को प्रभावी ढंग से प्रबंधित करने में मदद करने के लिए कार्य चेकलिस्ट शामिल हैं।
+                    </p>
+                    <ul class="space-y-4 text-slate-700 dark:text-slate-300">
+                        <li><i class="fas fa-image mr-3 text-orange-500"></i> मीडिया एकीकरण क्षमताएं</li>
+                        <li><i class="fas fa-table mr-3 text-orange-500"></i> संरचित डेटा टेबल</li>
+                        <li><i class="fas fa-code mr-3 text-orange-500"></i> तकनीकी कोड स्निपेट समर्थन</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-white dark:bg-black py-16 border-t border-slate-200 dark:border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="flex items-center space-x-2 mb-6">
+                        <img src="../../keeftalk_logo.png" alt="Keeftalk Logo" class="w-8 h-8 object-contain">
+                        <span class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Keeftalk</span>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+                        सुरक्षित संचार और उत्पादकता अनुप्रयोग।
+                    </p>
+                    <p class="mt-4 text-xs text-slate-400 dark:text-slate-500 uppercase tracking-widest font-bold">स्थान</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Keeftalk LLC, Menzah 6, Tunis, Tunisia</p>
+                    <div class="mt-6 flex items-center space-x-2 text-brand-online text-sm font-semibold">
+                        <i class="fas fa-sync-alt animate-spin-slow"></i>
+                        <span>सुरक्षित डेटा हैंडलिंग और सिंक्रोनाइज़ेशन।</span>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-6 text-slate-800">उत्पाद</h4>
+                    <ul class="space-y-4 text-slate-500 dark:text-slate-400">
+                        <li><a href="messaging.html" class="hover:text-brand-primary transition">मेसेजिंग</a></li>
+                        <li><a href="calls.html" class="hover:text-brand-primary transition">कॉल</a></li>
+                        <li><a href="email.html" class="hover:text-brand-primary transition">ईमेल</a></li>
+                        <li><a href="notes.html" class="hover:text-brand-primary transition">नोट्स</a></li>
+                        <li><a href="agenda.html" class="hover:text-brand-primary transition">एजेंडा</a></li>
+                        <li><a href="vault.html" class="hover:text-brand-primary transition">वॉल्ट</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-6 text-slate-800">कंपनी</h4>
+                    <ul class="space-y-4 text-slate-500 dark:text-slate-400">
+                        <li><a href="../about.html" class="hover:text-brand-primary transition">Keeftalk के बारे में</a></li>
+                        <li><a href="../security.html" class="hover:text-brand-primary transition">सुरक्षा मानक</a></li>
+                        <li><a href="../contact.html" class="hover:text-brand-primary transition">Keeftalk टीम से संपर्क करें</a></li>
+                        <li><a href="../legal/privacy.html" class="hover:text-brand-primary transition">गोपनीयता नीति</a></li>
+                        <li><a href="../legal/terms.html" class="hover:text-brand-primary transition">सेवा की शर्तें</a></li>
+                        <li><a href="../legal/licenses.html" class="hover:text-brand-primary transition">ओपन सोर्स लाइसेंस</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-slate-100 dark:border-white/5">
+                <div class="text-slate-400 dark:text-slate-600 text-sm mb-6 md:mb-0">
+                    &copy; 2026 Keeftalk. सर्वाधिकार सुरक्षित।
+                </div>
+                <div class="flex space-x-6">
+                    <a href="https://x.com/keeftalkapp" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-x-twitter"></i></a>
+                    <a href="https://facebook.com/keeftalk" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-facebook"></i></a>
+                    <a href="https://github.com/Keeftalk" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-brand-primary transition text-xl"><i class="fab fa-github"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../../js/components.js"></script>
+</body>
+</html>

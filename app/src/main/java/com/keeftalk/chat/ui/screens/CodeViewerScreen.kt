@@ -1,6 +1,5 @@
 package com.keeftalk.chat.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keeftalk.chat.util.FileUtils
 import com.keeftalk.chat.util.SyntaxHighlighter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,21 +49,27 @@ fun CodeViewerScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
     var currentSearchMatchIndex by remember { mutableIntStateOf(0) }
-    val searchMatches = remember(codeContent, searchQuery) {
-        if (searchQuery.length < 2) emptyList<Pair<Int, IntRange>>()
-        else {
+    var searchMatches by remember { mutableStateOf<List<Pair<Int, IntRange>>>(emptyList()) }
+    
+    LaunchedEffect(codeContent, searchQuery) {
+        if (searchQuery.length < 2) {
+            searchMatches = emptyList()
+            return@LaunchedEffect
+        }
+        
+        withContext(Dispatchers.Default) {
             val lines = codeContent?.lines() ?: emptyList()
             val matches = mutableListOf<Pair<Int, IntRange>>()
-                    lines.forEachIndexed { lineIndex, line ->
-                        var start = 0
-                        while (start < line.length) {
-                            val index = line.indexOf(searchQuery, start, ignoreCase = true)
-                            if (index == -1) break
-                            matches.add(lineIndex to index..(index + searchQuery.length - 1))
-                            start = index + searchQuery.length
-                        }
-                    }
-                    matches
+            lines.forEachIndexed { lineIndex, line ->
+                var start = 0
+                while (start < line.length) {
+                    val index = line.indexOf(searchQuery, start, ignoreCase = true)
+                    if (index == -1) break
+                    matches.add(lineIndex to index..(index + searchQuery.length - 1))
+                    start = index + searchQuery.length
+                }
+            }
+            searchMatches = matches
         }
     }
 
@@ -210,10 +217,13 @@ fun CodeViewerScreen(
                 val isDark = isSystemInDarkTheme()
                 val horizontalScrollState = rememberScrollState()
 
+                val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                val screenWidth = configuration.screenWidthDp.dp
+
                 Box(modifier = Modifier.fillMaxSize().horizontalScroll(horizontalScrollState)) {
                     LazyColumn(
                         state = lazyListState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxHeight().widthIn(min = screenWidth)
                     ) {
                         itemsIndexed(lines) { lineIndex, line ->
                             CodeLine(
@@ -265,7 +275,7 @@ fun CodeLine(
     
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(IntrinsicSize.Max)
             .drawBehind {
                 // Indentation guides
                 val tabWidthPx = 32.dp.toPx()

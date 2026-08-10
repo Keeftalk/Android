@@ -33,7 +33,13 @@ fun VaultMediaViewer(
 
     LaunchedEffect(item) {
         isLoading = true
+        android.util.Log.d("VAULT_UI", "Opening media viewer for item: ${item.id} | title: ${item.title}")
         decryptedFile = viewModel.getDecryptedFile(item)
+        if (decryptedFile == null) {
+            android.util.Log.e("VAULT_UI", "Failed to get decrypted file for item: ${item.id}")
+        } else {
+            android.util.Log.i("VAULT_UI", "File decrypted successfully: ${decryptedFile!!.absolutePath}")
+        }
         isLoading = false
     }
 
@@ -67,7 +73,20 @@ fun VaultMediaViewer(
                 }
             }
         } else {
-            Text("Failed to decrypt file", color = Color.White, modifier = Modifier.align(Alignment.Center))
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(Icons.Default.ErrorOutline, null, tint = Color.Red, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Failed to decrypt file", color = Color.White)
+                Text(
+                    "Check Logcat for [FILE_PIPELINE] to see details", 
+                    color = Color.Gray, 
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
 
         // Top Bar

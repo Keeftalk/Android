@@ -57,7 +57,6 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
         MemoryTracker.logHeapSnapshot(this, "App Start")
 
         // CORE ARCHITECTURE: Execute Tier 1 IMMEDIATELY
-        // Move heavy IO to Tier 2/3 to avoid blocking the main thread during app launch
         Trace.beginSection("Tier 1: Local Prep")
         PerformanceProfiler.startStage("Tier 1: Local Prep")
         
@@ -65,6 +64,9 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
         com.keeftalk.chat.util.KeeftalkStore.init(this)
         com.keeftalk.chat.security.crypto.KeyManager.init(this)
         
+        // Ensure channels exist synchronously for FCM wake-up
+        createNotificationChannels()
+
         PerformanceProfiler.endStage("Tier 1: Local Prep", category = PerformanceProfiler.Category.STORAGE)
         Trace.endSection()
 
@@ -129,10 +131,6 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
         com.keeftalk.chat.util.StartupOrchestrator.enqueue(com.keeftalk.chat.util.StartupOrchestrator.Tier.TIER_3_POST_RENDER) {
             Trace.beginSection("Tier 3: Post-Render")
             PerformanceProfiler.startStage("Tier 3: UI Pre-inflation & Network")
-
-            createNotificationChannels()
-            com.keeftalk.chat.util.CachedInflater.preInflate(this@KeeftalkApplication)
-            com.keeftalk.chat.util.ViewWarmer.init(this@KeeftalkApplication)
 
             // Initialize Supabase after UI is ready
             com.keeftalk.chat.di.AppModule.startSupabaseInit(this@KeeftalkApplication)
@@ -205,6 +203,21 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
             }
             val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
+
+            val callChannel = NotificationChannel("incoming_calls_v3", "Incoming Calls", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Urgent call alerts"
+                setSound(android.provider.Settings.System.DEFAULT_RINGTONE_URI, android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build())
+                enableLights(true)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 500, 500)
+                importance = NotificationManager.IMPORTANCE_HIGH
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+            }
+            manager.createNotificationChannel(callChannel)
         }
         PerformanceProfiler.endStage("Notification Channels Creation", category = PerformanceProfiler.Category.ANDROID)
     }

@@ -18,7 +18,15 @@ fun updateBubblePositions(
 ) {
     for (i in 0 until recyclerView.childCount) {
         val child = recyclerView.getChildAt(i)
-        val messageId = child.tag as? String ?: continue
+        val tag = child.tag as? String ?: continue
+        
+        // Handle complex binding tags: msg_UUID_status_...
+        val messageId = if (tag.startsWith("msg_")) {
+            tag.split("_").getOrNull(1) ?: tag
+        } else {
+            tag
+        }
+        
         val x = child.x
         val y = child.y
         bubblePositions[messageId] = Offset(x, y) to IntSize(child.width, child.height)

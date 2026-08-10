@@ -3,7 +3,9 @@
   <component name="PlanningModeManager">
     <option name="approvalStates">
       <map>
+        <entry key="005cf166-1704-43a1-8031-6fe90ca3ee78" value="false" />
         <entry key="03849896-ecdc-4fce-b27f-6dc9cd02bde8" value="false" />
+        <entry key="0402b1d9-b514-4630-a819-894e4658b11b" value="false" />
         <entry key="057ddbcc-44d7-440c-98a1-53698696ce50" value="false" />
         <entry key="0f10e2ff-6680-4db6-b377-a42e365de4c6" value="false" />
         <entry key="18469085-1a84-4200-b29a-d71a84fbbbbe" value="false" />
@@ -30,19 +32,23 @@
         <entry key="41a8513a-87f3-4270-afe2-3f79d872179f" value="false" />
         <entry key="4ab0036d-6bc7-4728-acb0-c2a61b04ddaf" value="false" />
         <entry key="4bc0a612-7342-49ac-bead-dfbc98a7c3dc" value="false" />
+        <entry key="50acc3c7-cc94-4b6e-a4b4-0e1f54ff2d6f" value="false" />
         <entry key="5575dad0-8f6e-4dde-a1c7-da624cf1ef2b" value="false" />
         <entry key="58455ed7-9615-4ac2-b3fe-ff61ea1bff09" value="false" />
         <entry key="5c00abc6-8ca1-49ba-9226-707b52ed744b" value="false" />
         <entry key="5dbdad9a-3954-4a1b-b147-b91aad5d367b" value="false" />
         <entry key="619f6a8d-6086-4b7e-b212-6ff0d19d592e" value="false" />
         <entry key="6b9d9410-6b4a-4f46-94d7-b1b913cfe32b" value="false" />
+        <entry key="6c2cb817-e676-46dc-a46f-467faab92c28" value="false" />
         <entry key="6c538256-32ee-472f-8ed3-8085ab9c2689" value="false" />
         <entry key="6ca45916-d12c-42bc-8fcb-ab8f26954bd0" value="false" />
         <entry key="74ec7cdd-d636-4568-a716-5377dbdf2ecc" value="false" />
         <entry key="75399ede-9030-4c2d-9c04-6b92acaf9324" value="false" />
+        <entry key="7a21296b-6972-436f-87e8-1d75d7f91310" value="false" />
         <entry key="7a7036b1-6c0d-4b07-a05f-460ef98058a1" value="false" />
         <entry key="86f67172-23a1-4618-8b75-4e5e02bc70c2" value="false" />
         <entry key="87a3d440-ee52-4104-94bc-f4b26affcf45" value="false" />
+        <entry key="88223921-124b-4db6-8290-ed7e6db6d0f7" value="false" />
         <entry key="88371a98-bc83-4474-8ade-d98ebeece350" value="false" />
         <entry key="890cfbe1-dec6-4ee1-9f7b-c66883d62197" value="false" />
         <entry key="8a605c46-2993-461c-9e59-3c27d2bd978b" value="false" />
@@ -54,14 +60,17 @@
         <entry key="a50965b8-e7a2-497b-99ff-09f38ca4900a" value="false" />
         <entry key="a95cee68-0627-46c4-8777-cb60db110256" value="false" />
         <entry key="b651fc73-0341-45ae-9c97-97c3d044dd23" value="false" />
+        <entry key="b7a289e7-f83e-4203-9fbc-63c071b11178" value="false" />
         <entry key="b9c47850-deac-4b4d-a068-62adda69eb64" value="false" />
         <entry key="bb6dfe74-3882-40b5-9f58-b67370d85d79" value="false" />
         <entry key="cf2609b3-0c6d-4a08-86b3-479791ef75c1" value="false" />
         <entry key="d11aa47b-6af0-4d6c-9bd0-b70a563257a8" value="false" />
+        <entry key="d1962e0f-3bc0-43c7-b093-a0a92eded5f2" value="false" />
         <entry key="d74827a5-f30f-4cb4-ad5c-27578b84c8dc" value="false" />
         <entry key="dd2e2b13-0fd3-40ef-974d-5c406a016c11" value="false" />
         <entry key="de882ec4-e388-45fb-a014-8f83f68fd550" value="false" />
         <entry key="e2d914fe-69a1-4418-9179-d16240051789" value="false" />
+        <entry key="eaf91121-8237-4b60-9d0b-1fcb9b358d2c" value="false" />
         <entry key="f1077f6d-dfe3-41d7-91da-9335f9bfbe14" value="false" />
         <entry key="f2e77327-4580-41bd-96c9-7067ca05d7ee" value="false" />
         <entry key="f470b54c-db73-4d37-bc0e-55eb5d980e05" value="false" />

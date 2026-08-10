@@ -128,7 +128,7 @@ fun EmailDetailScreen(
                 ) {
                     KeeftalkAvatar(
                         avatarUrl = msg.senderProfilePicUrl,
-                        initials = getInitials(msg.senderName),
+                        initials = com.keeftalk.chat.util.AvatarUtils.getInitials(msg.senderName),
                         seed = msg.senderEmail,
                         size = 56.dp
                     )
@@ -350,13 +350,4 @@ private fun formatFileSize(size: Long): String {
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     val digitGroups = (kotlin.math.log10(size.toDouble()) / kotlin.math.log10(1024.0)).toInt()
     return String.format(Locale.US, "%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
-}
-
-private fun getInitials(name: String): String {
-    return name.split(" ")
-        .filter { it.isNotEmpty() }
-        .mapNotNull { it.firstOrNull() }
-        .take(2)
-        .joinToString("")
-        .uppercase()
 }

@@ -45,6 +45,7 @@ interface ChatRepository {
     suspend fun sendDeliveryReceipt(chatId: String, messageId: String)
     fun getChatMembersFlow(chatId: String): Flow<List<com.keeftalk.chat.data.local.entities.ChatMemberEntity>>
     fun getSearchableProfiles(): Flow<List<com.keeftalk.chat.domain.model.Profile>>
+    suspend fun getProfilesByIds(ids: List<String>): List<com.keeftalk.chat.domain.model.Profile>
     suspend fun syncAllProfiles()
     suspend fun searchUsers(query: String): Result<List<com.keeftalk.chat.domain.model.Profile>>
     suspend fun searchUserByPhone(phone: String): Result<com.keeftalk.chat.domain.model.Profile?>

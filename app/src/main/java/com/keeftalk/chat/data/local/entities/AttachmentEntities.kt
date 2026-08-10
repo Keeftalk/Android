@@ -3,6 +3,7 @@ package com.keeftalk.chat.data.local.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,6 +23,10 @@ import kotlinx.serialization.Serializable
             parentColumns = ["id"],
             childColumns = ["file_id"]
         )
+    ],
+    indices = [
+        Index(value = ["message_id"]),
+        Index(value = ["file_id"])
     ]
 )
 data class MessageAttachmentEntity(
@@ -46,6 +51,10 @@ data class MessageAttachmentEntity(
             parentColumns = ["id"],
             childColumns = ["file_id"]
         )
+    ],
+    indices = [
+        Index(value = ["note_id"]),
+        Index(value = ["file_id"])
     ]
 )
 data class NoteAttachmentEntity(
@@ -70,6 +79,10 @@ data class NoteAttachmentEntity(
             parentColumns = ["id"],
             childColumns = ["file_id"]
         )
+    ],
+    indices = [
+        Index(value = ["agenda_event_id"]),
+        Index(value = ["file_id"])
     ]
 )
 data class AgendaAttachmentEntity(

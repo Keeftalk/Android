@@ -320,7 +320,7 @@ class NoteRepositoryImpl(
             val fileEntity = fileDao.getFileById(fileId) ?: return@withContext ""
             val file = fileEntity.toDomain()
             val fileRepo = AppModule.provideFileRepository(context)
-            val result = fileRepo.ensureMediaLocal(file)
+            val result = fileRepo.ensureMediaLocal(file, null)
             result.getOrNull()?.absolutePath ?: ""
         } catch (e: Exception) { "" }
     }

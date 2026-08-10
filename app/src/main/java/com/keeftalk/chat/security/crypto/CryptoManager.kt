@@ -2,7 +2,7 @@ package com.keeftalk.chat.security.crypto
 
 import javax.crypto.SecretKey
 import android.util.Log
-import java.util.Base64
+import android.util.Base64
 
 /**
  * Unified entry point for all cryptographic operations in Keeftalk.
@@ -13,50 +13,81 @@ class CryptoManager(
     val userId: String
 ) {
     private val TAG = "CryptoManager"
+    private val B64_FLAGS = Base64.NO_WRAP
 
     // --- Messaging (PCK-based) ---
 
     /**
-     * Encrypts a message for a conversation using its random Per-Conversation Key (PCK).
+     * Encrypts a message for a conversation using its shared Per-Conversation Key (PCK).
      * Returns the envelope and the crypto version used.
      */
-    suspend fun encryptMessage(chatId: String, plaintext: String): Pair<EncryptedMessageEnvelope, Int> {
-        // Use a random key from the manager (creates if missing)
-        val key = conversationKeyManager.getOrLoadKey(chatId) ?: conversationKeyManager.createKey(chatId)
+    suspend fun encryptMessage(
+        chatId: String, 
+        messageId: String,
+        senderId: String,
+        plaintext: String
+    ): Pair<EncryptedMessageEnvelope, Int> {
+        // Resolve the PCK. This will derive a deterministic shared key if one hasn't been shared yet.
+        val key = conversationKeyManager.getOrLoadKey(chatId) ?: throw Exception("Failed to resolve encryption key for chat $chatId")
         
-        val encryptedObj = StorageCryptoService.encrypt(plaintext.toByteArray(Charsets.UTF_8), key)
+        Log.d(TAG, "[CRYPTO_DIAG] encryptMessage | chatId=$chatId | msgId=$messageId")
+
+        // 1. Build AAD for Protocol Version 4 (Normalized and String-based)
+        val version = 4
+        val (aad, aadStr) = MessageCryptoContext.buildMessageAad(version, chatId, messageId)
+
+        // 2. Encrypt with AAD
+        val encryptedObj = StorageCryptoService.encrypt(plaintext.toByteArray(Charsets.UTF_8), key, aad, aadStr)
+        
         val envelope = EncryptedMessageEnvelope(
             type = 100, // Cloud-E2EE PCK Type
-            ciphertext = Base64.getDecoder().decode(encryptedObj.ciphertext),
+            ciphertext = Base64.decode(encryptedObj.ciphertext, B64_FLAGS),
             nonce = encryptedObj.iv
         )
-        return envelope to 3 // Version 3: Random PCK protected by CPK
+        return envelope to version
     }
 
     /**
-     * Decrypts a message using the conversation's Per-Conversation Key (PCK).
+     * Decrypts a message using the conversation's shared Per-Conversation Key (PCK).
      */
-    suspend fun decryptMessage(chatId: String, envelope: EncryptedMessageEnvelope, cryptoVersion: Int = 1): String {
+    suspend fun decryptMessage(
+        chatId: String, 
+        messageId: String,
+        senderId: String,
+        envelope: EncryptedMessageEnvelope, 
+        cryptoVersion: Int = 1
+    ): String {
         // Treat type 0 (Legacy/Unspecified) as 100 (Cloud-E2EE) for robustness
         if (envelope.type != 100 && envelope.type != 0) {
             throw Exception("Unsupported message type: ${envelope.type}. Only Cloud-E2EE (100) is supported.")
         }
 
         val nonce = envelope.nonce ?: throw Exception("Nonce missing for PCK message")
+        
+        Log.d(TAG, "[CRYPTO_DIAG] decryptMessage | chatId=$chatId | msgId=$messageId | cryptoVer=$cryptoVersion")
+
+        // 1. Resolve PCK (Synchronized with encryption derivation)
+        val key = conversationKeyManager.getOrLoadKey(chatId) ?: run {
+            throw Exception("PCK not found for chat $chatId. Decryption aborted.")
+        }
+
+        // 2. Reconstruct AAD for Version 4+ ONLY
+        // Version 3 and below are treated as legacy (No AAD) to restore compatibility
+        val (aad, aadStr) = if (cryptoVersion >= 4) {
+            MessageCryptoContext.buildMessageAad(cryptoVersion, chatId, messageId)
+        } else null to null
+
+        // 3. Decrypt
         val encryptedObj = EncryptedObject(
             version = 1,
             keyId = "pck",
             iv = nonce,
-            ciphertext = Base64.getEncoder().encodeToString(envelope.ciphertext)
+            ciphertext = Base64.encodeToString(envelope.ciphertext, B64_FLAGS)
         )
-
-        // Load key from manager (handles both legacy and new wrapped versions)
-        val key = conversationKeyManager.getOrLoadKey(chatId) ?: run {
-            throw Exception("PCK not found for chat $chatId. Decryption aborted.")
-        }
         
         return try {
-            String(StorageCryptoService.decrypt(encryptedObj, key), Charsets.UTF_8)
+            val decryptedBytes = StorageCryptoService.decrypt(encryptedObj, key, aad, aadStr)
+            String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             Log.e(TAG, "AES-GCM Decryption failed for chatId=$chatId version=$cryptoVersion. Error=${e.message}")
             throw e
@@ -90,7 +121,12 @@ class CryptoManager(
     }
 
     fun decryptMedia(encrypted: EncryptedObject, mediaKey: SecretKey): ByteArray {
-        return StorageCryptoService.decrypt(encrypted, mediaKey)
+        return try {
+            StorageCryptoService.decrypt(encrypted, mediaKey)
+        } catch (e: Exception) {
+            Log.e("FILE_PIPELINE", "DECRYPT_MEDIA_FAILED | keyId=${encrypted.keyId} | error=${e.message}")
+            throw e
+        }
     }
 
     private fun getKeyForPurpose(purpose: StoragePurpose): SecretKey {

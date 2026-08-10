@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <share-target android:targetClass="com.keeftalk.chat.ui.share.ShareHandlerActivity"
+        android:targetPackage="com.keeftalk.chat">
+        <data android:mimeType="image/*" />
+        <data android:mimeType="video/*" />
+        <data android:mimeType="audio/*" />
+        <data android:mimeType="text/*" />
+        <data android:mimeType="application/*" />
+        <category android:name="com.keeftalk.chat.category.DIRECT_SHARE" />
+        <intent
+            android:action="android.intent.action.SEND"
+            android:targetPackage="com.keeftalk.chat"
+            android:targetClass="com.keeftalk.chat.ui.share.ShareHandlerActivity" />
+        <intent
+            android:action="android.intent.action.SEND_MULTIPLE"
+            android:targetPackage="com.keeftalk.chat"
+            android:targetClass="com.keeftalk.chat.ui.share.ShareHandlerActivity" />
+    </share-target>
+</shortcuts>

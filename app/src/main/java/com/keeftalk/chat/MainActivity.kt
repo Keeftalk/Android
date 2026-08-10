@@ -9,11 +9,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
 import com.keeftalk.chat.util.BiometricAuthManager
 import com.keeftalk.chat.ui.screens.chatdetail.AttachmentType
-import com.google.android.gms.location.LocationServices
 import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Trace
+import java.util.Locale
 import androidx.core.net.toUri
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +63,7 @@ import com.keeftalk.chat.ui.discovery.DiscoveryScreen
 import com.keeftalk.chat.ui.discovery.DiscoveryViewModel
 import com.keeftalk.chat.ui.profile.ProfileScreen
 import com.keeftalk.chat.ui.profile.ProfileViewModel
+import com.keeftalk.chat.ui.profile.ConnectionPathScreen
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import com.keeftalk.chat.ui.screens.*
@@ -164,7 +165,15 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        android.util.Log.d(TAG, "onNewIntent received: ${intent.action}")
+        Log.d(TAG, "onNewIntent received: ${intent.action}")
+
+        // Handle Dropbox Auth Result
+        val dropboxCredential = com.dropbox.core.android.Auth.getDbxCredential()
+        if (dropboxCredential != null) {
+            Log.d(TAG, "Dropbox authentication successful")
+            AppModule.cloudImportResultFlow.tryEmit(listOf("DROPBOX_AUTH_SUCCESS"))
+        }
+
         intent.getStringExtra("chatId")?.let {
             pendingChatId.value = it
         }
@@ -175,7 +184,7 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
 
     @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        android.os.Trace.beginSection("MainActivity.onCreate")
+        Trace.beginSection("MainActivity.onCreate")
         PerformanceProfiler.startStage("MainActivity.onCreate()")
 
         PerformanceProfiler.startStage("SplashScreen Installation")
@@ -189,11 +198,11 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
         enableEdgeToEdge()
         PerformanceProfiler.endStage("EdgeToEdge Enabling", category = PerformanceProfiler.Category.ANDROID)
 
-        android.os.Trace.beginSection("MainActivity.setContentView")
+        Trace.beginSection("MainActivity.setContentView")
         PerformanceProfiler.startStage("UI Layout Inflation")
         setContentView(R.layout.activity_main)
         PerformanceProfiler.endStage("UI Layout Inflation", category = PerformanceProfiler.Category.UI)
-        android.os.Trace.endSection()
+        Trace.endSection()
 
         val composeOverlay = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.compose_overlay)
         val nativeShell = findViewById<android.view.ViewGroup>(R.id.native_fragment_shell)
@@ -211,7 +220,7 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
                     onChatListReady()
                 }
             },
-            3000 // Reduced timeout for faster failsafe
+            3000 
         )
 
         PerformanceProfiler.logEvent("MainActivity: attachToWindow deferred", category = PerformanceProfiler.Category.UI)
@@ -221,7 +230,7 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
         val isLocked = prefsRepo.isAppLockEnabledFast()
 
         if (isLogged && !isLocked) {
-            android.os.Trace.beginSection("MainActivity.nativeShellInit")
+            Trace.beginSection("MainActivity.nativeShellInit")
             PerformanceProfiler.startStage("Native Shell Fragment Init")
             val fragment = ChatListFragment()
             fragment.setOnChatClickListener { chatId ->
@@ -231,7 +240,7 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
                 .replace(R.id.native_fragment_shell, fragment, "chat_list")
                 .commit()
             PerformanceProfiler.endStage("Native Shell Fragment Init", category = PerformanceProfiler.Category.UI)
-            android.os.Trace.endSection()
+            Trace.endSection()
         } else {
             nativeShell.visibility = android.view.View.GONE
         }
@@ -249,7 +258,7 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
         PerformanceProfiler.endStage("Fast Path Sync Prefs Read", category = PerformanceProfiler.Category.STORAGE)
 
         PerformanceProfiler.startStage("Compose content set")
-        android.os.Trace.beginSection("MainActivity.setContent")
+        Trace.beginSection("MainActivity.setContent")
         composeOverlay.setContent {
             val mainViewModel: com.keeftalk.chat.ui.MainViewModel = viewModel()
             val fastChats by mainViewModel.fastChats.collectAsState()
@@ -327,8 +336,8 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
         }
         PerformanceProfiler.endStage("Compose content set", category = PerformanceProfiler.Category.COMPOSE)
         PerformanceProfiler.endStage("MainActivity.onCreate()", category = PerformanceProfiler.Category.UI)
-        android.os.Trace.endSection() // End MainActivity.setContent
-        android.os.Trace.endSection() // End MainActivity.onCreate
+        Trace.endSection() 
+        Trace.endSection() 
     }
 }
 
@@ -358,7 +367,7 @@ fun FullAppContent(
             }
         }
         is StartupState.Ready -> {
-            if (!state.isLogged || !state.isEmailVerified) {
+            if (!state.isLogged) {
                 val currentContext = LocalContext.current
                 AuthScreen(
                     viewModel = viewModel {
@@ -397,7 +406,7 @@ fun FullAppContent(
                 val notifications by mainViewModel.notifications.collectAsState()
 
                 var isAppUnlocked by remember { 
-                    mutableStateOf(value = !mainViewModel.userPreferencesRepository.isAppLockEnabledFast()) 
+                    mutableStateOf(!mainViewModel.userPreferencesRepository.isAppLockEnabledFast()) 
                 }
 
                 if ((!isAppUnlocked) && (securitySettings?.appLockEnabled == true)) {
@@ -496,7 +505,7 @@ fun MainScaffold(
     val context = LocalContext.current
     
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
-    var isDetailShown by remember { mutableStateOf(value = false) }
+    var isDetailShown by remember { mutableStateOf(false) }
     
     val customization = userPrefs.appCustomization
     var bottomTab by remember(customization.bottomNavTabs) { 
@@ -541,7 +550,6 @@ fun MainScaffold(
     val myId = userPrefs.userId
 
     // Progressive Data Fetching
-    val fastChats by mainViewModel.fastChats.collectAsState()
     val chatListViewModel: com.keeftalk.chat.ui.screens.ChatListViewModel? = if (isHydrated) {
         viewModel { com.keeftalk.chat.ui.screens.ChatListViewModel(mainViewModel.chatRepository) }
     } else null
@@ -553,14 +561,10 @@ fun MainScaffold(
         chatListViewModel?.setContainerId(selectedContainerId)
     }
     
-    val realChats = if ((isHydrated && chatListViewModel != null)) {
-        chatListViewModel.activeChats.collectAsState().value
-    } else emptyList()
-    
-    val chatsToDisplay = realChats.ifEmpty { fastChats }
+    val fullChatsForBadges = chatListViewModel?.allChatsForBadges?.collectAsState()?.value ?: emptyList()
 
-    val anyBadgeCount = remember(chatsToDisplay) {
-        chatsToDisplay.any { it.unreadCount > 0 }
+    val anyBadgeCount = remember(fullChatsForBadges) {
+        fullChatsForBadges.any { !it.isArchived && it.unreadCount > 0 }
     }
     val showContainersActual = (anyBadgeCount || manualRevealContainers || selectedContainerId != "all")
 
@@ -570,8 +574,6 @@ fun MainScaffold(
             manualRevealContainers = false
         }
     }
-
-    val fullChatsForBadges = chatListViewModel?.allChatsForBadges?.collectAsState()?.value ?: emptyList()
 
     val containers = remember(fullChatsForBadges, selectedContainerId, chatTab) {
         listOf(
@@ -585,19 +587,23 @@ fun MainScaffold(
 
     LaunchedEffect(intent) {
         val screen = intent.getStringExtra("screen")
-        if (screen == "profile_view_history") {
-            onScreenChange(AppScreen.ProfileViewHistory)
-            intent.removeExtra("screen")
-        } else if (screen == "security_activity") {
-            onScreenChange(AppScreen.SecuritySettings)
-            intent.removeExtra("screen")
-        } else if (screen == "sms_detail") {
-            val address = intent.getStringExtra("address") ?: ""
-            scope.launch {
-                val threadId = android.provider.Telephony.Threads.getOrCreateThreadId(context, address)
-                onScreenChange(AppScreen.SmsDetail(threadId, address))
+        when (screen) {
+            "profile_view_history" -> {
+                onScreenChange(AppScreen.ProfileViewHistory)
+                intent.removeExtra("screen")
             }
-            intent.removeExtra("screen")
+            "security_activity" -> {
+                onScreenChange(AppScreen.SecuritySettings)
+                intent.removeExtra("screen")
+            }
+            "sms_detail" -> {
+                val address = intent.getStringExtra("address") ?: ""
+                scope.launch {
+                    val threadId = android.provider.Telephony.Threads.getOrCreateThreadId(context, address)
+                    onScreenChange(AppScreen.SmsDetail(threadId, address))
+                }
+                intent.removeExtra("screen")
+            }
         }
 
         if (intent.action == android.content.Intent.ACTION_VIEW) {
@@ -605,6 +611,19 @@ fun MainScaffold(
             if (data?.scheme == "keeftalk" && data.host == "reset-password") {
                 onScreenChange(AppScreen.CreateNewPassword)
             }
+        }
+
+        if (intent.action == "SHARE_TO_CHAT") {
+            val chatId = intent.getStringExtra("chatId")
+            @Suppress("DEPRECATION")
+            val mediaItems = intent.getParcelableArrayListExtra<com.keeftalk.chat.domain.model.MediaItem>("mediaItems") ?: emptyList()
+            @Suppress("DEPRECATION")
+            val docModels = intent.getParcelableArrayListExtra<com.keeftalk.chat.domain.model.DocumentModel>("documentModels") ?: emptyList()
+            
+            if (chatId != null) {
+                onScreenChange(AppScreen.FileReview(chatId, mediaItems, docModels))
+            }
+            intent.action = null // Clear to avoid re-triggering
         }
     }
 
@@ -641,7 +660,7 @@ fun MainScaffold(
     }
 
     var highlightedChatId by remember { mutableStateOf<String?>(null) }
-    var systemDialogData by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var systemDialogData by remember { mutableStateOf<com.keeftalk.chat.ui.NotificationNavigationEvent.ShowSystemDialog?>(null) }
 
     LaunchedEffect(Unit) {
         mainViewModel.navigationEvent.collectLatest { event ->
@@ -660,17 +679,42 @@ fun MainScaffold(
                     bottomTab = com.keeftalk.chat.domain.model.KeeftalkModule.CALLS
                 }
                 is com.keeftalk.chat.ui.NotificationNavigationEvent.NavigateToNote -> onScreenChange(AppScreen.Notes(event.noteId))
-                is com.keeftalk.chat.ui.NotificationNavigationEvent.ShowSystemDialog -> systemDialogData = event.title to event.message
+                is com.keeftalk.chat.ui.NotificationNavigationEvent.ShowSystemDialog -> systemDialogData = event
             }
         }
     }
 
     if (systemDialogData != null) {
+        val data = systemDialogData!!
         AlertDialog(
             onDismissRequest = { systemDialogData = null },
-            title = { Text(systemDialogData!!.first) },
-            text = { Text(systemDialogData!!.second) },
-            confirmButton = { TextButton(onClick = { systemDialogData = null }) { Text("OK") } }
+            title = { Text(data.title) },
+            text = { Text(data.message) },
+            confirmButton = {
+                if (data.type == com.keeftalk.chat.domain.model.NotificationType.NUDGE && data.sourceId != null) {
+                    val sourceId = data.sourceId
+                    TextButton(onClick = {
+                        systemDialogData = null
+                        scope.launch {
+                            mainViewModel.chatRepository.getOrCreateOneToOneChat(sourceId).onSuccess { chatId ->
+                                onScreenChange(AppScreen.ChatList)
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, chatId)
+                            }
+                        }
+                    }) {
+                        Text("Chat", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                } else {
+                    TextButton(onClick = { systemDialogData = null }) { Text("OK") }
+                }
+            },
+            dismissButton = {
+                if (data.type == com.keeftalk.chat.domain.model.NotificationType.NUDGE) {
+                    TextButton(onClick = { systemDialogData = null }) {
+                        Text("Ignore", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    }
+                }
+            }
         )
     }
 
@@ -697,7 +741,7 @@ fun MainScaffold(
             try {
                 context.contentResolver.takePersistableUriPermission(fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to take persistable permission for $fileUri", e)
+                Log.w(TAG, "Failed to take_persistable_uri_permission for $fileUri", e)
             }
             activeChatIdForMedia?.let { chatId ->
                 scope.launch {
@@ -723,8 +767,6 @@ fun MainScaffold(
     val unlockFullAccessLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
         // On resume, DocumentPickerViewModel will check isExternalStorageManager again
     }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     val pickVisualMediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         uris.forEach { fileUri ->
@@ -779,6 +821,7 @@ fun MainScaffold(
         withContext(Dispatchers.IO) {
             try {
                 delay(10.seconds)
+                @Suppress("DEPRECATION")
                 val token = FirebaseMessaging.getInstance().token.await()
                 mainViewModel.authRepository.updateFcmToken(token)
             } catch (e: Exception) {
@@ -825,21 +868,26 @@ fun MainScaffold(
                 // isListVisible moved up to Surface for transparency logic
                 var isSearching by remember { mutableStateOf(false) }
                 var searchQuery by remember { mutableStateOf("") }
-                var showNotificationsAtMain by remember { mutableStateOf(false) }
 
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
-                        val isMainModule = currentScreen is AppScreen.ChatList || 
-                                          (currentScreen is AppScreen.Notes && currentScreen.noteId == null) ||
+                        val isMainModule = (currentScreen is AppScreen.Notes && currentScreen.noteId == null) ||
                                           currentScreen is AppScreen.Vault ||
                                           currentScreen is AppScreen.Email ||
                                           currentScreen is AppScreen.Calendar ||
-                                          currentScreen is AppScreen.Wallet
+                                          currentScreen is AppScreen.Wallet ||
+                                          currentScreen is AppScreen.Feed
 
-                        if (isListVisible && isMainModule) {
+                        val showGlobalTopBar = if (currentScreen is AppScreen.ChatList) {
+                            false // Handled locally in listPane to prevent transition jank
+                        } else {
+                            isMainModule
+                        }
+
+                        if (showGlobalTopBar) {
                             if (isSearching && isHydrated) {
                                 KeeftalkSearchTopBar(
                                     query = searchQuery, 
@@ -848,16 +896,12 @@ fun MainScaffold(
                                 )
                             } else {
                                 val title = when (currentScreen) {
-                                    is AppScreen.ChatList -> when {
-                                        bottomTab == com.keeftalk.chat.domain.model.KeeftalkModule.CALLS -> "Calls"
-                                        chatTab == 0 -> "Chats"
-                                        else -> "SMS"
-                                    }
                                     is AppScreen.Notes -> "Notes"
                                     is AppScreen.Vault -> ""
                                     is AppScreen.Email -> "Emails"
                                     is AppScreen.Calendar -> "Calendar"
                                     is AppScreen.Wallet -> "Wallet"
+                                    is AppScreen.Feed -> "Feed"
                                     else -> ""
                                 }
                                 
@@ -868,7 +912,18 @@ fun MainScaffold(
                                     onSettings = { onScreenChange(AppScreen.Settings) },
                                     notifications = notifications,
                                     onNotificationClick = { mainViewModel.handleNotificationClick(it) },
-                                    onMarkAllNotificationsAsRead = { mainViewModel.markAllNotificationsAsRead() }
+                                    onMarkAllNotificationsAsRead = { mainViewModel.markAllNotificationsAsRead() },
+                                    actions = {
+                                        if (currentScreen is AppScreen.Feed) {
+                                            IconButton(onClick = { 
+                                                // Trigger refresh via some global mechanism or just let PullToRefresh handle it
+                                                // For now, let's keep the management icon here
+                                                onScreenChange(AppScreen.ManageFeeds)
+                                            }) {
+                                                Icon(icons.edit, contentDescription = "Manage Feeds")
+                                            }
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -909,7 +964,7 @@ fun MainScaffold(
                                                 Box(modifier = Modifier.size(24.dp)) {
                                                     BadgedBox(badge = {
                                                         if (isHydrated && module == com.keeftalk.chat.domain.model.KeeftalkModule.CHATS) {
-                                                            val unreadCount = chatsToDisplay.sumOf { it.unreadCount }
+                                                            val unreadCount = fullChatsForBadges.asSequence().filter { !it.isArchived }.sumOf { it.unreadCount }
                                                             if (unreadCount > 0) {
                                                                 Box(
                                                                     modifier = Modifier
@@ -939,9 +994,10 @@ fun MainScaffold(
                         }
                     }
                 ) { innerPadding ->
+                    val topPadding = if (currentScreen is AppScreen.ChatList) 0.dp else innerPadding.calculateTopPadding()
                     Box(modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = innerPadding.calculateTopPadding())
+                        .padding(top = topPadding)
                     ) {
                         when (currentScreen) {
                             is AppScreen.ChatList -> {
@@ -966,7 +1022,7 @@ fun MainScaffold(
                                                 else -> onScreenChange(AppScreen.Settings) 
                                             } 
                                         },
-                                        showTopBar = false,
+                                        showTopBar = true,
                                         isSearching = isSearching,
                                         onIsSearchingChange = { isSearching = it },
                                         searchQuery = searchQuery,
@@ -974,84 +1030,107 @@ fun MainScaffold(
                                         fabActionFlow = fabActionFlow
                                     )
                                 } else {
-                                    Column(modifier = Modifier.fillMaxSize()) {
-                                        if (isListVisible && !isSearching) {
-                                            val isSmsEnabled = customization.isEnabled && customization.enabledModules.contains(com.keeftalk.chat.domain.model.KeeftalkModule.SMS)
-                                            if (!isSmsEnabled && chatTab != 0) {
-                                                LaunchedEffect(Unit) { chatTab = 0 }
-                                            }
+                                    ListDetailPaneScaffold(
+                                        modifier = Modifier.fillMaxSize().profileLayout("ChatListScaffold"),
+                                        directive = navigator.scaffoldDirective,
+                                        value = navigator.scaffoldValue,
+                                        listPane = {
+                                            val isSyncing by (chatListViewModel?.isSyncing?.collectAsState() ?: remember { mutableStateOf(false) })
+                                            val pullToRefreshState = rememberPullToRefreshState()
+                                            
+                                            Column(modifier = Modifier.fillMaxSize()) {
+                                                // MOVE TOP BARS HERE
+                                                if (isSearching && isHydrated) {
+                                                    KeeftalkSearchTopBar(
+                                                        query = searchQuery, 
+                                                        onQueryChange = { searchQuery = it }, 
+                                                        onCancel = { isSearching = false; searchQuery = "" }
+                                                    )
+                                                } else {
+                                                    val title = when {
+                                                        bottomTab == com.keeftalk.chat.domain.model.KeeftalkModule.CALLS -> "Calls"
+                                                        chatTab == 0 -> "Chats"
+                                                        else -> "SMS"
+                                                    }
+                                                    KeeftalkFeatureTopBar(
+                                                        title = title,
+                                                        onBack = null,
+                                                        onSearch = { isSearching = true },
+                                                        onSettings = { onScreenChange(AppScreen.Settings) },
+                                                        notifications = notifications,
+                                                        onNotificationClick = { mainViewModel.handleNotificationClick(it) },
+                                                        onMarkAllNotificationsAsRead = { mainViewModel.markAllNotificationsAsRead() }
+                                                    )
+                                                }
 
-                                            if (isSmsEnabled) {
-                                                val chatsWeight by animateFloatAsState(targetValue = if (chatTab == 0) 0.8f else 0.2f, label = "chatsWeight")
-                                                val smsWeight by animateFloatAsState(targetValue = if (chatTab == 1) 0.8f else 0.2f, label = "smsWeight")
-
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(56.dp)
-                                                        .zIndex(1f)
-                                                        .background(MaterialTheme.colorScheme.surface)
-                                                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Surface(
-                                                        onClick = { chatTab = 0 },
-                                                        modifier = Modifier.weight(chatsWeight),
-                                                        shape = RoundedCornerShape(16.dp),
-                                                        color = if (chatTab == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
-                                                        border = when {
-                                                            isOfflineFlash -> BorderStroke(2.dp, Color.Red)
-                                                            connectionRestoredFlash -> BorderStroke(2.dp, Color.Green)
-                                                            chatTab == 0 -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                                                            else -> null
-                                                        }
-                                                    ) {
-                                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                            Text(
-                                                                "Chats",
-                                                                style = MaterialTheme.typography.titleMedium,
-                                                                color = if (chatTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                                                fontWeight = if (chatTab == 0) FontWeight.Black else FontWeight.Medium,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                        }
+                                                // MOVE CHAT / SMS TABS HERE
+                                                if (!isSearching) {
+                                                    val isSmsEnabled = customization.isEnabled && customization.enabledModules.contains(com.keeftalk.chat.domain.model.KeeftalkModule.SMS)
+                                                    if (!isSmsEnabled && chatTab != 0) {
+                                                        LaunchedEffect(Unit) { chatTab = 0 }
                                                     }
 
-                                                    Surface(
-                                                        onClick = { if (isHydrated) chatTab = 1 },
-                                                        modifier = Modifier.weight(smsWeight),
-                                                        shape = RoundedCornerShape(16.dp),
-                                                        color = if (chatTab == 1) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
-                                                        border = if (chatTab == 1) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) else null
-                                                    ) {
-                                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                            Text(
-                                                                "SMS",
-                                                                style = MaterialTheme.typography.titleMedium,
-                                                                color = if (chatTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                                                fontWeight = if (chatTab == 1) FontWeight.Black else FontWeight.Medium,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
+                                                    if (isSmsEnabled) {
+                                                        val chatsWeight by animateFloatAsState(targetValue = if (chatTab == 0) 0.8f else 0.2f, label = "chatsWeight")
+                                                        val smsWeight by animateFloatAsState(targetValue = if (chatTab == 1) 0.8f else 0.2f, label = "smsWeight")
+
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .height(56.dp)
+                                                                .zIndex(1f)
+                                                                .background(MaterialTheme.colorScheme.surface)
+                                                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Surface(
+                                                                onClick = { chatTab = 0 },
+                                                                modifier = Modifier.weight(chatsWeight),
+                                                                shape = RoundedCornerShape(16.dp),
+                                                                color = if (chatTab == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+                                                                border = when {
+                                                                    isOfflineFlash -> BorderStroke(2.dp, Color.Red)
+                                                                    connectionRestoredFlash -> BorderStroke(2.dp, Color.Green)
+                                                                    chatTab == 0 -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                                                    else -> null
+                                                                }
+                                                            ) {
+                                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                                    Text(
+                                                                        "Chats",
+                                                                        style = MaterialTheme.typography.titleMedium,
+                                                                        color = if (chatTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                                        fontWeight = if (chatTab == 0) FontWeight.Black else FontWeight.Medium,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            Surface(
+                                                                onClick = { if (isHydrated) chatTab = 1 },
+                                                                modifier = Modifier.weight(smsWeight),
+                                                                shape = RoundedCornerShape(16.dp),
+                                                                color = if (chatTab == 1) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+                                                                border = if (chatTab == 1) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) else null
+                                                            ) {
+                                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                                    Text(
+                                                                        "SMS",
+                                                                        style = MaterialTheme.typography.titleMedium,
+                                                                        color = if (chatTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                                        fontWeight = if (chatTab == 1) FontWeight.Black else FontWeight.Medium,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
-                                            }
-                                        }
 
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            ListDetailPaneScaffold(
-                                                modifier = Modifier.fillMaxSize().profileLayout("ChatListScaffold"),
-                                                directive = navigator.scaffoldDirective,
-                                                value = navigator.scaffoldValue,
-                                                listPane = {
-                                                    val isSyncing by (chatListViewModel?.isSyncing?.collectAsState() ?: remember { mutableStateOf(value = false) })
-                                                    val pullToRefreshState = rememberPullToRefreshState()
-                                                    
-                                                    Column(modifier = Modifier.fillMaxSize()) {
-                                                        if (chatTab == 0 && !isSearching && showContainersActual) {
+                                                if (chatTab == 0 && !isSearching && showContainersActual) {
                                                             ChatContainersRow(
                                                                 containers = containers,
                                                                 selectedId = selectedContainerId,
@@ -1079,6 +1158,7 @@ fun MainScaffold(
                                                                 if (isHydrated && chatListViewModel != null) {
                                                                     ChatListRecyclerView(
                                                                         chatsPager = chatListViewModel.activeChatsPager,
+                                                                        typingStatuses = chatListViewModel.typingStatuses,
                                                                         currentUserId = myId,
                                                                         onChatClick = { chatId ->
                                                                             pendingChatId.value = chatId
@@ -1087,7 +1167,8 @@ fun MainScaffold(
                                                                             selectedChatForMenu = chat
                                                                         }
                                                                     )
-                                                                } else {
+                                                                }
+else {
                                                                     Box(modifier = Modifier.fillMaxSize().background(Color.Transparent))
                                                                 }
                                                             }
@@ -1216,18 +1297,18 @@ fun MainScaffold(
                                                                 },
                                                                 onGooglePhotosAppClick = {
                                                                     activeChatIdForMedia = content
-                                                                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                                                    val intentPhotos = Intent(Intent.ACTION_GET_CONTENT).apply {
                                                                         type = "image/* video/*"
                                                                         putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
                                                                         putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                                                                         setPackage("com.google.android.apps.photos")
                                                                     }
                                                                     try {
-                                                                        googlePhotosAppLauncher.launch(intent)
+                                                                        googlePhotosAppLauncher.launch(intentPhotos)
                                                                     } catch (e: Exception) {
                                                                         // If specifically targeting Google Photos fails, just use generic picker
-                                                                        intent.setPackage(null)
-                                                                        googlePhotosAppLauncher.launch(intent)
+                                                                        intentPhotos.setPackage(null)
+                                                                        googlePhotosAppLauncher.launch(intentPhotos)
                                                                     }
                                                                 },
                                                                 onAddReaction = { msgId, emoji -> detailViewModel.addReaction(msgId, emoji) },
@@ -1258,6 +1339,8 @@ fun MainScaffold(
                                                                                 } catch (e: Exception) {
                                                                                     onScreenChange(AppScreen.MediaViewer(messageId, content, pos))
                                                                                 }
+                                                                            } else if (msg.fileName?.lowercase(Locale.getDefault())?.endsWith(".pdf") == true) {
+                                                                                onScreenChange(AppScreen.PdfViewer(messageId, content))
                                                                             } else {
                                                                                 onScreenChange(AppScreen.MediaViewer(messageId, content, pos))
                                                                             }
@@ -1272,10 +1355,10 @@ fun MainScaffold(
                                                                 onEmailClick = { emailId ->
                                                                     onScreenChange(AppScreen.EmailDetail(emailId))
                                                                 },
-                                                                onVaultClick = { itemId ->
+                                                                onVaultClick = { _ ->
                                                                     onScreenChange(AppScreen.Vault)
                                                                 },
-                                                                onAgendaClick = { itemId ->
+                                                                onAgendaClick = { _ ->
                                                                     onScreenChange(AppScreen.Calendar)
                                                                 },
                                                                 onCodeClick = { messageId ->
@@ -1318,10 +1401,10 @@ fun MainScaffold(
                                                                 onSendEditedMedia = { items -> detailViewModel.sendEditedMedia(items) },
                                                                 onUnlockFullAccess = { 
                                                                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                                                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                                                        val intentAccess = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                                                                             data = "package:${context.packageName}".toUri()
                                                                         }
-                                                                        unlockFullAccessLauncher.launch(intent)
+                                                                        unlockFullAccessLauncher.launch(intentAccess)
                                                                     }
                                                                 }
                                                             )
@@ -1333,8 +1416,6 @@ fun MainScaffold(
                                             )
                                         }
                                     }
-                                }
-                            }
                             is AppScreen.NewGroup -> NewGroupScreen(
                                 viewModel = viewModel { NewGroupViewModel(mainViewModel.chatRepository) },
                                 onBack = { onScreenChange(AppScreen.ChatList) },
@@ -1354,21 +1435,34 @@ fun MainScaffold(
                             )
                             is AppScreen.MyProfile -> ProfileScreen(
                                 viewModel = viewModel {
-                                    ProfileViewModel(mainViewModel.authRepository, mainViewModel.chatRepository, AppModule.provideCountryService(context), AppModule.providePhoneNumberService(context), AppModule.provideCallLogManager(context), AppModule.provideSmsRepository(context), null)
+                                    ProfileViewModel(mainViewModel.authRepository, mainViewModel.chatRepository, AppModule.provideCountryService(context), AppModule.providePhoneNumberService(context), AppModule.provideCallLogManager(context), AppModule.provideSmsRepository(context), AppModule.provideRelationshipRepository(context), null)
                                 },
                                 onBack = { onScreenChange(AppScreen.ChatList) },
                                 isCurrentUser = true
                             )
                             is AppScreen.OtherProfile -> ProfileScreen(
                                 viewModel = viewModel(key = currentScreen.userId) {
-                                    ProfileViewModel(mainViewModel.authRepository, mainViewModel.chatRepository, AppModule.provideCountryService(context), AppModule.providePhoneNumberService(context), AppModule.provideCallLogManager(context), AppModule.provideSmsRepository(context), currentScreen.userId)
+                                    ProfileViewModel(mainViewModel.authRepository, mainViewModel.chatRepository, AppModule.provideCountryService(context), AppModule.providePhoneNumberService(context), AppModule.provideCallLogManager(context), AppModule.provideSmsRepository(context), AppModule.provideRelationshipRepository(context), currentScreen.userId)
                                 },
                                 onBack = { onScreenChange(AppScreen.ChatList) },
                                 onChatStarted = { chatId ->
                                     onScreenChange(AppScreen.ChatList)
                                     scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, chatId) }
                                 },
+                                onConnectionPathClick = { onScreenChange(AppScreen.ConnectionPath(currentScreen.userId)) },
                                 isCurrentUser = false
+                            )
+                            is AppScreen.ConnectionPath -> ConnectionPathScreen(
+                                viewModel = viewModel(key = currentScreen.userId) {
+                                    com.keeftalk.chat.ui.profile.ConnectionPathViewModel(
+                                        AppModule.provideRelationshipRepository(context),
+                                        mainViewModel.chatRepository,
+                                        mainViewModel.authRepository,
+                                        currentScreen.userId
+                                    )
+                                },
+                                onBack = { onScreenChange(AppScreen.OtherProfile(currentScreen.userId)) },
+                                onProfileClick = { userId -> onScreenChange(AppScreen.OtherProfile(userId)) }
                             )
                             is AppScreen.Settings -> {
                                 val settingsViewModel: SettingsViewModel = viewModel {
@@ -1391,7 +1485,13 @@ fun MainScaffold(
                                     onAppCustomizationClick = { onScreenChange(AppScreen.AppCustomization) },
                                     onAccessibilityClick = { onScreenChange(AppScreen.AccessibilitySettings) },
                                     onAboutClick = { onScreenChange(AppScreen.About) },
-                                    onHelpClick = { onScreenChange(AppScreen.Help) }
+                                    onHelpClick = { onScreenChange(AppScreen.Help) },
+                                    onTestScreensPreviewClick = { onScreenChange(AppScreen.TestScreensPreview) }
+                                )
+                            }
+                            is AppScreen.TestScreensPreview -> {
+                                com.keeftalk.chat.ui.settings.TestScreensPreviewScreen(
+                                    onBack = { onScreenChange(AppScreen.Settings) }
                                 )
                             }
                             is AppScreen.AccountSettings -> {
@@ -1520,7 +1620,7 @@ fun MainScaffold(
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
-                                TextAccessibilitySettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.ChatSettings) })
+                                TextAccessibilitySettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
                             }
                             is AppScreen.ChatMediaDownloadsSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
@@ -1676,6 +1776,9 @@ fun MainScaffold(
                                                 .exportAndSend(currentScreen.chatId, editorModels)
                                         }
                                         onScreenChange(AppScreen.ChatList)
+                                        scope.launch {
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, currentScreen.chatId)
+                                        }
                                     }
                                 )
                             }
@@ -1701,7 +1804,11 @@ fun MainScaffold(
                                     VaultViewModel(
                                         AppModule.provideVaultRepository(context), 
                                         AppModule.provideSecurityRepository(context),
-                                        AppModule.provideChatRepository(context)
+                                        AppModule.provideChatRepository(context),
+                                        AppModule.provideCloudImportCoordinator(context),
+                                        AppModule.provideGooglePhotosService(context),
+                                        AppModule.provideGoogleDriveService(context),
+                                        AppModule.provideDropboxService()
                                     )
                                 }
                                 VaultScreen(
@@ -1999,6 +2106,22 @@ fun MainScaffold(
                                     onBack = { scope.launch { navigator.navigateBack() } }
                                 )
                             }
+                            is AppScreen.Feed -> {
+                                com.keeftalk.chat.ui.feed.FeedScreen(
+                                    onManageFeeds = { onScreenChange(AppScreen.ManageFeeds) }
+                                )
+                            }
+                            is AppScreen.ManageFeeds -> {
+                                com.keeftalk.chat.ui.feed.ManageFeedsScreen(
+                                    onBack = { onScreenChange(AppScreen.Feed) },
+                                    onExploreCurated = { onScreenChange(AppScreen.ExploreFeeds) }
+                                )
+                            }
+                            is AppScreen.ExploreFeeds -> {
+                                com.keeftalk.chat.ui.feed.ExploreFeedsScreen(
+                                    onBack = { onScreenChange(AppScreen.ManageFeeds) }
+                                )
+                            }
                         }
                     }
                 }
@@ -2023,6 +2146,7 @@ fun MainScaffold(
                 val showFab = when (currentScreen) {
                     AppScreen.ChatList -> isListVisible // Show if list is part of the scaffold
                     AppScreen.AccessibilitySettings -> true
+                    AppScreen.Feed -> true
                     is AppScreen.Notes -> !isDetailShown
                     AppScreen.Calendar -> true
                     is AppScreen.CalendarEditor -> true
@@ -2075,7 +2199,6 @@ fun MainScaffold(
                                     ChatAction.CLEAR_HISTORY -> mainViewModel.chatRepository.clearChat(selectedChatForMenu!!.id)
                                     ChatAction.DELETE -> mainViewModel.chatRepository.deleteChat(selectedChatForMenu!!.id)
                                     ChatAction.FAVORITE -> mainViewModel.chatRepository.toggleFavorite(selectedChatForMenu!!.id, !selectedChatForMenu!!.isFavorite)
-                                    else -> {}
                                 }
                                 selectedChatForMenu = null
                             }
@@ -2083,8 +2206,6 @@ fun MainScaffold(
                         onDismiss = { selectedChatForMenu = null }
                     )
                 }
-
-                // Removed Extra Night Mode Overlay (now handled by Modifier.drawWithContent)
             }
         }
     }
@@ -2218,6 +2339,16 @@ sealed class AppScreen : Parcelable {
     data class ShareAgendaPicker(val chatId: String) : AppScreen()
     @Parcelize
     data class LocationDetail(val latitude: Double, val longitude: Double, val title: String? = null, val isLive: Boolean = false) : AppScreen()
+    @Parcelize
+    data class ConnectionPath(val userId: String) : AppScreen()
+    @Parcelize
+    data object Feed : AppScreen()
+    @Parcelize
+    data object ManageFeeds : AppScreen()
+    @Parcelize
+    data object ExploreFeeds : AppScreen()
+    @Parcelize
+    data object TestScreensPreview : AppScreen()
 }
 
 @SuppressLint("MissingPermission")

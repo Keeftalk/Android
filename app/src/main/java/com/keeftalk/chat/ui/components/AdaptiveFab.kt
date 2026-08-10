@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keeftalk.chat.AppScreen
+import com.keeftalk.chat.ui.vault.CloudImportFab
 import com.keeftalk.chat.ui.theme.FabCyan
 import com.keeftalk.chat.ui.theme.FabGradient
 import com.keeftalk.chat.ui.theme.FabPurple
@@ -38,7 +39,8 @@ enum class FabActionType {
     NEW_CHAT, NEW_GROUP, AI, NEW_SMS, ADD_CONTACT, DIALER, NEW_NOTE,
     EVENT, TASK, REMINDER, BIRTHDAY, MEETING, GOAL,
     UPLOAD_FILE, NEW_FOLDER, QR, WALLET, EMAIL, COMPOSE_EMAIL,
-    TOGGLE_NIGHT_MODE, INCREASE_SCALE, DECREASE_SCALE, TOGGLE_DRAWER
+    TOGGLE_NIGHT_MODE, INCREASE_SCALE, DECREASE_SCALE, TOGGLE_DRAWER,
+    CLOUD_IMPORT
 }
 
 data class FabMenuItem(
@@ -220,7 +222,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -240,7 +243,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -260,7 +264,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -280,7 +285,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -305,7 +311,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -326,7 +333,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -346,7 +354,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -366,7 +375,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -384,7 +394,8 @@ fun AdaptiveFab(
                     FabMenuItem("My Vault", icons.lock, { onNavigate(AppScreen.Vault); expanded = false }, isActive = currentScreen == AppScreen.Vault, module = com.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
                     FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
                     FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)
+                    FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); expanded = false }, trailingAvatars = emailAvatars, module = com.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
+                    FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); expanded = false }, module = com.keeftalk.chat.domain.model.KeeftalkModule.FEED)
                 )
             )
         }
@@ -515,6 +526,12 @@ fun AdaptiveFab(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.padding(bottom = 0.dp) // Reset local padding to rely on outer Box
         ) {
+            if (currentScreen == AppScreen.Vault) {
+                CloudImportFab(
+                    onClick = { onAction(FabActionType.CLOUD_IMPORT) }
+                )
+            }
+
             // Secondary FAB (e.g. The shared + FAB in Email/SMS/Calls)
             if (secondaryAction != null) {
                 KeeftalkFab(
@@ -607,12 +624,11 @@ fun MenuItem(
                         item.trailingAvatars.take(3).forEachIndexed { avatarIndex, avatarUrl ->
                             KeeftalkAvatar(
                                 avatarUrl = avatarUrl,
-                                initials = "", // Use fallback or just skip initials for small stacked icons
+                                initials = "?",
                                 seed = avatarUrl,
                                 size = 24.dp,
                                 modifier = Modifier
                                     .padding(end = (avatarIndex * 12).dp)
-                                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
                             )
                         }
                     }

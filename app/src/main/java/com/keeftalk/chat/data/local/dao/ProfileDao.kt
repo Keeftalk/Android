@@ -30,6 +30,9 @@ interface ProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfiles(profiles: List<ProfileEntity>)
 
+    @Query("SELECT * FROM profiles WHERE id IN (:ids)")
+    suspend fun getProfilesByIds(ids: List<String>): List<ProfileEntity>
+
     @Query("DELETE FROM profiles")
     suspend fun clearProfiles()
 }

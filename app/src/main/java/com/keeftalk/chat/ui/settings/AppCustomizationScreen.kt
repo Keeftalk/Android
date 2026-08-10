@@ -315,6 +315,7 @@ private fun getModuleName(module: KeeftalkModule) = when(module) {
     KeeftalkModule.EMAIL -> "My Email"
     KeeftalkModule.VAULT -> "My Vault"
     KeeftalkModule.WALLET -> "My Wallet"
+    KeeftalkModule.FEED -> "My Feed"
 }
 
 private fun getFabActionName(action: FabAction) = when(action) {
@@ -334,6 +335,7 @@ private fun getModuleIcon(module: KeeftalkModule, icons: com.keeftalk.chat.ui.th
     KeeftalkModule.EMAIL -> icons.email
     KeeftalkModule.VAULT -> icons.lock
     KeeftalkModule.WALLET -> icons.wallet
+    KeeftalkModule.FEED -> icons.feed
 }
 
 private fun getFabActionIcon(action: FabAction, icons: com.keeftalk.chat.ui.theme.AppIcons) = when(action) {

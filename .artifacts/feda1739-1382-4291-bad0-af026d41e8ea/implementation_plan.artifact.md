@@ -1,53 +1,42 @@
-# Implementation Plan - Fixing Conversation Key Sync & Identity
+# Implementation Plan - Fix Vault Issues and Add Refresh
 
-Address the `PostgrestRestException` caused by a missing `user_id` in the `conversation_keys` upsert, and fix the unique constraint issue to support per-user encrypted keys for the same conversation.
+Address issues with Vault thumbnails and sharing, and add manual/auto refresh capabilities.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> This change involves a database migration for your local Room database and requires an update to the Supabase schema. Please run the updated [fix_security_rls.sql](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/fix_security_rls.sql) in your Supabase SQL Editor.
+> The "Bucket not found" error suggests a configuration issue in Supabase or an incorrect download strategy. I will switch to using `downloadAuthenticated` by default for all Vault-related files to ensure maximum compatibility with private buckets.
 
 ## Proposed Changes
 
-### 1. Security & Crypto Core
+### [Component] Vault UI & Logic
 
-#### [MODIFY] [ConversationKeyEntity.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/security/crypto/ConversationKeyEntity.kt)
-- Add `user_id` column to the entity.
-- Update the unique index to be composite: `(conversationId, user_id)` to allow multiple users to store their own encrypted versions of the same Per-Conversation Key (PCK).
+#### [MODIFY] [VaultScreen.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/ui/vault/VaultScreen.kt)
+- Wrap the main content in `PullToRefreshBox`.
+- Trigger `viewModel.refresh()` on swipe.
 
-#### [MODIFY] [ConversationKeyDao.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/security/crypto/ConversationKeyDao.kt)
-- Update `getKeyForConversation` and `deleteKeyForConversation` to include `userId` as a parameter to ensure user isolation.
+#### [MODIFY] [VaultViewModel.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/ui/vault/VaultViewModel.kt)
+- Add `refresh()` method to trigger `repository.sync()`.
+- Implement a periodic sync (auto fetch) every 5 minutes while the screen is active.
 
-#### [MODIFY] [ConversationKeyManager.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/security/crypto/ConversationKeyManager.kt)
-- Update `getOrLoadKey` and `createKey` to fetch the current `userId` from `UserPreferencesRepository`.
-- Include `user_id` in both Supabase `select` and `upsert` calls.
+---
 
-### 2. Database Migration
+### [Component] Storage & Data
 
-#### [MODIFY] [KeeftalkDatabase.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/data/local/KeeftalkDatabase.kt)
-- Increment version from 82 to 83.
-- Add `MIGRATION_82_83` to handle the `user_id` column addition and index update in `conversation_keys`.
+#### [MODIFY] [FileRepositoryImpl.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/data/repository/FileRepositoryImpl.kt)
+- Refactor `ensureMediaLocal` to use `downloadAuthenticated` first, especially for files where the URL indicates they are in a user-specific folder.
+- Improve error logging to diagnose "Object not found" issues.
 
-### 3. SQL Schema
-
-#### [MODIFY] [full_keeftalk_schema.sql](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/full_keeftalk_schema.sql)
-- Update `conversation_keys` table definition to include `user_id` and a unique constraint on `(conversation_id, user_id)`.
-
-#### [MODIFY] [fix_security_rls.sql](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/fix_security_rls.sql)
-- Add idempotent logic to add `user_id` to `conversation_keys` if it doesn't exist, and add the unique constraint.
+#### [MODIFY] [ChatRepositoryImpl.kt](file:///home/m-abidi/AndroidStudioProjects/Keeftalk2/app/src/main/java/com/keeftalk/chat/data/repository/ChatRepositoryImpl.kt)
+- Ensure `shareVaultFileToChat` handles failures gracefully and provides feedback if decryption fails.
 
 ## Verification Plan
 
-### Automated Tests
-- Run `ConversationKeyManagerTest` (if exists) or verify via manual flow.
-
 ### Manual Verification
-1. **Scenario: Key Sync**
-   - Send a message in a new chat.
-   - **Expected Result**: The PCK is successfully generated, encrypted with CPK, and synced to Supabase with the correct `user_id`. No `PostgrestRestException` should occur.
-2. **Scenario: Device Sync**
-   - Log in on a second device (or clear app data and re-login).
-   - **Expected Result**: The app should fetch the PCK from Supabase using `conversation_id` and `user_id`, and successfully decrypt it with the restored CPK.
-3. **Scenario: Migration**
-   - Upgrade from version 82 to 83.
-   - **Expected Result**: Room database migrates successfully without data loss.
+- **Vault Refresh**:
+    - Swipe down on the Vault screen and verify the refresh indicator appears and data is re-synced.
+    - Wait 5 minutes and verify "isSyncing" status or logs show auto-fetch activity.
+- **Thumbnails & Decryption**:
+    - Verify images and videos downloaded from the cloud now correctly decrypt and show thumbnails.
+- **Sharing**:
+    - Share a cloud-only Vault item to a chat and verify it appears as a standard media message.

@@ -317,4 +317,28 @@ object LucideIcons {
             close()
         }.build()
     }
+
+    val Rss: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "LucideRss",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).path(
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 2f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round
+        ) {
+            moveTo(4f, 11f)
+            arcToRelative(9f, 9f, 0f, false, true, 9f, 9f)
+            moveTo(4f, 4f)
+            arcToRelative(16f, 16f, 0f, false, true, 16f, 16f)
+            moveToRelative(-16f, 0f)
+            arcToRelative(1f, 1f, 0f, true, true, 2f, 0f)
+            arcToRelative(1f, 1f, 0f, false, true, -2f, 0f)
+            close()
+        }.build()
+    }
 }

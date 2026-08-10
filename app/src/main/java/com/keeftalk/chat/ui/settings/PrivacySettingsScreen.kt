@@ -55,7 +55,13 @@ fun PrivacySettingsScreen(
                         icon = icons.clock,
                         title = "Last Seen",
                         subtitle = prefs.lastSeenVisibility.lowercase().replaceFirstChar { it.uppercase() },
-                        onClick = { showVisibilityPicker = "lastSeenVisibility" },
+                        onClick = { showVisibilityPicker = "lastSeenVisibility" }
+                    )
+                    SettingsItem(
+                        icon = icons.info,
+                        title = "Connections List",
+                        subtitle = prefs.connectionsVisibility.lowercase().replaceFirstChar { it.uppercase() },
+                        onClick = { showVisibilityPicker = "connectionsVisibility" },
                         showDivider = false
                     )
                 }
@@ -143,8 +149,15 @@ fun PrivacySettingsScreen(
                                 .padding(16.dp),
                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                         ) {
+                            val selected = when(key) {
+                                "profilePhotoVisibility" -> prefs.profilePhotoVisibility
+                                "aboutVisibility" -> prefs.aboutVisibility
+                                "lastSeenVisibility" -> prefs.lastSeenVisibility
+                                "connectionsVisibility" -> prefs.connectionsVisibility
+                                else -> ""
+                            }
                             RadioButton(
-                                selected = (option == (if (key == "profilePhotoVisibility") prefs.profilePhotoVisibility else if (key == "aboutVisibility") prefs.aboutVisibility else prefs.lastSeenVisibility)),
+                                selected = (option == selected),
                                 onClick = null
                             )
                             Spacer(modifier = Modifier.width(12.dp))

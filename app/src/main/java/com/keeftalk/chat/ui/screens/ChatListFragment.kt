@@ -21,6 +21,7 @@ import kotlinx.coroutines.*
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.recyclerview.widget.RecyclerView
+import androidx.compose.ui.graphics.toArgb
 import coil.load
 import com.keeftalk.chat.R
 import com.keeftalk.chat.di.AppModule
@@ -63,9 +64,10 @@ class ChatListFragment : Fragment() {
         }
         
         fun warmViewPool(context: android.content.Context) {
-            val inflater = LayoutInflater.from(context)
+            val themedContext = androidx.appcompat.view.ContextThemeWrapper(context, R.style.Theme_Keeftalk)
+            val inflater = LayoutInflater.from(themedContext)
             repeat(10) {
-                val view = CachedInflater.inflate(inflater, android.widget.FrameLayout(context))
+                val view = CachedInflater.inflate(inflater, android.widget.FrameLayout(themedContext))
                 sharedPool.putRecycledView(ChatViewHolder(view, {}, {}, ""))
             }
         }
@@ -235,13 +237,49 @@ class ChatListFragment : Fragment() {
         private val spacingMultiplier: Float = 0.5f
     ) : PagingDataAdapter<ChatListItemUiModel, ChatViewHolder>(ChatDiffCallback()) {
 
+        private var typingMap: Map<String, Set<String>> = emptyMap()
+
+        fun updateTypingStatuses(typing: Map<String, Set<String>>) {
+            val oldMap = typingMap
+            typingMap = typing
+            
+            // Find chats that changed typing status and notify them
+            val allAffectedIds = (oldMap.keys + typing.keys).toSet()
+            allAffectedIds.forEach { chatId ->
+                if (oldMap[chatId] != typing[chatId]) {
+                    // This is slightly inefficient as we don't know the position immediately,
+                    // but it's better than re-submitting PagingData
+                    for (i in 0 until itemCount) {
+                        if (peek(i)?.id == chatId) {
+                            notifyItemChanged(i, "typing_update")
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
             val view = CachedInflater.inflate(LayoutInflater.from(parent.context), parent)
             return ChatViewHolder(view, onClick, onLongClick, currentUserId, spacingMultiplier)
         }
 
         override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-            getItem(position)?.let { holder.bind(it) }
+            getItem(position)?.let { chat ->
+                val isTyping = typingMap[chat.id]?.isNotEmpty() == true
+                holder.bind(chat.copy(isTyping = isTyping))
+            }
+        }
+
+        override fun onBindViewHolder(holder: ChatViewHolder, position: Int, payloads: MutableList<Any>) {
+            if (payloads.contains("typing_update")) {
+                getItem(position)?.let { chat ->
+                    val isTyping = typingMap[chat.id]?.isNotEmpty() == true
+                    holder.bind(chat.copy(isTyping = isTyping))
+                }
+            } else {
+                super.onBindViewHolder(holder, position, payloads)
+            }
         }
     }
 
@@ -341,8 +379,10 @@ class ChatListFragment : Fragment() {
                 }
             } else if (chat.avatarUrl.isNullOrBlank()) {
                 avatar.setImageDrawable(null)
-                avatar.setBackgroundColor(com.keeftalk.chat.util.AvatarUtils.getAvatarColorInt(chat.id))
+                val bgColor = com.keeftalk.chat.util.AvatarUtils.getAvatarColor(avatarIdentifier)
+                avatar.setBackgroundColor(bgColor.toArgb())
                 avatarInitials.text = chat.initials
+                avatarInitials.setTextColor(com.keeftalk.chat.util.AvatarUtils.getTextColorForBackground(bgColor).toArgb())
                 avatarInitials.visibility = View.VISIBLE
             } else {
                 avatarInitials.visibility = View.GONE
@@ -370,6 +410,7 @@ class ChatListFragment : Fragment() {
             if (isFromMe && chat.lastMessageStatus != null) {
                 statusContainer.visibility = View.VISIBLE
                 if (chat.lastMessageStatus == com.keeftalk.chat.domain.model.MessageStatus.SEEN) {
+                    (statusIndicator as? com.google.android.material.imageview.ShapeableImageView)?.strokeWidth = density * 1f
                     if (localAvatar != null) {
                         statusInitials.visibility = View.GONE
                         statusIndicator.load(localAvatar) {
@@ -381,11 +422,14 @@ class ChatListFragment : Fragment() {
                             transformations(coil.transform.CircleCropTransformation())
                         }
                     } else {
-                        statusIndicator.setImageDrawable(android.graphics.drawable.ColorDrawable(com.keeftalk.chat.util.AvatarUtils.getAvatarColorInt(chat.id)))
+                        val bgColor = com.keeftalk.chat.util.AvatarUtils.getAvatarColor(avatarIdentifier)
+                        statusIndicator.setImageDrawable(android.graphics.drawable.ColorDrawable(bgColor.toArgb()))
                         statusInitials.text = chat.initials
+                        statusInitials.setTextColor(com.keeftalk.chat.util.AvatarUtils.getTextColorForBackground(bgColor).toArgb())
                         statusInitials.visibility = View.VISIBLE
                     }
                 } else {
+                    (statusIndicator as? com.google.android.material.imageview.ShapeableImageView)?.strokeWidth = 0f
                     statusInitials.visibility = View.GONE
                     statusIndicator.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     val (iconRes, tint) = when (chat.lastMessageStatus) {
