@@ -26,6 +26,7 @@ class VaultRepositoryImpl(
     private val syncQueueDao: VaultSyncQueueDao,
     private val fileDao: com.keeftalk.chat.data.local.dao.FileDao,
     private val fileUploadManager: com.keeftalk.chat.util.FileUploadManager,
+    private val authRepository: com.keeftalk.chat.domain.repository.AuthRepository
 ) : VaultRepository {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -470,18 +471,20 @@ class VaultRepositoryImpl(
     override suspend fun getStorageInfo(): Flow<VaultStorageInfo> {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: return flowOf(
-            VaultStorageInfo(0, VAULT_STORAGE_LIMIT, 0, 0, 0, emptyMap())
+            VaultStorageInfo(0, 5L * 1024 * 1024 * 1024, 0, 0, 0, emptyMap())
         )
 
         return combine(
             fileDao.getAccountCloudBytesFlow(userId),
             vaultDao.getTrashSizeFlow(),
-            vaultDao.getAllItems()
-        ) { cloudBytes, trashBytes, allItems ->
+            vaultDao.getAllItems(),
+            authRepository.currentUserProfile
+        ) { cloudBytes, trashBytes, allItems, profile ->
             val cloudTotal = cloudBytes ?: 0L
             val trashTotal = trashBytes ?: 0L
             val domainItems = allItems.map { it.toDomain() }
             val count = domainItems.size
+            val limit = profile?.storageLimit ?: 5L * 1024 * 1024 * 1024
             
             val categories = domainItems.groupBy { it.file?.fileType ?: FileType.OTHER }
                 .mapValues { entry -> 
@@ -502,7 +505,7 @@ class VaultRepositoryImpl(
 
             VaultStorageInfo(
                 cloudBytesUsed = cloudTotal,
-                cloudBytesLimit = VAULT_STORAGE_LIMIT,
+                cloudBytesLimit = limit,
                 localCacheBytesUsed = getLocalCacheSize(),
                 trashBytesUsed = trashTotal,
                 itemsCount = count,

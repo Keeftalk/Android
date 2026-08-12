@@ -46,7 +46,8 @@ enum class AccountSubSetting {
 @Composable
 fun AccountSettingsScreen(
     viewModel: SettingsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSubscriptionPlansClick: () -> Unit
 ) {
     var selectedSubSetting by remember { mutableStateOf<AccountSubSetting?>(null) }
     val scrollState = rememberScrollState()
@@ -149,7 +150,7 @@ fun AccountSettingsScreen(
                 }
             } else {
                 Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-                    AccountSubSettingDetail(subSetting)
+                    AccountSubSettingDetail(subSetting, viewModel, onSubscriptionPlansClick)
                 }
             }
         }
@@ -157,7 +158,13 @@ fun AccountSettingsScreen(
 }
 
 @Composable
-fun AccountSubSettingDetail(setting: AccountSubSetting) {
+fun AccountSubSettingDetail(
+    setting: AccountSubSetting,
+    viewModel: SettingsViewModel,
+    onSubscriptionPlansClick: () -> Unit
+) {
+    val profile by viewModel.currentUserProfile.collectAsState()
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -189,7 +196,7 @@ fun AccountSubSettingDetail(setting: AccountSubSetting) {
             AccountSubSetting.CLOUD_CACHE -> CacheView()
             AccountSubSetting.PRIV_PERMS -> PermsView()
             AccountSubSetting.PRIV_BLOCKED -> BlockedView()
-            AccountSubSetting.SUB_STORAGE -> SubscriptionView()
+            AccountSubSetting.SUB_STORAGE -> SubscriptionView(profile, onSubscriptionPlansClick)
         }
     }
 }
@@ -309,7 +316,9 @@ fun MfaMethodItem(title: String, subtitle: String, icon: ImageVector, active: Bo
     Column {
         PremiumStatusBox("Key Hardware Backed", "Android StrongBox Secure", true)
         Spacer(modifier = Modifier.height(16.dp))
-        PremiumActionCard("Rotate Master Key", "Full re-encryption", Icons.Rounded.RotateRight)
+        PremiumActionCard("Rotate Master Key", "Full re-encryption", Icons.Rounded.RotateRight) {
+            // TODO: Implementation for key rotation
+        }
         InfoCard("The Account Encryption Key (AEK) never leaves your device.")
     }
 }
@@ -413,49 +422,71 @@ fun RecoveryManageItem(value: String, type: String, verified: Boolean, canDelete
 @Composable fun BlockedView() { BlockedItem("Spam User", "@spambot_1") }
 
 @Composable
-fun SubscriptionView() {
+fun SubscriptionView(profile: com.keeftalk.chat.domain.model.Profile?, onUpgradeClick: () -> Unit) {
+    val plan = profile?.planType ?: com.keeftalk.chat.domain.model.SubscriptionPlan.FREE
+    val used = profile?.storageUsed ?: 0L
+    val limit = profile?.storageLimit ?: (5L * 1024 * 1024 * 1024)
+    val usedGb = used.toFloat() / (1024 * 1024 * 1024)
+    val limitGb = limit.toFloat() / (1024 * 1024 * 1024)
+    val isOverQuota = used > limit
+
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text(
-            text = "Keeftalk is free forever. Pay only when you need more space and power",
+            text = if (isOverQuota) "Your storage is full! Please upgrade or delete files to keep syncing." 
+                   else "Keeftalk is free forever. Pay only when you need more space and power",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (isOverQuota) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        StoragePulseCard(used = 4.2f, total = 10f)
+        StoragePulseCard(used = usedGb, total = limitGb, isOverQuota = isOverQuota)
         
-        MembershipStatusCard(planName = "Keeftalk Pro", active = true)
+        MembershipStatusCard(
+            planName = "Keeftalk ${plan.name.split("_")[0].lowercase().replaceFirstChar { it.uppercase() }}", 
+            active = plan != com.keeftalk.chat.domain.model.SubscriptionPlan.FREE,
+            onClick = onUpgradeClick
+        )
         
-        AccountControlSection(title = "Pro Advantages") {
+        AccountControlSection(title = "${plan.name.split("_")[0].lowercase().replaceFirstChar { it.uppercase() }} Advantages") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AdvantageItem("End-to-End Encryption (E2EE)")
                 AdvantageItem("Hardware-Backed Account Keys")
-                AdvantageItem("10GB High-Speed Cloud Storage")
+                AdvantageItem("${if (limitGb >= 1000) (limitGb/1024).toInt().toString() + "TB" else limitGb.toInt().toString() + "GB"} High-Speed Cloud Storage")
                 AdvantageItem("Unlimited Module Sync (Vault, Notes)")
                 AdvantageItem("Priority Community Support")
+                if (plan != com.keeftalk.chat.domain.model.SubscriptionPlan.FREE) {
+                    AdvantageItem("Original Quality Media")
+                    AdvantageItem("Larger File Sharing")
+                }
             }
         }
         
-        AccountControlSection(title = "Special Offers") {
-            PremiumActionCard("Upgrade to Business", "Custom domains & unlimited seats", Icons.Rounded.Business)
-            Spacer(modifier = Modifier.height(8.dp))
-            PremiumActionCard("Annual Billing Save 20%", "Locked-in pricing", Icons.Rounded.Savings)
+        if (plan != com.keeftalk.chat.domain.model.SubscriptionPlan.PRO_MONTHLY && plan != com.keeftalk.chat.domain.model.SubscriptionPlan.FAMILY_MONTHLY) {
+            AccountControlSection(title = "Special Offers") {
+                PremiumActionCard("Upgrade Plan", "Get more storage and features", Icons.Rounded.WorkspacePremium) {
+                    onUpgradeClick()
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                PremiumActionCard("Annual Billing Save 20%", "Locked-in pricing", Icons.Rounded.Savings) {
+                    onUpgradeClick()
+                }
+            }
         }
     }
 }
 
 @Composable
-fun StoragePulseCard(used: Float, total: Float) {
+fun StoragePulseCard(used: Float, total: Float, isOverQuota: Boolean = false) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(1.dp, if (isOverQuota) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -463,28 +494,29 @@ fun StoragePulseCard(used: Float, total: Float) {
                     Text("Global Storage Pulse", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                     Text("Aggregate across all modules", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.CloudQueue, null, tint = MaterialTheme.colorScheme.primary)
+                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background((if (isOverQuota) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary).copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.CloudQueue, null, tint = if (isOverQuota) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                 }
             }
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            StorageVisualizer(used = used, total = total)
+            StorageVisualizer(used = used, total = total, isError = isOverQuota)
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${(used / total * 100).toInt()}% consumed", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("${total - used}GB remaining", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${(used / total * 100).toInt()}% consumed", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = if (isOverQuota) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                Text("${if (total >= 1000) (total).toInt().toString() + "GB" else total.toInt().toString() + "GB"} total", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-fun MembershipStatusCard(planName: String, active: Boolean) {
+fun MembershipStatusCard(planName: String, active: Boolean, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
@@ -585,8 +617,8 @@ fun AdvantageItem(text: String) {
         }
     }
 }
-@Composable fun PremiumActionCard(title: String, subtitle: String, icon: ImageVector) {
-    Surface(onClick = {}, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))) {
+@Composable fun PremiumActionCard(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) }
             Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium); Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -632,10 +664,10 @@ fun AdvantageItem(text: String) {
         }
     }
 }
-@Composable fun StorageVisualizer(used: Float, total: Float) {
+@Composable fun StorageVisualizer(used: Float, total: Float, isError: Boolean = false) {
     Column {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Storage: ${used}GB / ${total}GB", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall) }
-        Spacer(modifier = Modifier.height(8.dp)); Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) { Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(used / total).background(MaterialTheme.colorScheme.primary)) }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Storage: ${"%.2f".format(used)}GB / ${"%.0f".format(total)}GB", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall) }
+        Spacer(modifier = Modifier.height(8.dp)); Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) { Box(modifier = Modifier.fillMaxHeight().fillMaxWidth((used / total).coerceIn(0f, 1f)).background(if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)) }
     }
 }
 @Composable fun PermissionItem(name: String, granted: Boolean) {

@@ -21,6 +21,7 @@ import io.github.jan.supabase.storage.UploadData
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.writeFully
 import io.ktor.utils.io.writer
+import kotlinx.coroutines.flow.first
 import java.util.Base64
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.scale
@@ -38,6 +39,7 @@ import javax.crypto.Mac
 class FileUploadManager(
     private val context: Context,
     private val fileRepository: FileRepository,
+    private val authRepository: com.keeftalk.chat.domain.repository.AuthRepository,
     private val supabaseProvider: suspend () -> SupabaseClient,
 ) {
     private val tag = "FileUploadManager"
@@ -53,18 +55,42 @@ class FileUploadManager(
         try {
             Log.i("FILE_PIPELINE", "ORIGINAL_UPLOAD_START | fileId=$fileId | localPath=${file.absolutePath} | sourceType=$sourceType")
             
-            // 1. Pre-processing (Memory-efficient compression)
-            val processedFile = compressIfNeeded(file)
+            val profile = authRepository.currentUserProfile.first() ?: throw Exception("Profile not found")
+            val plan = profile.planType
+
+            // 1. Enforce Max File Size
+            val maxFileSize = when (plan) {
+                SubscriptionPlan.FREE -> 100L * 1024 * 1024
+                SubscriptionPlan.PLUS_MONTHLY, SubscriptionPlan.PLUS_YEARLY -> 1024L * 1024 * 1024
+                else -> 5L * 1024 * 1024 * 1024
+            }
+
+            if (file.length() > maxFileSize) {
+                return@withContext Result.failure(Exception("File too large for your plan. Maximum is ${maxFileSize / (1024*1024)}MB."))
+            }
+
+            // 2. Pre-processing (Memory-efficient compression)
+            val processedFile = if (plan == SubscriptionPlan.FREE) {
+                compressForFreePlan(file)
+            } else {
+                compressIfNeeded(file)
+            }
+
+            // 3. Quota check (Client-side fail-fast, server will also enforce)
+            if ((profile.storageUsed + processedFile.length()) > profile.storageLimit) {
+                return@withContext Result.failure(Exception("Storage quota exceeded. Please upgrade your plan."))
+            }
+
             val plaintextSize = processedFile.length()
             
-            // 2. Per-User Deduplication (HMAC)
+            // 4. Per-User Deduplication (HMAC)
             if (!KeyManager.isInitialized()) {
                 KeyManager.restoreAEK(context)
             }
             val fpk = KeyManager.getFileProtectionKey()
             val hash = calculateHMAC(processedFile, fpk)
             
-            // 3. Deduplication Check
+            // 5. Deduplication Check
             val existingFile = fileRepository.getFileByHash(hash)
             if (existingFile != null) {
                 Log.i("FILE_PIPELINE", "DEDUPLICATION MATCH | fileId=${existingFile.id}")
@@ -84,7 +110,7 @@ class FileUploadManager(
                 }
             }
 
-            // 4. Secure Encryption Setup (v2)
+            // 6. Secure Encryption Setup (v2)
             Log.d("FILE_PIPELINE", "ENCRYPTION_SETUP_V2")
             val fek = StorageCryptoService.generateRandomKey()
             val baseIv = StorageCryptoService.generateBaseIv()
@@ -96,7 +122,7 @@ class FileUploadManager(
             // Ciphertext size = Plaintext + (16 bytes tag per chunk)
             val ciphertextSize = plaintextSize + (totalChunks * 16)
             
-            // 5. Cloud Upload via Streaming Channel
+            // 7. Cloud Upload via Streaming Channel
             val supabase = supabaseProvider()
             val bucket = supabase.storage["files"]
             val remotePath = "${ownerId}/$fileId/original"
@@ -140,7 +166,7 @@ class FileUploadManager(
                 throw Exception("Upload verification failed")
             }
 
-            // 6. Thumbnail Generation (Memory efficient)
+            // 8. Thumbnail Generation (Memory efficient)
             var thumbnailRemotePath: String? = null
             var thumbnailSize: Long? = null
             var thumbnailWidth: Int? = null
@@ -186,7 +212,7 @@ class FileUploadManager(
                 Log.w("FILE_PIPELINE", "THUMBNAIL_FAILED | reason=${e.message}")
             }
 
-            // 7. Metadata & Envelopes
+            // 9. Metadata & Envelopes
             val wrappedFek = StorageCryptoService.wrapKey(fek, fpk)
             val ownerEnvelope = EncryptionEnvelope(
                 recipientId = "OWNER",
@@ -218,7 +244,7 @@ class FileUploadManager(
                 thumbnailPlaintextSize = thumbnailPlaintextSize
             )
 
-            // 8. Database Record
+            // 10. Database Record
             val dimensions = MediaUtils.getDimensions(context, Uri.fromFile(processedFile).toString())
             val storagePath = bucket.publicUrl(remotePath)
             
@@ -258,6 +284,34 @@ class FileUploadManager(
             Log.e("FILE_PIPELINE", "FAILED stage=uploadFile fileId=$fileId reason=${e.message}", e)
             Result.failure(e)
         }
+    }
+
+    private fun compressForFreePlan(file: File): File {
+        val mimeType = getMimeTypeFromFile(file)
+        if (mimeType?.startsWith("image") == true) {
+            return try {
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeFile(file.absolutePath, options)
+                
+                // FREE Plan: Target around 1200px (standard compressed)
+                options.inSampleSize = calculateInSampleSize(options, 1200, 1200)
+                options.inJustDecodeBounds = false
+                
+                val bitmap = BitmapFactory.decodeFile(file.absolutePath, options) ?: return file
+                val compressedFile = File(context.cacheDir, "free_compressed_${file.name}")
+                FileOutputStream(compressedFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out) // Lower quality for FREE
+                }
+                compressedFile
+            } catch (e: Exception) { file }
+        } else if (mimeType?.startsWith("video") == true) {
+            // For videos, in a real app we'd use Media3 Transformer to transcode to 720p/low-bitrate
+            // For now, we'll assume it's "compressed" by the OS or just return as is if no transcoder implemented.
+            return file
+        }
+        return file
     }
 
     private fun compressIfNeeded(file: File): File {

@@ -1494,6 +1494,21 @@ else {
                                     onBack = { onScreenChange(AppScreen.Settings) }
                                 )
                             }
+                            is AppScreen.SubscriptionPlans -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context)
+                                    )
+                                }
+                                com.keeftalk.chat.ui.settings.SubscriptionPlansScreen(
+                                    viewModel = settingsViewModel,
+                                    billingManager = AppModule.provideBillingManager(context),
+                                    onBack = { onScreenChange(AppScreen.AccountSettings) }
+                                )
+                            }
                             is AppScreen.AccountSettings -> {
                                 val settingsViewModel: SettingsViewModel = viewModel {
                                     SettingsViewModel(
@@ -1505,7 +1520,8 @@ else {
                                 }
                                 com.keeftalk.chat.ui.settings.AccountSettingsScreen(
                                     viewModel = settingsViewModel,
-                                    onBack = { onScreenChange(AppScreen.Settings) }
+                                    onBack = { onScreenChange(AppScreen.Settings) },
+                                    onSubscriptionPlansClick = { onScreenChange(AppScreen.SubscriptionPlans) }
                                 )
                             }
                             is AppScreen.AppCustomization -> {
@@ -2349,6 +2365,8 @@ sealed class AppScreen : Parcelable {
     data object ExploreFeeds : AppScreen()
     @Parcelize
     data object TestScreensPreview : AppScreen()
+    @Parcelize
+    data object SubscriptionPlans : AppScreen()
 }
 
 @SuppressLint("MissingPermission")

@@ -44,5 +44,7 @@ interface AuthRepository {
 
     suspend fun findProfilesByIdentifier(identifier: String): Result<List<com.keeftalk.chat.domain.model.Profile>>
 
+    suspend fun verifySubscriptionPurchase(purchaseToken: String, productId: String): Result<Unit>
+
     fun shutdown()
 }

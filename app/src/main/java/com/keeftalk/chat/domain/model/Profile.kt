@@ -5,6 +5,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+enum class SubscriptionPlan {
+    FREE, PLUS_MONTHLY, PLUS_YEARLY, PRO_MONTHLY, FAMILY_MONTHLY
+}
+
+@Serializable
 data class Profile(
     val id: String,
     val username: String = "",
@@ -30,6 +35,14 @@ data class Profile(
     val lastSeen: Long = 0L,
     @SerialName("views_count")
     val viewsCount: Long = 0L,
+    @SerialName("plan_type")
+    val planType: SubscriptionPlan = SubscriptionPlan.FREE,
+    @SerialName("storage_limit")
+    val storageLimit: Long = 5L * 1024 * 1024 * 1024,
+    @SerialName("storage_used")
+    val storageUsed: Long = 0L,
+    @SerialName("is_family_owner")
+    val isFamilyOwner: Boolean = false,
     val privacy: PrivacySettings = PrivacySettings(),
     @SerialName("notification_settings")
     val notifications: com.keeftalk.chat.data.prefs.NotificationPreferences = com.keeftalk.chat.data.prefs.NotificationPreferences()

@@ -162,6 +162,9 @@ object AppModule {
     private var locationService: com.keeftalk.chat.domain.service.LocationService? = null
 
     @Volatile
+    private var billingManager: com.keeftalk.chat.data.billing.BillingManager? = null
+
+    @Volatile
     private var supabaseClient: SupabaseClient? = null
     private var supabaseInitDeferred = kotlinx.coroutines.CompletableDeferred<SupabaseClient>()
 
@@ -799,7 +802,8 @@ object AppModule {
                 db.vaultDao(),
                 db.vaultSyncQueueDao(),
                 db.fileDao(),
-                provideFileUploadManager(context)
+                provideFileUploadManager(context),
+                provideAuthRepository(context)
             ).also { vaultRepository = it }
         }
     }
@@ -931,6 +935,7 @@ object AppModule {
             fileUploadManager ?: com.keeftalk.chat.util.FileUploadManager(
                 context.applicationContext,
                 provideFileRepository(context),
+                provideAuthRepository(context),
                 { provideSupabaseClientAsync(context) }
             ).also { fileUploadManager = it }
         }
@@ -1025,6 +1030,12 @@ object AppModule {
     fun provideLocationService(context: Context): com.keeftalk.chat.domain.service.LocationService {
         return locationService ?: synchronized(this) {
             locationService ?: com.keeftalk.chat.data.service.LocationServiceImpl(context.applicationContext).also { locationService = it }
+        }
+    }
+
+    fun provideBillingManager(context: Context): com.keeftalk.chat.data.billing.BillingManager {
+        return billingManager ?: synchronized(this) {
+            billingManager ?: com.keeftalk.chat.data.billing.BillingManager(context.applicationContext).also { billingManager = it }
         }
     }
 }

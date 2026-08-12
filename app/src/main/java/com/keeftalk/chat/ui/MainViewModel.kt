@@ -171,6 +171,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun observeBillingEvents() {
+        val billingManager = AppModule.provideBillingManager(getApplication())
+        viewModelScope.launch {
+            billingManager.purchaseEvents.collect { result ->
+                when (result) {
+                    is com.keeftalk.chat.data.billing.PurchaseResult.Success -> {
+                        authRepository.verifySubscriptionPurchase(
+                            result.purchase.purchaseToken,
+                            result.purchase.products.firstOrNull() ?: ""
+                        )
+                    }
+                    is com.keeftalk.chat.data.billing.PurchaseResult.Error -> {
+                        _navigationEvent.emit(NotificationNavigationEvent.ShowSystemDialog(
+                            title = "Purchase Failed",
+                            message = result.message
+                        ))
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
     fun handleNotificationClick(notification: AppNotification) {
         viewModelScope.launch {
             chatRepository.markNotificationAsRead(notification.id)
@@ -323,6 +346,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val customizationRepo = AppModule.provideAppCustomizationRepository(getApplication())
                 customizationRepo.startCustomizationObservation()
                 
+                observeBillingEvents()
+
                 com.keeftalk.chat.util.PerformanceProfiler.endStage("Deferred Repo Init (Tier 3)")
             }
 

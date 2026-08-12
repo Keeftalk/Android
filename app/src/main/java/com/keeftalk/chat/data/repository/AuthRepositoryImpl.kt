@@ -32,6 +32,7 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.functions.functions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -774,6 +775,26 @@ class AuthRepositoryImpl(
         Result.success(results)
     } catch (e: Exception) {
         Log.e(TAG, "ENDPOINT: postgrest/profiles/search | ERROR: ${e.message}")
+        Result.failure(e)
+    }
+
+    override suspend fun verifySubscriptionPurchase(purchaseToken: String, productId: String): Result<Unit> = try {
+        val supabase = getSupabase()
+        supabase.functions.invoke(
+            "verify-purchase",
+            buildJsonObject {
+                put("purchaseToken", purchaseToken)
+                put("productId", productId)
+            }
+        )
+        
+        // Refresh profile to get updated entitlements
+        val user = supabase.auth.currentUserOrNull() ?: throw Exception("Not logged in")
+        fetchAndCacheProfile(user.id)
+        
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.e(TAG, "Subscription verification failed", e)
         Result.failure(e)
     }
 
