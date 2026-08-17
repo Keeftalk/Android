@@ -27,6 +27,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.scale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -40,6 +41,7 @@ class FileUploadManager(
     private val context: Context,
     private val fileRepository: FileRepository,
     private val authRepository: com.keeftalk.chat.domain.repository.AuthRepository,
+    private val securityManager: com.keeftalk.chat.security.crypto.SecurityManager,
     private val supabaseProvider: suspend () -> SupabaseClient,
 ) {
     private val tag = "FileUploadManager"
@@ -49,9 +51,10 @@ class FileUploadManager(
         file: File,
         sourceType: SourceType,
         ownerId: String,
-        onProgress: (Float) -> Unit = {}
+        onProgress: (uploaded: Long, total: Long) -> Unit = { _, _ -> }
     ): Result<com.keeftalk.chat.domain.model.File> = withContext(Dispatchers.IO) {
         val fileId = UUID.randomUUID().toString()
+        var processedFile: File? = null
         try {
             Log.i("FILE_PIPELINE", "ORIGINAL_UPLOAD_START | fileId=$fileId | localPath=${file.absolutePath} | sourceType=$sourceType")
             
@@ -70,25 +73,25 @@ class FileUploadManager(
             }
 
             // 2. Pre-processing (Memory-efficient compression)
-            val processedFile = if (plan == SubscriptionPlan.FREE) {
+            processedFile = if (plan == SubscriptionPlan.FREE) {
                 compressForFreePlan(file)
             } else {
                 compressIfNeeded(file)
             }
 
             // 3. Quota check (Client-side fail-fast, server will also enforce)
-            if ((profile.storageUsed + processedFile.length()) > profile.storageLimit) {
+            if ((profile.storageUsed + processedFile!!.length()) > profile.storageLimit) {
                 return@withContext Result.failure(Exception("Storage quota exceeded. Please upgrade your plan."))
             }
 
-            val plaintextSize = processedFile.length()
+            val plaintextSize = processedFile!!.length()
             
             // 4. Per-User Deduplication (HMAC)
-            if (!KeyManager.isInitialized()) {
-                KeyManager.restoreAEK(context)
-            }
+            // ensure AEK is ready (will suspend if recovery is needed)
+            securityManager.getEncryptionContext()
+            
             val fpk = KeyManager.getFileProtectionKey()
-            val hash = calculateHMAC(processedFile, fpk)
+            val hash = calculateHMAC(processedFile!!, fpk)
             
             // 5. Deduplication Check
             val existingFile = fileRepository.getFileByHash(hash)
@@ -106,6 +109,12 @@ class FileUploadManager(
                 if (isRemotePresent) {
                     Log.i("FILE_PIPELINE", "REMOTE PRESENT | Reusing fileId=${existingFile.id}")
                     fileRepository.incrementReferenceCount(existingFile.id)
+                    
+                    // Cleanup
+                    if (processedFile != file && processedFile!!.exists()) {
+                        processedFile!!.delete()
+                    }
+                    
                     return@withContext Result.success(existingFile)
                 }
             }
@@ -127,9 +136,12 @@ class FileUploadManager(
             val bucket = supabase.storage["files"]
             val remotePath = "${ownerId}/$fileId/original"
             
-            val channel = CoroutineScope(Dispatchers.IO).writer {
+            val limiter = BandwidthLimiter(BandwidthPolicy.getUploadLimit(plan))
+            
+            // Use the current coroutine scope for the channel writer to ensure structured concurrency
+            val channel = writer {
                 val buffer = ByteArray(CHUNK_SIZE)
-                processedFile.inputStream().use { input ->
+                processedFile!!.inputStream().use { input ->
                     var chunkIndex = 0
                     var totalRead = 0L
                     
@@ -148,9 +160,12 @@ class FileUploadManager(
                         
                         channel.writeFully(encryptedChunk)
                         
+                        // Apply bandwidth throttling
+                        limiter.throttle(encryptedChunk.size)
+                        
                         totalRead += read
                         chunkIndex++
-                        onProgress(totalRead.toFloat() / plaintextSize)
+                        onProgress(totalRead, plaintextSize)
                     }
                 }
             }.channel
@@ -176,7 +191,7 @@ class FileUploadManager(
             var thumbnailPlaintextSize: Long? = null
 
             try {
-                val thumbBitmap = generateThumbnailBitmap(processedFile)
+                val thumbBitmap = generateThumbnailBitmap(processedFile!!)
                 if (thumbBitmap != null) {
                     Log.d("FILE_PIPELINE", "THUMBNAIL_GENERATION_SUCCESS")
                     thumbnailWidth = thumbBitmap.width
@@ -207,6 +222,8 @@ class FileUploadManager(
                     
                     thumbnailRemotePath = bucket.publicUrl(thumbRemotePath)
                     Log.i("FILE_PIPELINE", "THUMBNAIL_UPLOAD_SUCCESS | remotePath=$thumbnailRemotePath")
+                    
+                    // Cleanup local thumbnail if needed (it will be saved to db as thumbnailLocalPath though)
                 }
             } catch (e: Exception) {
                 Log.w("FILE_PIPELINE", "THUMBNAIL_FAILED | reason=${e.message}")
@@ -220,9 +237,9 @@ class FileUploadManager(
                 type = EnvelopeType.OWNER
             )
 
-            val mimeType = context.contentResolver.getType(Uri.fromFile(processedFile)) ?: getMimeTypeFromFile(processedFile)
+            val mimeType = context.contentResolver.getType(Uri.fromFile(processedFile!!)) ?: getMimeTypeFromFile(processedFile!!)
             val attributes = FileAttributes(
-                fileName = processedFile.name,
+                fileName = processedFile!!.name,
                 mimeType = mimeType,
                 originalName = file.name
             )
@@ -279,10 +296,33 @@ class FileUploadManager(
 
             fileRepository.saveFile(newFile)
             Log.i("FILE_PIPELINE", "COMPLETE | fileId=$fileId | plaintextSize=$plaintextSize | ciphertextSize=$ciphertextSize")
+            
+            // 11. Optimistic Storage Update
+            val totalBytesAdded = ciphertextSize + (thumbnailSize ?: 0L)
+            authRepository.optimisticUpdateStorageUsed(ownerId, totalBytesAdded)
+            
+            // Trigger background refresh to sync with server truth
+            // Use a repository-scoped launch if possible, but here we just need it to happen
+            // Dispatchers.IO + GlobalScope is bad, but CoroutineScope(Dispatchers.IO) here is also transient.
+            // For now, keeping it as is or moving to a better scope if available.
+            CoroutineScope(Dispatchers.IO).launch {
+                authRepository.refreshProfile(ownerId)
+            }
+
             Result.success(newFile)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) {
+                Log.w("FILE_PIPELINE", "UPLOAD_CANCELLED | fileId=$fileId")
+                throw e
+            }
             Log.e("FILE_PIPELINE", "FAILED stage=uploadFile fileId=$fileId reason=${e.message}", e)
             Result.failure(e)
+        } finally {
+            // Cleanup processed file (compressed copy) always
+            if (processedFile != null && processedFile != file && processedFile!!.exists()) {
+                processedFile!!.delete()
+                Log.d("FILE_PIPELINE", "CLEANUP | Deleted processed file: ${processedFile!!.name}")
+            }
         }
     }
 

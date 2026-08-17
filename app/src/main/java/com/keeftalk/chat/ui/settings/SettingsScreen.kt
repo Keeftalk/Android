@@ -32,20 +32,22 @@ fun SettingsScreen(
     onArchivedChatsClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     onAccountSettingsClick: () -> Unit = {},
-    onPrivacyClick: () -> Unit = {},
-    onSecurityClick: () -> Unit = {},
     onChatSettingsClick: () -> Unit = {},
+    onCallSettingsClick: () -> Unit = {},
+    onNoteSettingsClick: () -> Unit = {},
+    onVaultSettingsClick: () -> Unit = {},
+    onCalendarSettingsClick: () -> Unit = {},
+    onEmailSettingsClick: () -> Unit = {},
+    onParentalControlsClick: () -> Unit = {},
     onAppCustomizationClick: () -> Unit = {},
-    onAccessibilityClick: () -> Unit = {},
+    onDisplaySettingsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     onHelpClick: () -> Unit = {},
     onTestScreensPreviewClick: () -> Unit = {},
     title: String = "Settings"
 ) {
-    val prefs by viewModel.userPreferences.collectAsState()
     val profile by viewModel.currentUserProfile.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var showThemeDialog by remember { mutableStateOf(false) }
     var showLegalDocumentType by remember { mutableStateOf<String?>(null) }
     val icons = LocalAppIcons.current
 
@@ -77,20 +79,8 @@ fun SettingsScreen(
                     SettingsItem(
                         icon = Icons.Default.AccountCircle,
                         title = "Account Settings",
-                        subtitle = "Identity, password, data portability",
+                        subtitle = "Identity, privacy, security, and storage",
                         onClick = onAccountSettingsClick
-                    )
-                    SettingsItem(
-                        icon = icons.user,
-                        title = "Privacy",
-                        subtitle = "Online status, read receipts, visibility",
-                        onClick = onPrivacyClick
-                    )
-                    SettingsItem(
-                        icon = icons.shield,
-                        title = "Security",
-                        subtitle = "Two-step verification, active sessions",
-                        onClick = onSecurityClick
                     )
                     SettingsItem(
                         icon = icons.bell,
@@ -120,55 +110,50 @@ fun SettingsScreen(
                         icon = icons.phone,
                         title = "My Calls",
                         subtitle = "Call history, dialer, ringtones",
-                        onClick = { /* TODO: Navigate to Calls Settings */ }
+                        onClick = onCallSettingsClick
                     )
                     SettingsItem(
                         icon = icons.notes,
                         title = "My Notes",
                         subtitle = "Notebooks, syncing, formatting",
-                        onClick = { /* TODO: Navigate to Notes Settings */ }
+                        onClick = onNoteSettingsClick
                     )
                     SettingsItem(
                         icon = icons.lock,
                         title = "My Vault",
                         subtitle = "Encrypted storage, password, backup",
-                        onClick = { /* TODO: Navigate to Vault Settings */ }
+                        onClick = onVaultSettingsClick
                     )
                     SettingsItem(
                         icon = icons.calendar,
                         title = "My Calendar",
                         subtitle = "Events, reminders, holidays",
-                        onClick = { /* TODO: Navigate to Calendar Settings */ }
+                        onClick = onCalendarSettingsClick
                     )
                     SettingsItem(
                         icon = icons.wallet,
                         title = "My Wallet",
-                        subtitle = "Payments, cards, transaction history",
-                        onClick = { /* TODO: Navigate to Wallet Settings */ }
+                        subtitle = "Soon",
+                        enabled = false,
+                        onClick = { /* Not clickable */ }
                     )
                     SettingsItem(
                         icon = icons.email,
                         title = "My E-Mail",
                         subtitle = "Accounts, signature, filters",
-                        onClick = { /* TODO: Navigate to Email Settings */ }
+                        onClick = onEmailSettingsClick
                     )
                     SettingsItem(
                         icon = Icons.Default.FamilyRestroom,
                         title = "Parental Controls",
                         subtitle = "Manage family and usage limits",
-                        onClick = { /* TODO: Navigate to Parental Controls */ }
+                        onClick = onParentalControlsClick
                     )
                     SettingsItem(
                         icon = icons.palette,
-                        title = "Theme",
-                        subtitle = prefs.themeMode.lowercase().replaceFirstChar { it.uppercase() },
-                        onClick = { showThemeDialog = true }
-                    )
-                    SettingsItem(
-                        icon = Icons.Default.AccessibilityNew,
-                        title = "Accessibility",
-                        subtitle = "Extra night mode, UI scaling",
-                        onClick = onAccessibilityClick,
+                        title = "Display",
+                        subtitle = "Theme, fonts, accessibility",
+                        onClick = onDisplaySettingsClick,
                         showDivider = false
                     )
                 }
@@ -220,17 +205,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showThemeDialog) {
-        ThemeSelectionDialog(
-            currentTheme = prefs.themeMode,
-            onDismiss = { showThemeDialog = false },
-            onThemeSelected = { theme ->
-                viewModel.updateThemeMode(theme)
-                showThemeDialog = false
-            }
-        )
-    }
-
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -254,42 +228,6 @@ fun SettingsScreen(
     }
 }
 
-@Composable
-fun ThemeSelectionDialog(
-    currentTheme: String,
-    onDismiss: () -> Unit,
-    onThemeSelected: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Theme") },
-        text = {
-            Column {
-                AppTheme.values().forEach { theme ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onThemeSelected(theme.name) }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (currentTheme == theme.name),
-                            onClick = null
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = theme.name.lowercase().replaceFirstChar { it.uppercase() })
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
 
 
 @Composable

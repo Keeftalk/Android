@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,13 +57,15 @@ fun SettingsItem(
     onClick: (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    showDivider: Boolean = true
+    showDivider: Boolean = true,
+    enabled: Boolean = true
 ) {
-    Column {
+    val alpha = if (enabled) 1f else 0.4f
+    Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

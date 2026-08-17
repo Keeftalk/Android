@@ -17,8 +17,8 @@ fun NotificationsSettingsScreen(
     onBack: () -> Unit,
     onSendTestNotification: () -> Unit = {}
 ) {
-    val prefs by viewModel.userPreferences.collectAsState()
-    val notificationPrefs = prefs.notifications
+    val settings by viewModel.fullSettings.collectAsState()
+    val notificationPrefs = settings.notificationSettings
     val icons = LocalAppIcons.current
 
     Scaffold(
@@ -40,7 +40,7 @@ fun NotificationsSettingsScreen(
                         subtitle = "Global master switch",
                         checked = notificationPrefs.allEnabled,
                         onCheckedChange = { value ->
-                            viewModel.updateNotificationPreferences { it.copy(allEnabled = value) }
+                            viewModel.updateNotificationSettings { it.copy(allEnabled = value) }
                         },
                         showDivider = false
                     )
@@ -60,7 +60,7 @@ fun NotificationsSettingsScreen(
                                 title = "Private Messages",
                                 checked = notificationPrefs.messagesEnabled,
                                 onCheckedChange = { value ->
-                                    viewModel.updateNotificationPreferences { it.copy(messagesEnabled = value) }
+                                    viewModel.updateNotificationSettings { it.copy(messagesEnabled = value) }
                                 }
                             )
                             SettingsToggleItem(
@@ -68,7 +68,7 @@ fun NotificationsSettingsScreen(
                                 title = "Group Chats",
                                 checked = notificationPrefs.groupsEnabled,
                                 onCheckedChange = { value ->
-                                    viewModel.updateNotificationPreferences { it.copy(groupsEnabled = value) }
+                                    viewModel.updateNotificationSettings { it.copy(groupsEnabled = value) }
                                 }
                             )
                             SettingsToggleItem(
@@ -76,7 +76,7 @@ fun NotificationsSettingsScreen(
                                 title = "Incoming Calls",
                                 checked = notificationPrefs.callsEnabled,
                                 onCheckedChange = { value ->
-                                    viewModel.updateNotificationPreferences { it.copy(callsEnabled = value) }
+                                    viewModel.updateNotificationSettings { it.copy(callsEnabled = value) }
                                 },
                                 showDivider = false
                             )
@@ -87,19 +87,17 @@ fun NotificationsSettingsScreen(
                                 icon = icons.info,
                                 title = "Show Message Preview",
                                 subtitle = "Display message text in notifications",
-                                checked = notificationPrefs.showPreviewContent,
+                                checked = notificationPrefs.showPreview,
                                 onCheckedChange = { value ->
-                                    viewModel.updateNotificationPreferences { it.copy(showPreviewContent = value) }
+                                    viewModel.updateNotificationSettings { it.copy(showPreview = value) }
                                 }
                             )
                             SettingsToggleItem(
                                 icon = icons.sparkles,
                                 title = "In-App Banners",
                                 subtitle = "Show notifications while using the app",
-                                checked = notificationPrefs.inAppNotificationsEnabled,
-                                onCheckedChange = { value ->
-                                    viewModel.updateNotificationPreferences { it.copy(inAppNotificationsEnabled = value) }
-                                },
+                                checked = true, // Defaulting for now
+                                onCheckedChange = { /* value -> viewModel.updateNotificationSettings { ... } */ },
                                 showDivider = false
                             )
                         }
@@ -112,11 +110,11 @@ fun NotificationsSettingsScreen(
                                 onClick = { /* Show sound picker */ }
                             )
                             SettingsToggleItem(
-                                icon = icons.palette, // Using palette for LED
-                                title = "LED Light",
-                                checked = notificationPrefs.ledEnabled,
+                                icon = icons.palette, 
+                                title = "Vibration",
+                                checked = notificationPrefs.vibration != "NONE",
                                 onCheckedChange = { value ->
-                                    viewModel.updateNotificationPreferences { it.copy(ledEnabled = value) }
+                                    viewModel.updateNotificationSettings { it.copy(vibration = if (value) "NORMAL" else "NONE") }
                                 },
                                 showDivider = false
                             )

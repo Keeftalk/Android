@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.sp
 // )
 
 val Inter = FontFamily.Default
-val Quicksand = FontFamily.Default
 
 val Typography = Typography(
     bodyLarge = TextStyle(
@@ -68,12 +67,11 @@ val Typography = Typography(
 )
 
 fun getTypographyForTheme(
-    theme: AppTheme,
     fontSize: Int = 16,
     fontScale: Float = 1.0f,
     isBold: Boolean = false
 ): Typography {
-    val fontFamily = if (theme == AppTheme.PINKY) Quicksand else Inter
+    val fontFamily = Inter
     val fontWeightNormal = if (isBold) FontWeight.SemiBold else FontWeight.Normal
     val fontWeightBold = FontWeight.Bold
     

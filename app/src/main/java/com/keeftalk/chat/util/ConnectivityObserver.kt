@@ -17,6 +17,8 @@ interface ConnectivityObserver {
     enum class Status {
         Available, Unavailable, Losing, Lost
     }
+    
+    fun isWifiConnected(): Boolean
 }
 
 class NetworkConnectivityObserver(
@@ -71,5 +73,11 @@ class NetworkConnectivityObserver(
                 connectivityManager.unregisterNetworkCallback(callback)
             }
         }.distinctUntilChanged()
+    }
+
+    override fun isWifiConnected(): Boolean {
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 }

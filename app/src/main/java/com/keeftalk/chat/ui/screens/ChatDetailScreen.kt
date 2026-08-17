@@ -339,10 +339,16 @@ fun ChatMessageList(
     LaunchedEffect(expandedMessageId) { adapter.expandedMessageId = expandedMessageId }
     adapter.onToggleTimestamp = onToggleTimestamp
 
+    var isFirstLoad by remember { mutableStateOf(true) }
     LaunchedEffect(adapter.itemCount) {
-        if (adapter.itemCount > 0 && initialScrollPosition != 0) {
-            (recyclerViewState.value?.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(initialScrollPosition, initialScrollOffset)
+        if (adapter.itemCount > 0 && isFirstLoad) {
+            if (initialScrollPosition != 0) {
+                (recyclerViewState.value?.layoutManager as? LinearLayoutManager)
+                    ?.scrollToPositionWithOffset(initialScrollPosition, initialScrollOffset)
+            } else {
+                recyclerViewState.value?.scrollToPosition(0)
+            }
+            isFirstLoad = false
         }
     }
 
@@ -701,6 +707,14 @@ fun ChatDetailContent(
     var showPollDialog by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showAttachmentSheet by remember { mutableStateOf(initialShowAttachmentSheet) }
+    var pendingAttachmentClick by remember { mutableStateOf(false) }
+
+    LaunchedEffect(mediaPermissionState.allPermissionsGranted) {
+        if (mediaPermissionState.allPermissionsGranted && pendingAttachmentClick) {
+            showAttachmentSheet = true
+            pendingAttachmentClick = false
+        }
+    }
     var showDocumentPicker by remember { mutableStateOf(false) }
     var showForwardDialog by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -812,14 +826,12 @@ fun ChatDetailContent(
                     onDismiss = { itemsToPreview = emptyList() },
                     qualityMap = mediaQualityMap,
                     onQualityChange = onQualityChange,
-                    onExecuteCommand = { index, command ->
-                        if (index in itemsToPreview.indices) {
-                            itemsToPreview = itemsToPreview.toMutableList().apply {
-                                this[index] = command.execute(this[index])
-                            }
+                    onPageChange = { currentPreviewIndex = it },
+                    onUpdateItem = { index, updatedModel ->
+                        itemsToPreview = itemsToPreview.toMutableList().apply {
+                            this[index] = updatedModel
                         }
-                    },
-                    onPageChange = { currentPreviewIndex = it }
+                    }
                 )
             } else {
                 ChatMessageList(
@@ -930,7 +942,14 @@ fun ChatDetailContent(
             },
             onCameraClick = { showCamera = true },
             onCameraLongClick = { showCamera = true },
-            onAttachmentClick = { showAttachmentSheet = true },
+            onAttachmentClick = {
+                if (mediaPermissionState.allPermissionsGranted) {
+                    showAttachmentSheet = true
+                } else {
+                    pendingAttachmentClick = true
+                    mediaPermissionState.launchMultiplePermissionRequest()
+                }
+            },
             onEmojiClick = { showEmojiPicker = !showEmojiPicker },
             onMicStart = onMicStart,
             onMicStop = onMicStop,

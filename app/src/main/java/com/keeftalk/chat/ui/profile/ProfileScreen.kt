@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -331,107 +332,186 @@ fun ViewProfileContent(
 @Composable
 fun RelationshipCard(viewModel: ProfileViewModel, onConnectionPathClick: () -> Unit) {
     val relationship by viewModel.relationship.collectAsState()
-    val icons = LocalAppIcons.current
-
+    
     AnimatedContent(
         targetState = relationship,
         transitionSpec = {
-            fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+            fadeIn(animationSpec = tween(600)) togetherWith fadeOut(animationSpec = tween(400))
         },
         label = "RelationshipContent"
     ) { rel ->
         if (rel == null) {
             RelationshipCardPlaceholder()
         } else {
+            val primaryColor = MaterialTheme.colorScheme.primary
+            
             Surface(
-                color = Color.White.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                modifier = Modifier.fillMaxWidth().clickable { onConnectionPathClick() }
+                color = Color.Transparent,
+                shape = RoundedCornerShape(32.dp),
+                border = BorderStroke(1.dp, Brush.linearGradient(
+                    0.0f to Color.White.copy(alpha = 0.15f),
+                    0.5f to Color.White.copy(alpha = 0.05f),
+                    1.0f to primaryColor.copy(alpha = 0.2f)
+                )),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .shadow(
+                        elevation = 20.dp,
+                        shape = RoundedCornerShape(32.dp),
+                        spotColor = primaryColor.copy(alpha = 0.2f)
+                    )
+                    .clickable { onConnectionPathClick() }
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Hub, 
-                                contentDescription = null, 
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                Box(
+                    modifier = Modifier
+                        .background(Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF1E1E1E),
+                                Color(0xFF121212)
                             )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = when (rel.distance) {
-                                    1 -> "1st · Direct Connection"
-                                    2 -> "2nd · Contact of contact"
-                                    3 -> "3rd · Contact of 2nd degree"
-                                    4 -> "4th · Network connection"
-                                    else -> "∞ · No known connection"
-                                },
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
-                            if (rel.mutualConnectionCount > 0) {
-                                val details = listOfNotNull(
-                                    "${rel.mutualConnectionCount} mutual connections",
-                                    rel.strengthLabel,
-                                    rel.densityLabel?.let { "$it density" }
-                                ).joinToString(" · ")
-                                
+                        ))
+                        .padding(24.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Degree Indicator Badge - High Premium
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .background(primaryColor.copy(alpha = 0.1f), CircleShape)
+                                    .border(1.dp, primaryColor.copy(alpha = 0.3f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = details,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White.copy(alpha = 0.5f)
-                                )
-                            } else if (rel.strengthLabel != null || rel.densityLabel != null) {
-                                 val details = listOfNotNull(
-                                    rel.strengthLabel,
-                                    rel.densityLabel?.let { "$it density" }
-                                ).joinToString(" · ")
-                                
-                                Text(
-                                    text = details,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White.copy(alpha = 0.5f)
+                                    text = when (rel.distance) {
+                                        1 -> "1st"
+                                        2 -> "2nd"
+                                        3 -> "3rd"
+                                        else -> rel.distance?.toString() ?: "∞"
+                                    },
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        color = primaryColor
+                                    )
                                 )
                             }
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(onClick = onConnectionPathClick) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
-                        }
-                    }
-                    
-                    if (rel.mutualConnectionPreview.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box {
-                                rel.mutualConnectionPreview.take(3).forEachIndexed { index, profile ->
-                                    KeeftalkAvatar(
-                                        avatarUrl = profile.avatarUrl,
-                                        initials = AvatarUtils.getInitials(profile.fullName ?: profile.username),
-                                        seed = profile.id,
-                                        size = 28.dp,
-                                        modifier = Modifier
-                                            .padding(start = (index * 16).dp)
-                                            .border(2.dp, Color.Black, CircleShape)
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = when (rel.distance) {
+                                        1 -> "Direct Connection"
+                                        2 -> "Mutual Connection"
+                                        3 -> "3rd Degree Connection"
+                                        else -> "Network Member"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = (-0.5).sp,
+                                        color = Color.White
+                                    )
+                                )
+                                Text(
+                                    text = when (rel.distance) {
+                                        1 -> "In your contact list"
+                                        2 -> "Connected through a contact"
+                                        3 -> "Part of your extended network"
+                                        else -> "Outside your immediate circle"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            }
+                            
+                            Surface(
+                                color = Color.White.copy(alpha = 0.05f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                        null,
+                                        tint = Color.White.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(12.dp)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(if (rel.mutualConnectionPreview.size > 1) (16 * (rel.mutualConnectionPreview.size - 1) + 32).dp else 12.dp))
-                            val names = rel.mutualConnectionPreview.take(2).joinToString(", ") { it.fullName ?: it.username }
-                            Text(
-                                text = if (rel.mutualConnectionCount > 2) "Connected through $names and ${rel.mutualConnectionCount - 2} others"
-                                       else "Connected through $names",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.5f)
-                            )
+                        }
+
+                        if (rel.mutualConnectionCount > 0) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            Surface(
+                                color = Color.White.copy(alpha = 0.03f),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (rel.mutualConnectionPreview.isNotEmpty()) {
+                                        val visibleAvatars = rel.mutualConnectionPreview.take(3)
+                                        val remainingCount = rel.mutualConnectionCount - visibleAvatars.size
+                                        
+                                        Box(modifier = Modifier.height(36.dp)) {
+                                            visibleAvatars.forEachIndexed { index, profile ->
+                                                KeeftalkAvatar(
+                                                    avatarUrl = profile.avatarUrl,
+                                                    initials = AvatarUtils.getInitials(profile.fullName ?: profile.username),
+                                                    seed = profile.id,
+                                                    size = 36.dp,
+                                                    modifier = Modifier
+                                                        .padding(start = (index * 24).dp)
+                                                        .border(2.dp, Color(0xFF1E1E1E), CircleShape)
+                                                )
+                                            }
+                                            
+                                            if (remainingCount > 0) {
+                                                Surface(
+                                                    color = primaryColor,
+                                                    shape = CircleShape,
+                                                    border = BorderStroke(2.dp, Color(0xFF1E1E1E)),
+                                                    modifier = Modifier
+                                                        .padding(start = (visibleAvatars.size * 24).dp)
+                                                        .size(36.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(
+                                                            text = "+$remainingCount",
+                                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                                fontWeight = FontWeight.Black,
+                                                                fontSize = 11.sp,
+                                                                color = Color.Black
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        val stackWidth = (visibleAvatars.size + (if (remainingCount > 0) 1 else 0)) * 24 + 12
+                                        Spacer(modifier = Modifier.width(stackWidth.dp))
+                                    }
+                                    
+                                    val names = rel.mutualConnectionPreview.take(1).firstOrNull()?.let { it.fullName ?: it.username }
+                                    Text(
+                                        text = if (names != null) {
+                                            if (rel.mutualConnectionCount > 1) "Connected through $names and ${rel.mutualConnectionCount - 1} others"
+                                            else "Connected through $names"
+                                        } else "${rel.mutualConnectionCount} mutual contacts",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -445,9 +525,9 @@ fun RelationshipCardPlaceholder() {
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.05f,
-        targetValue = 0.15f,
+        targetValue = 0.12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
+            animation = tween(1200, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "alpha"
@@ -455,20 +535,34 @@ fun RelationshipCardPlaceholder() {
 
     Surface(
         color = Color.White.copy(alpha = alpha),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(32.dp),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
-        modifier = Modifier.fillMaxWidth().height(80.dp)
+        modifier = Modifier.fillMaxWidth().height(110.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.size(40.dp).background(Color.White.copy(alpha = 0.1f), CircleShape))
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(Color.White.copy(alpha = 0.1f), CircleShape)
+            )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Box(modifier = Modifier.fillMaxWidth(0.6f).height(16.dp).background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                        .height(20.dp)
+                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth(0.4f).height(12.dp).background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.3f)
+                        .height(14.dp)
+                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+                )
             }
         }
     }
@@ -841,7 +935,7 @@ fun SmsHistoryItem(message: com.keeftalk.chat.domain.repository.SmsMessage) {
                 text = message.body,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                overflow = TextOverflow.Ellipsis,
                 color = Color.White
             )
             Text(

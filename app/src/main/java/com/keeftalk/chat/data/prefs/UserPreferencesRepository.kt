@@ -83,6 +83,24 @@ class UserPreferencesRepository(private val context: Context) {
         val APP_CUSTOMIZATION_JSON = stringPreferencesKey("app_customization_json")
         val WEATHER_LOCATION_MODE = stringPreferencesKey("weather_location_mode")
         val WEATHER_MANUAL_LOCATION = stringPreferencesKey("weather_manual_location")
+
+        // Module Integrations
+        val EMAIL_INTEGRATION_ENABLED = booleanPreferencesKey("email_integration_enabled")
+        val SMS_BRIDGE_ENABLED = booleanPreferencesKey("sms_bridge_enabled")
+        val VOIP_ENABLED = booleanPreferencesKey("voip_enabled")
+        val WALLET_ENABLED = booleanPreferencesKey("wallet_enabled")
+        val CALENDAR_SYNC_ENABLED = booleanPreferencesKey("calendar_sync_enabled")
+        val NOTES_SYNC_ENABLED = booleanPreferencesKey("notes_sync_enabled")
+        val CLOUD_BACKUP_ENABLED = booleanPreferencesKey("cloud_backup_enabled")
+
+        // New Feature Settings Keys
+        val CHAT_SETTINGS_JSON = stringPreferencesKey("chat_settings_json")
+        val CALL_SETTINGS_JSON = stringPreferencesKey("call_settings_json")
+        val NOTE_SETTINGS_JSON = stringPreferencesKey("note_settings_json")
+        val VAULT_SETTINGS_JSON = stringPreferencesKey("vault_settings_json")
+        val CALENDAR_SETTINGS_JSON = stringPreferencesKey("calendar_settings_json")
+        val EMAIL_SETTINGS_JSON = stringPreferencesKey("email_settings_json")
+        val PARENTAL_CONTROLS_JSON = stringPreferencesKey("parental_controls_json")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
@@ -130,7 +148,14 @@ class UserPreferencesRepository(private val context: Context) {
                     try { Json.decodeFromString<AppCustomization>(it) } catch (_: Exception) { AppCustomization() }
                 } ?: AppCustomization(),
                 weatherLocationMode = preferences[PreferencesKeys.WEATHER_LOCATION_MODE] ?: "AUTO",
-                weatherManualLocation = preferences[PreferencesKeys.WEATHER_MANUAL_LOCATION]
+                weatherManualLocation = preferences[PreferencesKeys.WEATHER_MANUAL_LOCATION],
+                emailIntegrationEnabled = preferences[PreferencesKeys.EMAIL_INTEGRATION_ENABLED] ?: true,
+                smsBridgeEnabled = preferences[PreferencesKeys.SMS_BRIDGE_ENABLED] ?: false,
+                voipEnabled = preferences[PreferencesKeys.VOIP_ENABLED] ?: true,
+                walletEnabled = preferences[PreferencesKeys.WALLET_ENABLED] ?: false,
+                calendarSyncEnabled = preferences[PreferencesKeys.CALENDAR_SYNC_ENABLED] ?: true,
+                notesSyncEnabled = preferences[PreferencesKeys.NOTES_SYNC_ENABLED] ?: true,
+                cloudBackupEnabled = preferences[PreferencesKeys.CLOUD_BACKUP_ENABLED] ?: true
             )
         }
 
@@ -312,6 +337,80 @@ class UserPreferencesRepository(private val context: Context) {
             mode?.let { preferences[PreferencesKeys.WEATHER_LOCATION_MODE] = it }
             location?.let { preferences[PreferencesKeys.WEATHER_MANUAL_LOCATION] = it }
         }
+    }
+
+    suspend fun updateModuleIntegration(key: String, enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            when (key) {
+                "emailIntegrationEnabled" -> preferences[PreferencesKeys.EMAIL_INTEGRATION_ENABLED] = enabled
+                "smsBridgeEnabled" -> preferences[PreferencesKeys.SMS_BRIDGE_ENABLED] = enabled
+                "voipEnabled" -> preferences[PreferencesKeys.VOIP_ENABLED] = enabled
+                "walletEnabled" -> preferences[PreferencesKeys.WALLET_ENABLED] = enabled
+                "calendarSyncEnabled" -> preferences[PreferencesKeys.CALENDAR_SYNC_ENABLED] = enabled
+                "notesSyncEnabled" -> preferences[PreferencesKeys.NOTES_SYNC_ENABLED] = enabled
+                "cloudBackupEnabled" -> preferences[PreferencesKeys.CLOUD_BACKUP_ENABLED] = enabled
+            }
+        }
+    }
+
+    suspend fun updateFullSettings(settings: com.keeftalk.chat.domain.model.UserSettings) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CHAT_SETTINGS_JSON] = Json.encodeToString(settings.chatSettings)
+            preferences[PreferencesKeys.CALL_SETTINGS_JSON] = Json.encodeToString(settings.callSettings)
+            preferences[PreferencesKeys.NOTE_SETTINGS_JSON] = Json.encodeToString(settings.noteSettings)
+            preferences[PreferencesKeys.VAULT_SETTINGS_JSON] = Json.encodeToString(settings.vaultSettings)
+            preferences[PreferencesKeys.CALENDAR_SETTINGS_JSON] = Json.encodeToString(settings.calendarSettings)
+            preferences[PreferencesKeys.EMAIL_SETTINGS_JSON] = Json.encodeToString(settings.emailSettings)
+            preferences[PreferencesKeys.PARENTAL_CONTROLS_JSON] = Json.encodeToString(settings.parentalControls)
+            preferences[PreferencesKeys.NOTIFICATIONS_JSON] = Json.encodeToString(settings.notificationSettings)
+            
+            // Sync individual fields for backward compatibility
+            preferences[PreferencesKeys.THEME_MODE] = settings.chatSettings.theme
+            preferences[PreferencesKeys.FONT_SIZE] = settings.chatSettings.fontSize.toFloat()
+            
+            // Privacy Sync
+            preferences[PreferencesKeys.READ_RECEIPTS_ENABLED] = settings.privacySettings.readReceiptsEnabled
+            preferences[PreferencesKeys.TYPING_INDICATORS_ENABLED] = settings.privacySettings.typingIndicatorsEnabled
+            preferences[PreferencesKeys.PROFILE_PHOTO_VISIBILITY] = settings.privacySettings.profilePhotoVisibility.name
+            preferences[PreferencesKeys.ABOUT_VISIBILITY] = settings.privacySettings.aboutVisibility.name
+            preferences[PreferencesKeys.LAST_SEEN_VISIBILITY] = settings.privacySettings.lastSeenVisibility.name
+            preferences[PreferencesKeys.CALL_PERMISSION] = settings.privacySettings.callPermission.name
+            preferences[PreferencesKeys.GROUP_PERMISSION] = settings.privacySettings.groupPermission.name
+            preferences[PreferencesKeys.SCREENSHOT_PROTECTION_ENABLED] = settings.privacySettings.screenshotProtectionEnabled
+            preferences[PreferencesKeys.BIOMETRIC_LOCK_ENABLED] = settings.privacySettings.biometricLockEnabled
+            preferences[PreferencesKeys.BIOMETRIC_TIMEOUT] = settings.privacySettings.biometricTimeoutMinutes
+        }
+    }
+    
+    val fullSettingsFlow: Flow<com.keeftalk.chat.domain.model.UserSettings> = context.dataStore.data.map { preferences ->
+        val userId = preferences[PreferencesKeys.USER_ID] ?: ""
+        com.keeftalk.chat.domain.model.UserSettings(
+            userId = userId,
+            chatSettings = preferences[PreferencesKeys.CHAT_SETTINGS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserChatSettings(userId = userId) }
+            } ?: com.keeftalk.chat.domain.model.UserChatSettings(userId = userId),
+            callSettings = preferences[PreferencesKeys.CALL_SETTINGS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserCallSettings() }
+            } ?: com.keeftalk.chat.domain.model.UserCallSettings(),
+            noteSettings = preferences[PreferencesKeys.NOTE_SETTINGS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserNoteSettings() }
+            } ?: com.keeftalk.chat.domain.model.UserNoteSettings(),
+            vaultSettings = preferences[PreferencesKeys.VAULT_SETTINGS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserVaultSettings() }
+            } ?: com.keeftalk.chat.domain.model.UserVaultSettings(),
+            calendarSettings = preferences[PreferencesKeys.CALENDAR_SETTINGS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserCalendarSettings() }
+            } ?: com.keeftalk.chat.domain.model.UserCalendarSettings(),
+            emailSettings = preferences[PreferencesKeys.EMAIL_SETTINGS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserEmailSettings() }
+            } ?: com.keeftalk.chat.domain.model.UserEmailSettings(),
+            parentalControls = preferences[PreferencesKeys.PARENTAL_CONTROLS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserParentalControls() }
+            } ?: com.keeftalk.chat.domain.model.UserParentalControls(),
+            notificationSettings = preferences[PreferencesKeys.NOTIFICATIONS_JSON]?.let {
+                try { Json.decodeFromString(it) } catch (_: Exception) { com.keeftalk.chat.domain.model.UserNotificationSettings() }
+            } ?: com.keeftalk.chat.domain.model.UserNotificationSettings()
+        )
     }
 
     suspend fun clearAll() {

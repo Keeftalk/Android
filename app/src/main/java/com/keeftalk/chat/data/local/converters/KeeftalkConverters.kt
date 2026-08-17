@@ -28,6 +28,16 @@ class KeeftalkConverters {
     }
 
     @TypeConverter
+    fun fromProfileList(value: List<com.keeftalk.chat.domain.model.Profile>): String {
+        return json.encodeToString(value)
+    }
+
+    @TypeConverter
+    fun toProfileList(value: String): List<com.keeftalk.chat.domain.model.Profile> {
+        return json.decodeFromString(value)
+    }
+
+    @TypeConverter
     fun fromCalendarItemType(value: CalendarItemType): String = value.name
 
     @TypeConverter

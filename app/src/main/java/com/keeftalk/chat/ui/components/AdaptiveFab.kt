@@ -195,8 +195,8 @@ fun AdaptiveFab(
     val currentChatIcon = if (chatTab == 0) icons.messageCircle else icons.messageSquare
     val emailAvatars = emailAccounts.map { it.profilePicUrl }
 
-    val accessibilityEnabled = customization.enabledFabActions.contains(com.keeftalk.chat.domain.model.FabAction.ACCESSIBILITY)
-    val accessibilityItems = if (accessibilityEnabled) listOf(
+    val displayEnabled = customization.enabledFabActions.contains(com.keeftalk.chat.domain.model.FabAction.DISPLAY)
+    val displayItems = if (displayEnabled) listOf(
         FabMenuItem("Extra Night Mode", Icons.Default.Nightlight, { onAction(FabActionType.TOGGLE_NIGHT_MODE) }),
         FabMenuItem("Increase Size (A+)", Icons.Default.Add, { onAction(FabActionType.INCREASE_SCALE) }),
         FabMenuItem("Decrease Size (A-)", Icons.Default.Remove, { onAction(FabActionType.DECREASE_SCALE) }),
@@ -211,7 +211,7 @@ fun AdaptiveFab(
                 FabMenuItem("+", icons.add, { expanded = !expanded }, isPrimary = true),
                 null,
                 listOf(
-                    FabMenuItem("New Chat", icons.messageCircle, { onAction(FabActionType.NEW_CHAT); expanded = false }),
+                    FabMenuItem("Find and Discover Pleaaople", icons.messageCircle, { onAction(FabActionType.NEW_CHAT); expanded = false }),
                     FabMenuItem("New Group", Icons.Default.Group, { onAction(FabActionType.NEW_GROUP); expanded = false }),
                     FabMenuItem("", Icons.Default.Add, {}, isDivider = true),
                     FabMenuItem("Scan / Show QR", icons.qrCode, { onAction(FabActionType.QR); expanded = false }),
@@ -380,8 +380,8 @@ fun AdaptiveFab(
                 )
             )
         }
-        currentScreen == AppScreen.AccessibilitySettings -> {
-            // Accessibility Settings (Show global nav items)
+        currentScreen == AppScreen.DisplaySettings -> {
+            // Display Settings (Show global nav items)
             Triple(
                 FabMenuItem("+", icons.add, { expanded = !expanded }, isPrimary = true),
                 null,
@@ -450,15 +450,15 @@ fun AdaptiveFab(
                 Column(
                     modifier = Modifier.padding(vertical = 4.dp)
                 ) {
-                    // Accessibility Row (Compact)
-                    if (accessibilityItems.isNotEmpty()) {
+                    // Display Row (Compact)
+                    if (displayItems.isNotEmpty()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            accessibilityItems.filter { !it.isDivider }.forEach { item ->
+                            displayItems.filter { !it.isDivider }.forEach { item ->
                                 IconButton(
                                     onClick = item.action,
                                     modifier = Modifier
@@ -477,7 +477,7 @@ fun AdaptiveFab(
                         )
                     }
 
-                    // Helper to check if item is in accessibility row to avoid duplication
+                    // Helper to check if item is in display row to avoid duplication
                     // We can't use .contains on FabMenuItem because of lambdas, but we can check types if we mapped them
                     // However, we can just look at labels or icons as a proxy, or better, pass the action type
                     

@@ -17,13 +17,8 @@ import androidx.core.view.WindowCompat
 
 enum class AppTheme {
     SYSTEM,
-    DAY,
-    PINKY,
-    MASCULINE,
-    DEFAULT,
     LIGHT,
-    DARK,
-    AMOLED
+    DARK
 }
 
 data class ChatThemeExtra(
@@ -65,54 +60,6 @@ private val DarkColorScheme = darkColorScheme(
     outline = DarkBorderColor
 )
 
-private val DayColorScheme = lightColorScheme(
-    primary = DayPrimary,
-    onPrimary = Color.White,
-    background = DayBackgroundBody,
-    onBackground = TextPrimary,
-    surface = BackgroundSurface,
-    onSurface = TextPrimary,
-    surfaceVariant = BackgroundSurfaceAlt,
-    onSurfaceVariant = TextSecondary,
-    outline = BorderColor
-)
-
-private val PinkyColorScheme = lightColorScheme(
-    primary = PinkyPrimary,
-    onPrimary = Color.White,
-    background = PinkyBackgroundBody,
-    onBackground = PinkyTextPrimary,
-    surface = BackgroundSurface,
-    onSurface = PinkyTextPrimary,
-    surfaceVariant = PinkyBackgroundSurfaceAlt,
-    onSurfaceVariant = PinkyTextSecondary,
-    outline = PinkyBorderColor
-)
-
-private val MasculineColorScheme = darkColorScheme(
-    primary = MasculinePrimary,
-    onPrimary = Color.White,
-    background = MasculineBackgroundBody,
-    onBackground = MasculineTextPrimary,
-    surface = MasculineBackgroundSurface,
-    onSurface = MasculineTextPrimary,
-    surfaceVariant = MasculineBackgroundSurfaceAlt,
-    onSurfaceVariant = MasculineTextSecondary,
-    outline = MasculineBorderColor
-)
-
-private val AmoledColorScheme = darkColorScheme(
-    primary = Primary,
-    onPrimary = Color.White,
-    background = Color.Black,
-    onBackground = Color.White,
-    surface = Color.Black,
-    onSurface = Color.White,
-    surfaceVariant = Color(0xFF121212),
-    onSurfaceVariant = Color.Gray,
-    outline = Color(0xFF333333)
-)
-
 @Composable
 fun KeeftalkTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
@@ -127,9 +74,9 @@ fun KeeftalkTheme(
 ) {
     val isSystemDark = isSystemInDarkTheme()
     val isDark = when (appTheme) {
-        AppTheme.SYSTEM, AppTheme.DEFAULT -> isSystemDark
-        AppTheme.MASCULINE, AppTheme.DARK, AppTheme.AMOLED -> true
-        else -> false
+        AppTheme.SYSTEM -> isSystemDark
+        AppTheme.DARK -> true
+        AppTheme.LIGHT -> false
     }
 
     val context = LocalContext.current
@@ -140,26 +87,18 @@ fun KeeftalkTheme(
             dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                 if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             }
-            appTheme == AppTheme.SYSTEM || appTheme == AppTheme.DEFAULT -> if (isSystemDark) DarkColorScheme else LightColorScheme
-            appTheme == AppTheme.DAY -> DayColorScheme
-            appTheme == AppTheme.PINKY -> PinkyColorScheme
-            appTheme == AppTheme.MASCULINE -> MasculineColorScheme
+            appTheme == AppTheme.SYSTEM -> if (isSystemDark) DarkColorScheme else LightColorScheme
             appTheme == AppTheme.LIGHT -> LightColorScheme
             appTheme == AppTheme.DARK -> DarkColorScheme
-            appTheme == AppTheme.AMOLED -> AmoledColorScheme
             else -> if (isDark) DarkColorScheme else LightColorScheme
         }
     }
 
     val chatExtra = remember(appTheme, isSystemDark) {
         when (appTheme) {
-            AppTheme.SYSTEM, AppTheme.DEFAULT -> if (isSystemDark) ChatThemeExtra(Primary, DarkMsgThem) else ChatThemeExtra(MsgMe, MsgThem)
-            AppTheme.DAY -> ChatThemeExtra(DayMsgMe, DayMsgThem)
-            AppTheme.PINKY -> ChatThemeExtra(PinkyMsgMe, PinkyMsgThem)
-            AppTheme.MASCULINE -> ChatThemeExtra(MasculineMsgMe, MasculineMsgThem, useGlassmorphism = true)
+            AppTheme.SYSTEM -> if (isSystemDark) ChatThemeExtra(Primary, DarkMsgThem) else ChatThemeExtra(MsgMe, MsgThem)
             AppTheme.LIGHT -> ChatThemeExtra(MsgMe, MsgThem)
             AppTheme.DARK -> ChatThemeExtra(Primary, DarkMsgThem)
-            AppTheme.AMOLED -> ChatThemeExtra(Primary, Color.DarkGray)
         }
     }
 
@@ -173,7 +112,7 @@ fun KeeftalkTheme(
     }
 
     val typography = if (isSkeleton) Typography() else remember(appTheme, fontSize, fontScale, isBold) {
-        getTypographyForTheme(appTheme, fontSize, fontScale, isBold)
+        getTypographyForTheme(fontSize, fontScale, isBold)
     }
 
     val icons = remember(appTheme) {

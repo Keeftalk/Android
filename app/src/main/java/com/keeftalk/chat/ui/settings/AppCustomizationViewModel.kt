@@ -143,7 +143,7 @@ class AppCustomizationViewModel(
                     FabAction.NEW_GROUP,
                     FabAction.QR,
                     FabAction.AI,
-                    FabAction.ACCESSIBILITY
+                    FabAction.DISPLAY
                 ),
                 fabSizeMultiplier = 0.8f,
                 secondaryFabSizeMultiplier = 0.8f,

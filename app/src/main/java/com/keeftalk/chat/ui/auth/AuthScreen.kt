@@ -50,9 +50,6 @@ fun AuthScreen(
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
             onAuthSuccess()
-        } else if (uiState is AuthUiState.SignupSuccess) {
-            viewModel.setFormType(AuthFormType.LOGIN)
-            viewModel.resetState()
         }
     }
 
@@ -143,6 +140,27 @@ fun AuthScreen(
         com.keeftalk.chat.ui.components.LegalViewerModal(
             typeOrUrl = typeOrUrl,
             onDismiss = { showLegalDocumentType = null }
+        )
+    }
+
+    if (uiState is AuthUiState.EncryptionError) {
+        AlertDialog(
+            onDismissRequest = { viewModel.resetState() },
+            title = { Text("Security Context Mismatch") },
+            text = { Text((uiState as AuthUiState.EncryptionError).message) },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.performSecurityReset() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Security Reset (Wipe Keys)", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.resetState() }) {
+                    Text("Try Again")
+                }
+            }
         )
     }
 }
@@ -334,16 +352,12 @@ fun LoginForm(viewModel: AuthViewModel, onForgotPassword: () -> Unit) {
 @Composable
 fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
     val fullName by viewModel.signupFullName.collectAsStateWithLifecycle()
-    val username by viewModel.signupUsername.collectAsStateWithLifecycle()
     val email by viewModel.signupEmail.collectAsStateWithLifecycle()
     val phone by viewModel.signupPhone.collectAsStateWithLifecycle()
     val currentCountry by viewModel.currentCountry.collectAsStateWithLifecycle()
     val password by viewModel.signupPassword.collectAsStateWithLifecycle()
-    val confirmPassword by viewModel.signupConfirmPassword.collectAsStateWithLifecycle()
     val agreeToTerms by viewModel.agreeToTerms.collectAsStateWithLifecycle()
     val passwordStrength by viewModel.signupPasswordStrength.collectAsStateWithLifecycle()
-    val usernameAvailable by viewModel.usernameAvailable.collectAsStateWithLifecycle()
-    val usernameSuggestions by viewModel.usernameSuggestions.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isSignupValid by viewModel.isSignupValid.collectAsStateWithLifecycle()
     
@@ -361,55 +375,6 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             error = signupErrors["fullName"],
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next, capitalization = KeyboardCapitalization.Words)
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Column {
-            PremiumTextField(
-                value = username,
-                onValueChange = viewModel::onSignupUsernameChange,
-                label = "Username",
-                icon = Icons.Default.AlternateEmail,
-                error = signupErrors["username"] ?: when {
-                    username.isNotEmpty() && username.length < 4 -> "Username must be at least 4 characters"
-                    usernameAvailable == false -> "Username already taken"
-                    else -> null
-                },
-                success = if (usernameAvailable == true && username.length >= 4) "Username available" else null,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-            )
-            
-            if (usernameAvailable == false && usernameSuggestions.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .padding(top = 8.dp, start = 4.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Suggestions: ",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    usernameSuggestions.forEach { suggestion ->
-                        Surface(
-                            onClick = { viewModel.onSuggestionClick(suggestion) },
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                        ) {
-                            Text(
-                                text = suggestion,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
         
         Spacer(modifier = Modifier.height(16.dp))
         
@@ -447,11 +412,12 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
             label = "Password",
             icon = Icons.Default.Lock,
             isPassword = true,
+            initialPasswordVisible = true,
             error = signupErrors["password"],
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
         )
         
-        // ... progress indicator ...
         if (password.isNotEmpty()) {
             LinearProgressIndicator(
                 progress = { passwordStrength },
@@ -468,19 +434,6 @@ fun SignUpForm(viewModel: AuthViewModel, onShowLegal: (String) -> Unit) {
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        PremiumTextField(
-            value = confirmPassword,
-            onValueChange = viewModel::onSignupConfirmPasswordChange,
-            label = "Confirm Password",
-            icon = Icons.Default.CheckCircle,
-            isPassword = true,
-            error = signupErrors["confirmPassword"] ?: if (confirmPassword.isNotEmpty() && password != confirmPassword) "Passwords do not match" else null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
-        )
         
         Spacer(modifier = Modifier.height(12.dp))
         

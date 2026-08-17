@@ -51,7 +51,7 @@ class CloudImportCoordinator(
                 if (tempFile != null && tempFile.exists()) {
                     try {
                         // 2. Pass to existing pipeline (Encryption -> Upload -> Vault)
-                        val result = vaultRepository.uploadFile(tempFile, parentId) { _ -> }
+                        val result = vaultRepository.uploadFile(tempFile, parentId) { _, _ -> }
                         if (result.isSuccess) {
                             successCount++
                             Log.d(TAG, "Successfully imported ${tempFile.name}")
@@ -94,7 +94,7 @@ class CloudImportCoordinator(
                 if (downloadResult.isSuccess && tempFile.exists()) {
                     try {
                         // 2. Pass to existing pipeline (Encryption -> Upload -> Vault)
-                        val result = vaultRepository.uploadFile(tempFile, parentId) { _ -> }
+                        val result = vaultRepository.uploadFile(tempFile, parentId) { _, _ -> }
                         if (result.isSuccess) {
                             successCount++
                             Log.d(TAG, "Successfully imported ${tempFile.name}")
@@ -138,7 +138,7 @@ class CloudImportCoordinator(
                 if (downloadResult.isSuccess && tempFile.exists()) {
                     try {
                         // 2. Pass to existing pipeline (Encryption -> Upload -> Vault)
-                        val result = vaultRepository.uploadFile(tempFile, parentId) { _ -> }
+                        val result = vaultRepository.uploadFile(tempFile, parentId) { _, _ -> }
                         if (result.isSuccess) {
                             successCount++
                             Log.d(TAG, "Successfully imported ${tempFile.name}")
@@ -181,7 +181,7 @@ class CloudImportCoordinator(
                 if (downloadResult.isSuccess && tempFile.exists()) {
                     try {
                         // 2. Pass to existing pipeline (Encryption -> Upload -> Vault)
-                        val result = vaultRepository.uploadFile(tempFile, parentId) { _ -> }
+                        val result = vaultRepository.uploadFile(tempFile, parentId) { _, _ -> }
                         if (result.isSuccess) {
                             successCount++
                             Log.d(TAG, "Successfully imported ${tempFile.name}")

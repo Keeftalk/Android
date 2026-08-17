@@ -323,7 +323,7 @@ private fun getFabActionName(action: FabAction) = when(action) {
     FabAction.NEW_GROUP -> "New Group"
     FabAction.QR -> "Scan / Show QR"
     FabAction.AI -> "Chat with AI"
-    FabAction.ACCESSIBILITY -> "Accessibility Options"
+    FabAction.DISPLAY -> "Display Options"
 }
 
 private fun getModuleIcon(module: KeeftalkModule, icons: com.keeftalk.chat.ui.theme.AppIcons) = when(module) {
@@ -343,5 +343,5 @@ private fun getFabActionIcon(action: FabAction, icons: com.keeftalk.chat.ui.them
     FabAction.NEW_GROUP -> Icons.Default.Groups
     FabAction.QR -> icons.qrCode
     FabAction.AI -> icons.brain
-    FabAction.ACCESSIBILITY -> icons.sparkles
+    FabAction.DISPLAY -> icons.palette
 }

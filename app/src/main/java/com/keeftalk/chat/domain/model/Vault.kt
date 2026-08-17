@@ -23,6 +23,17 @@ data class VaultItem(
     val deletedAt: Long? = null
 )
 
+data class UploadProgress(
+    val id: String,
+    val fileName: String,
+    val progress: Float,
+    val uploadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
+    val startTimeMillis: Long = System.currentTimeMillis(),
+    val isError: Boolean = false,
+    val errorMessage: String? = null
+)
+
 @Serializable
 data class VaultFolder(
     val id: String,
@@ -76,4 +87,4 @@ enum class TipSeverity {
     INFO, WARNING, CRITICAL
 }
 
-const val VAULT_STORAGE_LIMIT = 5L * 1024 * 1024 * 1024 // 5GB
+val VAULT_STORAGE_LIMIT = SubscriptionPlan.FREE.storageLimit

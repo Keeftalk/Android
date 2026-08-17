@@ -10,11 +10,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class ChatSettingsViewModel(
-    private val chatSettingsRepository: ChatSettingsRepository,
+    private val settingsRepository: com.keeftalk.chat.domain.repository.SettingsRepository,
     private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    val chatSettings: StateFlow<UserChatSettings> = chatSettingsRepository.chatSettings
+    val chatSettings: StateFlow<UserChatSettings> = settingsRepository.settings
+        .map { it.chatSettings }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserChatSettings(userId = ""))
 
     val userPreferences: StateFlow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
@@ -29,7 +30,24 @@ class ChatSettingsViewModel(
 
     fun updateSetting(key: String, value: Any) {
         viewModelScope.launch {
-            chatSettingsRepository.updateSetting(key, value)
+            // Map legacy individual updates to unified model
+            settingsRepository.updateChatSettings { current ->
+                when (key) {
+                    "theme" -> current.copy(theme = value as String)
+                    "font_size" -> current.copy(fontSize = (value as Number).toInt())
+                    "auto_download_mobile" -> current.copy(autoDownloadMobile = value as List<String>)
+                    "auto_download_wifi" -> current.copy(autoDownloadWifi = value as List<String>)
+                    "auto_download_roaming" -> current.copy(autoDownloadRoaming = value as List<String>)
+                    "upload_photo_quality" -> current.copy(uploadPhotoQuality = value as String)
+                    "upload_video_quality" -> current.copy(uploadVideoQuality = value as String)
+                    "autoplay_gifs" -> current.copy(autoplayGifs = value as Boolean)
+                    "autoplay_videos" -> current.copy(autoplayVideos = value as Boolean)
+                    "save_to_gallery" -> current.copy(saveToGallery = value as Boolean)
+                    "enter_key_behavior" -> current.copy(enterKeyBehavior = value as String)
+                    "link_previews_enabled" -> current.copy(linkPreviewsEnabled = value as Boolean)
+                    else -> current
+                }
+            }
         }
     }
 
@@ -41,32 +59,32 @@ class ChatSettingsViewModel(
 
     fun refreshCacheSize() {
         viewModelScope.launch {
-            _cacheSize.value = chatSettingsRepository.getCacheSize()
+            _cacheSize.value = settingsRepository.getCacheSize()
         }
     }
 
     fun clearCache(types: List<String>) {
         viewModelScope.launch {
-            chatSettingsRepository.clearCache(types)
+            settingsRepository.clearCache(types)
             refreshCacheSize()
         }
     }
 
     fun resetToDefault() {
         viewModelScope.launch {
-            chatSettingsRepository.resetToDefault()
+            settingsRepository.resetToDefault()
         }
     }
 
     fun clearSearchHistory() {
         viewModelScope.launch {
-            chatSettingsRepository.clearSearchHistory()
+            settingsRepository.clearSearchHistory()
         }
     }
 
     fun clearRecentEmojis() {
         viewModelScope.launch {
-            chatSettingsRepository.clearRecentEmojis()
+            settingsRepository.clearRecentEmojis()
         }
     }
 }

@@ -108,14 +108,6 @@
                 <data android:scheme="keeftalk" android:host="confirm-signup" />
             </intent-filter>
 
-            <!-- Password Reset Deep Link -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="keeftalk" android:host="reset-password" />
-            </intent-filter>
-
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

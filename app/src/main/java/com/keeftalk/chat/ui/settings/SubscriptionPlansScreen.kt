@@ -16,7 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keeftalk.chat.data.billing.BillingManager
+import com.keeftalk.chat.data.billing.PurchaseResult
 import com.keeftalk.chat.domain.model.SubscriptionPlan
+import com.keeftalk.chat.util.BandwidthPolicy
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,7 +30,28 @@ fun SubscriptionPlansScreen(
 ) {
     val profile by viewModel.currentUserProfile.collectAsState()
     val productDetails by billingManager.productDetails.collectAsState()
+    val isQuerying by billingManager.isQuerying.collectAsState()
+    val isServiceConnected by billingManager.isServiceConnected.collectAsState()
     val activity = LocalActivity.current ?: return
+    
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        billingManager.purchaseEvents.collect { result ->
+            when (result) {
+                is PurchaseResult.Success -> {
+                    snackbarHostState.showSnackbar("Purchase successful! Your plan will be updated shortly.")
+                }
+                is PurchaseResult.Error -> {
+                    snackbarHostState.showSnackbar("Error: ${result.message}")
+                }
+                is PurchaseResult.Cancelled -> {
+                    // Silent cancellation is often preferred, but we could log it
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -39,60 +63,137 @@ fun SubscriptionPlansScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                PlanCard(
-                    title = "Free",
-                    price = "$0",
-                    description = "The complete messenger",
-                    features = listOf("5 GB encrypted storage", "Compressed media", "100 MB max upload"),
-                    isActive = profile?.planType == SubscriptionPlan.FREE,
-                    onSelect = {}
-                )
-            }
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (!isServiceConnected && !isQuerying) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                "Billing service unavailable. Please check your internet connection or Play Store account.",
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
 
-            item {
-                val plusMonthly = productDetails.find { it.productId == BillingManager.PLUS_MONTHLY }
-                PlanCard(
-                    title = "Plus",
-                    price = plusMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$4.99/mo",
-                    description = "For users who need more space",
-                    features = listOf("100 GB encrypted storage", "Original quality media", "1 GB max upload"),
-                    isActive = (profile?.planType == SubscriptionPlan.PLUS_MONTHLY || profile?.planType == SubscriptionPlan.PLUS_YEARLY),
-                    onSelect = { plusMonthly?.let { billingManager.launchPurchaseFlow(activity, it) } }
-                )
-            }
-
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val proMonthly = productDetails.find { it.productId == BillingManager.PRO_MONTHLY }
+                item {
                     PlanCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Pro",
-                        price = proMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$14.99/mo",
-                        description = "Power user tools",
-                        features = listOf("500 GB storage", "AI Assistant", "5 GB max upload"),
-                        isActive = profile?.planType == SubscriptionPlan.PRO_MONTHLY,
-                        onSelect = { proMonthly?.let { billingManager.launchPurchaseFlow(activity, it) } }
-                    )
-
-                    val familyMonthly = productDetails.find { it.productId == BillingManager.FAMILY_MONTHLY }
-                    PlanCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Family",
-                        price = familyMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$14.99/mo",
-                        description = "Shared family pool",
-                        features = listOf("2 TB shared pool", "Up to 6 users", "Plus features for all"),
-                        isActive = profile?.planType == SubscriptionPlan.FAMILY_MONTHLY,
-                        onSelect = { familyMonthly?.let { billingManager.launchPurchaseFlow(activity, it) } }
+                        title = SubscriptionPlan.FREE.displayName,
+                        price = "$0",
+                        description = "The complete messenger",
+                        features = listOf(
+                            "${SubscriptionPlan.FREE.formatStorageLimit()} encrypted storage",
+                            "Compressed media",
+                            "${SubscriptionPlan.FREE.formatMaxFileSize()} max upload",
+                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getUploadLimit(SubscriptionPlan.FREE))} upload",
+                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getDownloadLimit(SubscriptionPlan.FREE))} download"
+                        ),
+                        isActive = profile?.planType == SubscriptionPlan.FREE,
+                        isLoading = false,
+                        onSelect = {}
                     )
                 }
+
+                item {
+                    val plusMonthly = productDetails.find { it.productId == BillingManager.PLUS_MONTHLY }
+                    PlanCard(
+                        title = SubscriptionPlan.PLUS_MONTHLY.displayName,
+                        price = plusMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$4.99/mo",
+                        description = "For users who need more space",
+                        features = listOf(
+                            "${SubscriptionPlan.PLUS_MONTHLY.formatStorageLimit()} encrypted storage",
+                            "Original quality media",
+                            "${SubscriptionPlan.PLUS_MONTHLY.formatMaxFileSize()} max upload",
+                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getUploadLimit(SubscriptionPlan.PLUS_MONTHLY))} upload",
+                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getDownloadLimit(SubscriptionPlan.PLUS_MONTHLY))} download"
+                        ),
+                        isActive = (profile?.planType == SubscriptionPlan.PLUS_MONTHLY || profile?.planType == SubscriptionPlan.PLUS_YEARLY),
+                        isLoading = isQuerying && plusMonthly == null,
+                        onSelect = { 
+                            plusMonthly?.let { 
+                                billingManager.launchPurchaseFlow(activity, it) 
+                            } ?: run {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Subscription plan details not found. Please try again later.")
+                                }
+                            }
+                        }
+                    )
+                }
+
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val proMonthly = productDetails.find { it.productId == BillingManager.PRO_MONTHLY }
+                        PlanCard(
+                            modifier = Modifier.weight(1f),
+                            title = SubscriptionPlan.PRO_MONTHLY.displayName,
+                            price = proMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$14.99/mo",
+                            description = "Power user tools",
+                            features = listOf(
+                                "${SubscriptionPlan.PRO_MONTHLY.formatStorageLimit()} storage",
+                                "AI Assistant",
+                                "${SubscriptionPlan.PRO_MONTHLY.formatMaxFileSize()} max upload",
+                                "Unlimited transfer speed"
+                            ),
+                            isActive = profile?.planType == SubscriptionPlan.PRO_MONTHLY,
+                            isLoading = isQuerying && proMonthly == null,
+                            onSelect = { 
+                                proMonthly?.let { 
+                                    billingManager.launchPurchaseFlow(activity, it) 
+                                } ?: run {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("Subscription plan details not found.")
+                                    }
+                                }
+                            }
+                        )
+
+                        val familyMonthly = productDetails.find { it.productId == BillingManager.FAMILY_MONTHLY }
+                        PlanCard(
+                            modifier = Modifier.weight(1f),
+                            title = SubscriptionPlan.FAMILY_MONTHLY.displayName,
+                            price = familyMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$14.99/mo",
+                            description = "Shared family pool",
+                            features = listOf(
+                                "${SubscriptionPlan.FAMILY_MONTHLY.formatStorageLimit()} shared pool",
+                                "Up to 6 users",
+                                "Plus features for all",
+                                "Unlimited transfer speed"
+                            ),
+                            isActive = profile?.planType == SubscriptionPlan.FAMILY_MONTHLY,
+                            isLoading = isQuerying && familyMonthly == null,
+                            onSelect = { 
+                                familyMonthly?.let { 
+                                    billingManager.launchPurchaseFlow(activity, it) 
+                                } ?: run {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("Subscription plan details not found.")
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (isQuerying) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -106,7 +207,8 @@ fun PlanCard(
     features: List<String>,
     isActive: Boolean,
     onSelect: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -135,10 +237,14 @@ fun PlanCard(
             Button(
                 onClick = onSelect,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isActive,
+                enabled = !isActive && !isLoading,
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(if (isActive) "Current Plan" else "Select Plan")
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
+                } else {
+                    Text(if (isActive) "Current Plan" else "Select Plan")
+                }
             }
         }
     }

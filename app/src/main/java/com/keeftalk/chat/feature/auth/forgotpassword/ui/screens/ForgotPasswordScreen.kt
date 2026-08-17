@@ -7,17 +7,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -41,19 +42,33 @@ fun ForgotPasswordScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.forgotPasswordState.collectAsStateWithLifecycle()
-    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             IconButton(
                 onClick = {
-                    if (state.step == ForgotPasswordStep.ENTER_IDENTITY) onBack()
-                    else viewModel.backToIdentity()
+                    when (state.step) {
+                        ForgotPasswordStep.ENTER_IDENTITY -> onBack()
+                        ForgotPasswordStep.SELECT_PROFILE -> viewModel.backToIdentity()
+                        ForgotPasswordStep.CONFIRM_PROFILE -> {
+                            if (state.foundProfiles.size > 1) {
+                                viewModel.selectProfile(state.selectedProfile!!) // Should actually just go back to SELECT_PROFILE
+                            } else {
+                                viewModel.backToIdentity()
+                            }
+                        }
+                        ForgotPasswordStep.VERIFY_OTP -> viewModel.selectProfile(state.selectedProfile!!)
+                        ForgotPasswordStep.CREATE_NEW_PASSWORD -> {
+                            // Maybe stay here or go back to OTP? Usually reset process is linear.
+                        }
+                        else -> onBack()
+                    }
                 },
                 modifier = Modifier.align(Alignment.CenterStart)
             ) {
@@ -79,11 +94,13 @@ fun ForgotPasswordScreen(
                 ForgotPasswordStep.ENTER_IDENTITY -> IdentityInput(state, viewModel, onBack)
                 ForgotPasswordStep.SELECT_PROFILE -> ProfileSelection(state, viewModel)
                 ForgotPasswordStep.CONFIRM_PROFILE -> ProfileConfirmation(state, viewModel)
-                ForgotPasswordStep.CONFIRMATION -> ResetPasswordConfirmationScreen(
-                    email = state.selectedProfile?.email ?: "",
-                    countdown = state.countdown,
-                    onResend = { viewModel.sendResetLink() },
-                    onBackToLogin = onBack
+                ForgotPasswordStep.VERIFY_OTP -> OtpVerification(state, viewModel, onBack)
+                ForgotPasswordStep.CREATE_NEW_PASSWORD -> CreateNewPasswordScreen(
+                    viewModel = viewModel,
+                    onSuccess = { /* Already handled in ViewModel */ }
+                )
+                ForgotPasswordStep.CONFIRMATION -> PasswordResetSuccessScreen(
+                    onSignInNow = onBack
                 )
             }
         }
@@ -124,10 +141,10 @@ fun IdentityInput(
             onValueChange = { viewModel.onIdentifierChange(it) },
             label = "Account Information",
             icon = Icons.Default.Search,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Search
             ),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+            keyboardActions = KeyboardActions(
                 onSearch = { 
                     focusManager.clearFocus()
                     viewModel.findAccount() 
@@ -181,7 +198,7 @@ fun ProfileSelection(
         Spacer(modifier = Modifier.height(24.dp))
 
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
@@ -256,10 +273,10 @@ fun ProfileConfirmation(
         Spacer(modifier = Modifier.height(48.dp))
 
         PremiumButton(
-            text = "Yes, Send Reset Link",
+            text = "Yes, Send OTP",
             isLoading = state.isLoading,
             enabled = !state.isLoading,
-            onClick = { viewModel.sendResetLink() }
+            onClick = { viewModel.sendOtp() }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -270,6 +287,110 @@ fun ProfileConfirmation(
             shape = RoundedCornerShape(16.dp)
         ) {
             Text("Not my account", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun OtpVerification(
+    state: com.keeftalk.chat.feature.auth.forgotpassword.state.ForgotPasswordState,
+    viewModel: ForgotPasswordViewModel,
+    onBackToLogin: () -> Unit
+) {
+    val focusManager = LocalFocusManager.current
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            modifier = Modifier.size(100.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.MarkEmailRead,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "Enter Verification Code",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "We've sent a 6-digit verification code to ${state.selectedProfile?.email?.let { AuthUtils.maskEmail(it) } ?: "your email"}.",
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        PremiumTextField(
+            value = state.otp,
+            onValueChange = { viewModel.onOtpChange(it) },
+            label = "6-Digit Code",
+            icon = Icons.Default.Dialpad,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    viewModel.verifyOtp()
+                }
+            ),
+            error = state.error
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        PremiumButton(
+            text = "Verify Code",
+            isLoading = state.isLoading,
+            enabled = state.otp.length == 6 && !state.isLoading,
+            onClick = {
+                focusManager.clearFocus()
+                viewModel.verifyOtp()
+            }
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Didn't receive the code? ",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+
+            TextButton(
+                onClick = { viewModel.sendOtp() },
+                enabled = state.countdown == 0 && !state.isLoading
+            ) {
+                Text(
+                    text = if (state.countdown > 0) "Resend in ${state.countdown}s" else "Resend Code",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(onClick = onBackToLogin) {
+            Text("Back to Login", fontWeight = FontWeight.SemiBold)
         }
     }
 }

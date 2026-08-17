@@ -11,6 +11,10 @@ data class UserSecuritySettings(
     val appLockEnabled: Boolean = false,
     val appLockTimeoutSeconds: Int = 0,
     val biometricUnlockEnabled: Boolean = false,
+    val encryptedAccountKey: String? = null,
+    val keySalt: String? = null,
+    val keyNonce: String? = null,
+    val verificationTag: String? = null,
     val createdAt: Long = 0,
     val updatedAt: Long = 0
 )

@@ -3,12 +3,14 @@ package com.keeftalk.chat.data.local.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.keeftalk.chat.domain.model.Relationship
+import com.keeftalk.chat.domain.model.Profile
 
 @Entity(tableName = "relationship_cache")
 data class RelationshipCacheEntity(
     @PrimaryKey val targetUserId: String,
     val distance: Int?,
     val mutualConnectionCount: Int,
+    val mutualConnectionPreview: List<Profile> = emptyList(),
     val strengthLabel: String?,
     val densityLabel: String?,
     val nudgesReceived: Int = 0,
@@ -20,6 +22,7 @@ fun RelationshipCacheEntity.toDomain() = Relationship(
     distance = distance,
     isDirectConnection = distance == 1,
     mutualConnectionCount = mutualConnectionCount,
+    mutualConnectionPreview = mutualConnectionPreview,
     strengthLabel = strengthLabel,
     densityLabel = densityLabel,
     nudgesReceived = nudgesReceived
@@ -29,6 +32,7 @@ fun Relationship.toEntity() = RelationshipCacheEntity(
     targetUserId = targetUserId,
     distance = distance,
     mutualConnectionCount = mutualConnectionCount,
+    mutualConnectionPreview = mutualConnectionPreview,
     strengthLabel = strengthLabel,
     densityLabel = densityLabel,
     nudgesReceived = nudgesReceived

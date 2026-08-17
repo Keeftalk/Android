@@ -574,13 +574,19 @@ class UnifiedNotesViewModel(
         }
     }
 
+    private val noteSettings = prefs.fullSettingsFlow.map { it.noteSettings }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserNoteSettings())
+
     private fun autoSave(note: Note) {
         if (!canEdit.value) return
+        val settings = noteSettings.value
+        if (!settings.autoSaveEnabled) return
+
         saveJob?.cancel()
-        NotesLogger.v("AUTOSAVE", "Scheduling auto-save in 3000ms (debounced)", noteId = note.id)
+        val interval = settings.autoSaveIntervalSeconds.coerceAtLeast(1) * 1000L
+        NotesLogger.v("AUTOSAVE", "Scheduling auto-save in ${interval}ms (debounced)", noteId = note.id)
         saveJob = viewModelScope.launch {
             _savingState.value = SavingState.Saving
-            delay(3000.milliseconds)
+            delay(interval)
             
             NotesLogger.i("AUTOSAVE", "Typing stopped, triggering database save", noteId = note.id)
             repository.saveNote(note)

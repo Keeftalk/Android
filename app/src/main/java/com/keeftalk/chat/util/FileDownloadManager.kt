@@ -5,6 +5,8 @@ import android.util.Log
 import com.keeftalk.chat.domain.model.File as KeeftalkFile
 import com.keeftalk.chat.di.AppModule
 import com.keeftalk.chat.security.crypto.*
+import com.keeftalk.chat.domain.model.SubscriptionPlan
+import com.keeftalk.chat.domain.repository.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.storage.storage
 import io.ktor.utils.io.ByteReadChannel
@@ -15,6 +17,7 @@ import io.ktor.utils.io.close
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -25,6 +28,7 @@ import java.util.*
 class FileDownloadManager(
     private val context: Context,
     private val cryptoManager: CryptoManager,
+    private val authRepository: AuthRepository,
     private val supabaseProvider: suspend () -> SupabaseClient
 ) {
     private val TAG = "FileDownloadManager"
@@ -50,6 +54,10 @@ class FileDownloadManager(
             val supabase = supabaseProvider()
             val bucket = supabase.storage["files"]
             
+            val profile = authRepository.currentUserProfile.first()
+            val plan = profile?.planType ?: SubscriptionPlan.FREE
+            val limiter = BandwidthLimiter(BandwidthPolicy.getDownloadLimit(plan))
+
             val remotePath = if (fileModel.storagePath.contains("/files/")) {
                 fileModel.storagePath.substringAfter("/files/").substringBefore("?")
             } else {
@@ -84,6 +92,9 @@ class FileDownloadManager(
                     channel.readFully(encryptedBuffer)
                     totalReadFromNetwork += currentEncryptedChunkSize
                     
+                    // Apply bandwidth throttling
+                    limiter.throttle(encryptedBuffer.size)
+
                     val decryptedChunk = StorageCryptoService.decryptChunk(
                         encryptedData = encryptedBuffer,
                         key = fek,

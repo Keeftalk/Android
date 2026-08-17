@@ -283,12 +283,8 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
 
             val appTheme = remember(syncTheme) {
                 when (syncTheme) {
-                    "LIGHT" -> AppTheme.LIGHT
+                        "LIGHT" -> AppTheme.LIGHT
                     "DARK" -> AppTheme.DARK
-                    "AMOLED" -> AppTheme.AMOLED
-                    "DAY" -> AppTheme.DAY
-                    "PINKY" -> AppTheme.PINKY
-                    "MASCULINE" -> AppTheme.MASCULINE
                     else -> AppTheme.SYSTEM
                 }
             }
@@ -356,6 +352,7 @@ fun FullAppContent(
     var currentScreen by androidx.compose.runtime.saveable.rememberSaveable { 
         mutableStateOf<AppScreen>(AppScreen.ChatList) 
     }
+    val onScreenChange: (AppScreen) -> Unit = { currentScreen = it }
     var showAttachmentsForChatId by androidx.compose.runtime.saveable.rememberSaveable { 
         mutableStateOf<String?>(null) 
     }
@@ -367,25 +364,57 @@ fun FullAppContent(
             }
         }
         is StartupState.Ready -> {
+            LaunchedEffect(intent) {
+                if (intent.action == android.content.Intent.ACTION_VIEW) {
+                    val data = intent.data
+                    if (data?.scheme == "keeftalk" && data.host == "reset-password") {
+                        onScreenChange(AppScreen.CreateNewPassword)
+                        intent.action = null
+                    } else if (data?.scheme == "keeftalk" && data.host == "confirm-signup") {
+                        // Supabase handleDeeplinks will update the session,
+                        // and StartupState.Ready will eventually reflect the new isLogged status.
+                        intent.action = null
+                    }
+                }
+            }
+
             if (!state.isLogged) {
                 val currentContext = LocalContext.current
-                AuthScreen(
-                    viewModel = viewModel {
-                        AuthViewModel(
-                            mainViewModel.authRepository,
-                            AppModule.provideCountryService(currentContext),
-                            AppModule.providePhoneNumberService(currentContext)
-                        ).apply {
-                            if (state.isLogged && !state.isEmailVerified) {
-                                setFormType(com.keeftalk.chat.ui.auth.AuthFormType.VERIFY_EMAIL)
-                            }
-                        }
-                    },
-                    onAuthSuccess = {
-                        mainViewModel.refreshLoginStatus()
+                
+                when (currentScreen) {
+                    is AppScreen.ForgotPassword -> {
+                        val forgotPasswordViewModel: ForgotPasswordViewModel = viewModel { ForgotPasswordViewModel(mainViewModel.authRepository) }
+                        ForgotPasswordScreen(viewModel = forgotPasswordViewModel, onBack = { onScreenChange(AppScreen.ChatList) })
                     }
-                )
-                // Notify ready when AuthScreen is shown to dismiss splash
+                    is AppScreen.CreateNewPassword -> {
+                        val forgotPasswordViewModel: ForgotPasswordViewModel = viewModel { ForgotPasswordViewModel(mainViewModel.authRepository) }
+                        CreateNewPasswordScreen(viewModel = forgotPasswordViewModel, onSuccess = { onScreenChange(AppScreen.ResetSuccess) })
+                    }
+                    is AppScreen.ResetSuccess -> {
+                        PasswordResetSuccessScreen(onSignInNow = { onScreenChange(AppScreen.ChatList) })
+                    }
+                    else -> {
+                        AuthScreen(
+                            viewModel = viewModel {
+                                AuthViewModel(
+                                    mainViewModel.authRepository,
+                                    AppModule.provideCountryService(currentContext),
+                                    AppModule.providePhoneNumberService(currentContext)
+                                ).apply {
+                                    if (state.isLogged && !state.isEmailVerified) {
+                                        setFormType(com.keeftalk.chat.ui.auth.AuthFormType.VERIFY_EMAIL)
+                                    }
+                                }
+                            },
+                            onForgotPassword = { onScreenChange(AppScreen.ForgotPassword) },
+                            onAuthSuccess = {
+                                mainViewModel.refreshLoginStatus()
+                            }
+                        )
+                    }
+                }
+
+                // Notify ready when Auth or ForgotPassword screens are shown to dismiss splash
                 LaunchedEffect(Unit) { 
                     StartupOrchestrator.onCriticalRenderEventEnd()
                     onReady() 
@@ -417,6 +446,13 @@ fun FullAppContent(
                         onReady() 
                     }
                 } else {
+                        val securityState by mainViewModel.securityState.collectAsState()
+                        if (securityState == com.keeftalk.chat.security.crypto.SecurityState.RECOVERY_REQUIRED) {
+                            com.keeftalk.chat.ui.security.SecurityRecoveryDialog(
+                                onDismiss = { /* Stay in restricted state */ }
+                            )
+                        }
+
                         MainScaffold(
                             mainViewModel = mainViewModel,
                             userPrefs = userPrefs,
@@ -593,7 +629,7 @@ fun MainScaffold(
                 intent.removeExtra("screen")
             }
             "security_activity" -> {
-                onScreenChange(AppScreen.SecuritySettings)
+                onScreenChange(AppScreen.AccountSettings)
                 intent.removeExtra("screen")
             }
             "sms_detail" -> {
@@ -603,13 +639,6 @@ fun MainScaffold(
                     onScreenChange(AppScreen.SmsDetail(threadId, address))
                 }
                 intent.removeExtra("screen")
-            }
-        }
-
-        if (intent.action == android.content.Intent.ACTION_VIEW) {
-            val data = intent.data
-            if (data?.scheme == "keeftalk" && data.host == "reset-password") {
-                onScreenChange(AppScreen.CreateNewPassword)
             }
         }
 
@@ -1398,7 +1427,14 @@ else {
                                                                 onQualityChange = { id, quality -> detailViewModel.setMediaQuality(id, quality) },
                                                                 onClearMediaSelection = { detailViewModel.clearMediaSelection() },
                                                                 onSendMediaWithCaption = { media, caption -> detailViewModel.sendMediaWithCaption(media, caption) },
-                                                                onSendEditedMedia = { items -> detailViewModel.sendEditedMedia(items) },
+                                                                onSendEditedMedia = { items -> 
+                                                                    scope.launch {
+                                                                        @androidx.media3.common.util.UnstableApi
+                                                                        AppModule.provideMediaExportPipeline(context)
+                                                                            .exportAndSend(content, items)
+                                                                    }
+                                                                    detailViewModel.clearMediaSelection()
+                                                                },
                                                                 onUnlockFullAccess = { 
                                                                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                                                                         val intentAccess = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
@@ -1470,7 +1506,9 @@ else {
                                         AppModule.provideUserPreferencesRepository(context),
                                         mainViewModel.authRepository,
                                         mainViewModel.chatRepository,
-                                        AppModule.providePrivacyRepository(context)
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
                                     )
                                 }
                                 SettingsScreen(
@@ -1479,11 +1517,15 @@ else {
                                     onViewProfile = { onScreenChange(AppScreen.MyProfile) },
                                     onAccountSettingsClick = { onScreenChange(AppScreen.AccountSettings) },
                                     onNotificationsClick = { onScreenChange(AppScreen.NotificationSettings) },
-                                    onPrivacyClick = { onScreenChange(AppScreen.PrivacySettings) },
-                                    onSecurityClick = { onScreenChange(AppScreen.SecuritySettings) },
                                     onChatSettingsClick = { onScreenChange(AppScreen.ChatSettings) },
+                                    onCallSettingsClick = { onScreenChange(AppScreen.CallSettings) },
+                                    onNoteSettingsClick = { onScreenChange(AppScreen.NoteSettings) },
+                                    onVaultSettingsClick = { onScreenChange(AppScreen.VaultSettings) },
+                                    onCalendarSettingsClick = { onScreenChange(AppScreen.CalendarSettings) },
+                                    onEmailSettingsClick = { onScreenChange(AppScreen.EmailSettings) },
+                                    onParentalControlsClick = { onScreenChange(AppScreen.ParentalControls) },
                                     onAppCustomizationClick = { onScreenChange(AppScreen.AppCustomization) },
-                                    onAccessibilityClick = { onScreenChange(AppScreen.AccessibilitySettings) },
+                                    onDisplaySettingsClick = { onScreenChange(AppScreen.DisplaySettings) },
                                     onAboutClick = { onScreenChange(AppScreen.About) },
                                     onHelpClick = { onScreenChange(AppScreen.Help) },
                                     onTestScreensPreviewClick = { onScreenChange(AppScreen.TestScreensPreview) }
@@ -1500,7 +1542,9 @@ else {
                                         AppModule.provideUserPreferencesRepository(context),
                                         mainViewModel.authRepository,
                                         mainViewModel.chatRepository,
-                                        AppModule.providePrivacyRepository(context)
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
                                     )
                                 }
                                 com.keeftalk.chat.ui.settings.SubscriptionPlansScreen(
@@ -1515,7 +1559,9 @@ else {
                                         AppModule.provideUserPreferencesRepository(context),
                                         mainViewModel.authRepository,
                                         mainViewModel.chatRepository,
-                                        AppModule.providePrivacyRepository(context)
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
                                     )
                                 }
                                 com.keeftalk.chat.ui.settings.AccountSettingsScreen(
@@ -1539,7 +1585,9 @@ else {
                                         AppModule.provideUserPreferencesRepository(context),
                                         mainViewModel.authRepository,
                                         mainViewModel.chatRepository,
-                                        AppModule.providePrivacyRepository(context)
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
                                     )
                                 }
                                 NotificationsSettingsScreen(
@@ -1548,49 +1596,100 @@ else {
                                     onSendTestNotification = { settingsViewModel.sendTestNotification() }
                                 )
                             }
-                            is AppScreen.PrivacySettings -> {
-                                val settingsViewModel: SettingsViewModel = viewModel {
-                                    SettingsViewModel(
-                                        AppModule.provideUserPreferencesRepository(context),
-                                        mainViewModel.authRepository,
-                                        mainViewModel.chatRepository,
-                                        AppModule.providePrivacyRepository(context)
-                                    )
-                                }
-                                PrivacySettingsScreen(
-                                    viewModel = settingsViewModel,
-                                    onBack = { onScreenChange(AppScreen.Settings) },
-                                    onBlockedUsersClick = { onScreenChange(AppScreen.BlockedUsers) },
-                                    onProfileViewHistoryClick = { onScreenChange(AppScreen.ProfileViewHistory) }
-                                )
-                            }
                             is AppScreen.BlockedUsers -> {
                                 val settingsViewModel: SettingsViewModel = viewModel {
                                     SettingsViewModel(
                                         AppModule.provideUserPreferencesRepository(context),
                                         mainViewModel.authRepository,
                                         mainViewModel.chatRepository,
-                                        AppModule.providePrivacyRepository(context)
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
                                     )
                                 }
                                 BlockedUsersScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
                             }
-                            is AppScreen.SecuritySettings -> {
-                                val securityViewModel: SecuritySettingsViewModel = viewModel {
-                                    SecuritySettingsViewModel(AppModule.provideSecurityRepository(context))
+                            is AppScreen.CallSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
                                 }
-                                SecuritySettingsScreen(
-                                    viewModel = securityViewModel,
-                                    onBack = { onScreenChange(AppScreen.Settings) },
-                                    onBlockedUsersClick = { onScreenChange(AppScreen.BlockedUsers) },
-                                    onSeeAllActivityClick = { onScreenChange(AppScreen.SecurityActivity) }
-                                )
+                                CallSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
                             }
-                            is AppScreen.SecurityActivity -> {
-                                val securityViewModel: SecuritySettingsViewModel = viewModel {
-                                    SecuritySettingsViewModel(AppModule.provideSecurityRepository(context))
+                            is AppScreen.NoteSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
                                 }
-                                SecurityActivityScreen(viewModel = securityViewModel, onBack = { onScreenChange(AppScreen.SecuritySettings) })
+                                NoteSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.VaultSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                VaultSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.CalendarSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                CalendarSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.ParentalControls -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                ParentalControlsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.EmailSettings -> {
+                                val emailViewModel: EmailViewModel = viewModel {
+                                    EmailViewModel(
+                                        AppModule.provideEmailRepository(context),
+                                        AppModule.provideEmailAuthManager(context)
+                                    )
+                                }
+                                com.keeftalk.chat.feature.email.ui.screens.EmailSettingsScreen(
+                                    viewModel = emailViewModel,
+                                    onBack = { onScreenChange(AppScreen.Email) },
+                                    onAddAccount = { 
+                                        emailViewModel.setOnboardingStep(com.keeftalk.chat.feature.email.viewmodel.OnboardingStep.ProviderSelection)
+                                        emailViewModel.forceShowOnboarding(true)
+                                        onScreenChange(AppScreen.Email)
+                                    }
+                                )
                             }
                             is AppScreen.ProfileViewHistory -> {
                                 val profileViewHistoryViewModel: ProfileViewHistoryViewModel = viewModel {
@@ -1605,7 +1704,7 @@ else {
                             is AppScreen.ChatSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
@@ -1623,7 +1722,7 @@ else {
                             is AppScreen.ChatAppearanceSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
@@ -1632,7 +1731,7 @@ else {
                             is AppScreen.ChatTextAccessibilitySettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
@@ -1641,7 +1740,7 @@ else {
                             is AppScreen.ChatMediaDownloadsSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
@@ -1650,7 +1749,7 @@ else {
                             is AppScreen.ChatBehaviorSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
@@ -1659,7 +1758,7 @@ else {
                             is AppScreen.ChatStorageCacheSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
@@ -1668,14 +1767,14 @@ else {
                             is AppScreen.ChatCleanupSettings -> {
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
-                                        AppModule.provideChatSettingsRepository(context),
+                                        AppModule.provideSettingsRepository(context),
                                         AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
                                 ChatCleanupSettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.ChatStorageCacheSettings) })
                             }
-                            is AppScreen.AccessibilitySettings -> {
-                                AccessibilitySettingsScreen(
+                            is AppScreen.DisplaySettings -> {
+                                com.keeftalk.chat.ui.settings.DisplaySettingsScreen(
                                     viewModel = mainViewModel,
                                     onBack = { onScreenChange(AppScreen.Settings) }
                                 )
@@ -1791,6 +1890,7 @@ else {
                                             AppModule.provideMediaExportPipeline(context)
                                                 .exportAndSend(currentScreen.chatId, editorModels)
                                         }
+                                        // Navigate back to Chat Detail immediately
                                         onScreenChange(AppScreen.ChatList)
                                         scope.launch {
                                             navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, currentScreen.chatId)
@@ -1824,7 +1924,9 @@ else {
                                         AppModule.provideCloudImportCoordinator(context),
                                         AppModule.provideGooglePhotosService(context),
                                         AppModule.provideGoogleDriveService(context),
-                                        AppModule.provideDropboxService()
+                                        AppModule.provideDropboxService(),
+                                        AppModule.provideAuthRepository(context),
+                                        AppModule.provideUserPreferencesRepository(context)
                                     )
                                 }
                                 VaultScreen(
@@ -1978,7 +2080,17 @@ else {
                                 val chatListViewModel: com.keeftalk.chat.ui.screens.ChatListViewModel = viewModel { com.keeftalk.chat.ui.screens.ChatListViewModel(mainViewModel.chatRepository) }
                                 ArchivedChatsScreen(viewModel = chatListViewModel, myId = myId, onBack = { onScreenChange(AppScreen.ChatList) }, onChatClick = { scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, it) } })
                             }
-                            is AppScreen.Help -> HelpScreen(onBack = { onScreenChange(AppScreen.Settings) })
+                            is AppScreen.Help -> {
+                                val bugReportViewModel: com.keeftalk.chat.ui.settings.BugReportViewModel = viewModel {
+                                    com.keeftalk.chat.ui.settings.BugReportViewModel(
+                                        AppModule.provideBugReportRepository(context)
+                                    )
+                                }
+                                HelpScreen(
+                                    viewModel = bugReportViewModel,
+                                    onBack = { onScreenChange(AppScreen.Settings) }
+                                )
+                            }
                             is AppScreen.SmsList -> { /* Already handled via chatTab */ }
                             is AppScreen.SmsDetail -> {
                                 val smsDetailViewModel: com.keeftalk.chat.ui.screens.SmsDetailViewModel = viewModel(key = currentScreen.threadId.toString()) {
@@ -2161,7 +2273,7 @@ else {
 
                 val showFab = when (currentScreen) {
                     AppScreen.ChatList -> isListVisible // Show if list is part of the scaffold
-                    AppScreen.AccessibilitySettings -> true
+                    AppScreen.DisplaySettings -> true
                     AppScreen.Feed -> true
                     is AppScreen.Notes -> !isDetailShown
                     AppScreen.Calendar -> true
@@ -2278,17 +2390,21 @@ sealed class AppScreen : Parcelable {
     @Parcelize
     data object NotificationSettings : AppScreen()
     @Parcelize
-    data object PrivacySettings : AppScreen()
-    @Parcelize
-    data object SecuritySettings : AppScreen()
-    @Parcelize
-    data object SecurityActivity : AppScreen()
-    @Parcelize
     data object ProfileViewHistory : AppScreen()
     @Parcelize
     data object BlockedUsers : AppScreen()
     @Parcelize
     data object ChatSettings : AppScreen()
+    @Parcelize
+    data object CallSettings : AppScreen()
+    @Parcelize
+    data object NoteSettings : AppScreen()
+    @Parcelize
+    data object VaultSettings : AppScreen()
+    @Parcelize
+    data object CalendarSettings : AppScreen()
+    @Parcelize
+    data object ParentalControls : AppScreen()
     @Parcelize
     data object AppCustomization : AppScreen()
     @Parcelize
@@ -2304,7 +2420,7 @@ sealed class AppScreen : Parcelable {
     @Parcelize
     data object ChatCleanupSettings : AppScreen()
     @Parcelize
-    data object AccessibilitySettings : AppScreen()
+    data object DisplaySettings : AppScreen()
     @Parcelize
     data class ChatNotificationSettings(val chatId: String) : AppScreen()
     @Parcelize

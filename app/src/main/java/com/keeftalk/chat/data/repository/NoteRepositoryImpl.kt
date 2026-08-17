@@ -37,7 +37,8 @@ class NoteRepositoryImpl(
     private val syncQueueDao: SyncQueueDao,
     private val fileDao: com.keeftalk.chat.data.local.dao.FileDao,
     private val fileUploadManager: com.keeftalk.chat.util.FileUploadManager,
-    private val prefs: UserPreferencesRepository
+    private val prefs: UserPreferencesRepository,
+    private val authRepository: com.keeftalk.chat.domain.repository.AuthRepository
 ) : NoteRepository {
 
     private val cryptoManager get() = AppModule.provideCryptoManager(context)
@@ -59,9 +60,14 @@ class NoteRepositoryImpl(
         NotesLogger.i("REPO", "NoteRepositoryImpl initialized")
         com.keeftalk.chat.util.StartupOrchestrator.enqueue(com.keeftalk.chat.util.StartupOrchestrator.Tier.TIER_3_POST_RENDER) {
             scope.launch {
-                while (isActive) {
-                    processSyncQueue()
-                    delay(30.seconds)
+                prefs.fullSettingsFlow.collectLatest { settings ->
+                    if (settings.noteSettings.syncNotesAcrossDevices) {
+                        while (isActive && settings.noteSettings.syncNotesAcrossDevices) {
+                            processSyncQueue()
+                            syncNotes()
+                            delay(30.seconds)
+                        }
+                    }
                 }
             }
         }
@@ -305,8 +311,8 @@ class NoteRepositoryImpl(
             }
         }
         
-        val currentUserId = getSupabase().auth.currentUserOrNull()?.id ?: "anon"
-        val result = fileUploadManager.uploadFile(file, SourceType.NOTE, currentUserId)
+        val user = authRepository.getAuthenticatedUser() ?: throw Exception("Not authenticated")
+        val result = fileUploadManager.uploadFile(file, SourceType.NOTE, user.id)
         
         if (result.isSuccess) {
             result.getOrThrow().id

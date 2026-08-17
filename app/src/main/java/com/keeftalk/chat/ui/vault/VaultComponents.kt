@@ -96,6 +96,128 @@ fun VaultBreadcrumbs(
     }
 }
 
+@Composable
+fun UploadingCard(
+    upload: UploadProgress,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp, 
+            if (upload.isError) MaterialTheme.colorScheme.error.copy(alpha = 0.3f) 
+            else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        if (upload.isError) MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (upload.isError) Icons.Default.ErrorOutline else Icons.Default.CloudUpload,
+                    contentDescription = null,
+                    tint = if (upload.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = upload.fileName,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                if (upload.isError) {
+                    Text(
+                        text = upload.errorMessage ?: "Upload failed",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${formatVaultSize(upload.uploadedBytes)} of ${formatVaultSize(upload.totalBytes)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        val elapsed = System.currentTimeMillis() - upload.startTimeMillis
+                        if (upload.uploadedBytes > 0 && elapsed > 500) {
+                            val speed = upload.uploadedBytes.toDouble() / (elapsed / 1000.0) // bytes per sec
+                            val remaining = upload.totalBytes - upload.uploadedBytes
+                            val etaSeconds = if (speed > 0) (remaining / speed).toLong() else 0L
+                            
+                            val etaText = if (etaSeconds > 3600) {
+                                "%dh %dm".format(etaSeconds / 3600, (etaSeconds % 3600) / 60)
+                            } else if (etaSeconds > 60) {
+                                "%dm %ds".format(etaSeconds / 60, etaSeconds % 60)
+                            } else {
+                                "%ds".format(etaSeconds)
+                            }
+                            
+                            Text(
+                                text = "$etaText left",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    LinearProgressIndicator(
+                        progress = { upload.progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            IconButton(onClick = onCancel) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cancel",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
 
 
 @Composable
@@ -226,7 +348,7 @@ fun VaultStorageCard(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            val limit = info?.cloudBytesLimit ?: 5L * 1024 * 1024 * 1024
+            val limit = info?.cloudBytesLimit ?: SubscriptionPlan.FREE.storageLimit
             val progress = (info?.cloudBytesUsed?.toFloat() ?: 0f) / limit.toFloat()
             Box(
                 modifier = Modifier

@@ -1,7 +1,6 @@
 package com.keeftalk.chat.data.repository
 
 import android.content.Context
-import android.provider.OpenableColumns
 import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.room.withTransaction
@@ -70,6 +69,8 @@ class ChatRepositoryImpl(
     private val fileDao: com.keeftalk.chat.data.local.dao.FileDao,
     private val fileUploadManager: com.keeftalk.chat.util.FileUploadManager,
     private val userPrefsRepo: UserPreferencesRepository,
+    private val settingsRepository: com.keeftalk.chat.domain.repository.SettingsRepository,
+    private val connectivityObserver: com.keeftalk.chat.util.ConnectivityObserver,
     private val databaseWriteDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ChatRepository {
 
@@ -89,7 +90,7 @@ class ChatRepositoryImpl(
         return AppModule.provideSupabaseClientAsync(context)
     }
 
-    private suspend fun getAdminSupabase(): SupabaseClient {
+    private fun getAdminSupabase(): SupabaseClient {
         return AppModule.provideAdminSupabaseClient()
     }
 
@@ -614,19 +615,33 @@ class ChatRepositoryImpl(
         }
 
         // --- AUTO-DOWNLOAD MEDIA TRIGGER ---
-        // Trigger for BOTH new and existing messages if they are successfully decrypted
         if (decryptionState == DecryptionState.SUCCESS) {
             val isPdf = normalizedType == "FILE" && dto.attachments.firstOrNull()?.files?.fileName?.lowercase()?.endsWith(".pdf") == true
             val isVaultMedia = normalizedType == "SHARED_VAULT_FILE"
             
             if (normalizedType == "IMAGE" || normalizedType == "VIDEO" || normalizedType == "VOICE" || normalizedType == "PDF" || isPdf || isVaultMedia) {
                 repositoryScope.launch {
-                    // Small delay to ensure DB transaction from the caller (db.withTransaction) is committed
-                    delay(800) 
-                    val msg = messageDao.getMessageWithReactionsById(dto.id).firstOrNull()
-                    if (msg != null) {
-                        Log.i(TAG, "[AUTO_DOWNLOAD] Triggered for message ${msg.message.id} (${msg.message.type})")
-                        ensureMediaLocal(msg.toDomainInternal())
+                    val settings = settingsRepository.settings.first().chatSettings
+                    val isWifi = connectivityObserver.isWifiConnected()
+                    val autoDownloadList = if (isWifi) settings.autoDownloadWifi else settings.autoDownloadMobile
+                    
+                    val typeToMatch = when (normalizedType) {
+                        "IMAGE" -> "PHOTO"
+                        "VIDEO" -> "VIDEO"
+                        "VOICE" -> "AUDIO"
+                        else -> "DOCUMENT"
+                    }
+                    
+                    if (autoDownloadList.contains(typeToMatch)) {
+                        // Small delay to ensure DB transaction is committed
+                        delay(800) 
+                        val msg = messageDao.getMessageWithReactionsById(dto.id).firstOrNull()
+                        if (msg != null) {
+                            Log.i(TAG, "[AUTO_DOWNLOAD] Triggered for message ${msg.message.id} (${msg.message.type})")
+                            ensureMediaLocal(msg.toDomainInternal())
+                        }
+                    } else {
+                        Log.d(TAG, "[AUTO_DOWNLOAD] Skipped for message ${dto.id}: Auto-download disabled for $typeToMatch (isWifi=$isWifi)")
                     }
                 }
             }
@@ -1124,15 +1139,15 @@ class ChatRepositoryImpl(
         // Diagnostic Room Check
         repositoryScope.launch {
             val messages = messageDao.getMessagesForChatWithReactionsOnce(chatId, 100, 0)
-            val success = messages.count { it.message.decryptionState == com.keeftalk.chat.domain.model.DecryptionState.SUCCESS }
-            val pending = messages.count { it.message.decryptionState == com.keeftalk.chat.domain.model.DecryptionState.PENDING || it.message.decryptionState == com.keeftalk.chat.domain.model.DecryptionState.RETRY_REQUIRED }
-            val failed = messages.count { it.message.decryptionState == com.keeftalk.chat.domain.model.DecryptionState.PERMANENT_FAILURE }
+            val success = messages.count { it.message.decryptionState == DecryptionState.SUCCESS }
+            val pending = messages.count { it.message.decryptionState == DecryptionState.PENDING || it.message.decryptionState == DecryptionState.RETRY_REQUIRED }
+            val failed = messages.count { it.message.decryptionState == DecryptionState.PERMANENT_FAILURE }
             
             PerformanceProfiler.logEvent("ChatDetail: Decryption State Snapshot", info = "chatId=$chatId success=$success pending=$pending failed=$failed", category = PerformanceProfiler.Category.CHAT)
             PerformanceProfiler.endStage("Chat Room Query")
         }
 
-        return androidx.paging.Pager<Int, MessageWithReactions>(
+        return androidx.paging.Pager(
             config = androidx.paging.PagingConfig(
                 pageSize = 20,
                 initialLoadSize = 20,
@@ -1307,6 +1322,17 @@ class ChatRepositoryImpl(
     }
 
     override suspend fun sendMessage(chatId: String, content: String, type: MessageType, filePath: String?, replyToId: String?, onProgress: ((Float) -> Unit)?) {
+        // --- PARENTAL CONTROL CHECK ---
+        val chat = chatDao.getChatById(chatId)
+        if (chat != null && chat.peerId != null) {
+            val pcManager = AppModule.provideParentalControlManager(context)
+            val isUnknown = !chat.isFavorite
+            if (!pcManager.canMessage(chat.peerId!!, isUnknown)) {
+                Log.w(TAG, "sendMessage: Action restricted by Parental Controls")
+                return
+            }
+        }
+
         val messageId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         val currentUserId = userPrefsRepo.getUserIdFast() ?: ""
@@ -1339,6 +1365,10 @@ class ChatRepositoryImpl(
                 var attachmentId: String? = null
 
                 if (filePath != null && type != MessageType.TEXT && type != MessageType.LOCATION) {
+                    val authRepo = AppModule.provideAuthRepository(context)
+                    val user = authRepo.getAuthenticatedUser() ?: throw Exception("Not authenticated")
+                    val currentUserId = user.id
+                    
                     val file = try {
                         if (filePath.startsWith("content://") || filePath.startsWith("file://")) {
                             val uri = Uri.parse(filePath)
@@ -1366,7 +1396,7 @@ class ChatRepositoryImpl(
                             uploadedFile = uploaded
                             attachmentId = UUID.randomUUID().toString()
                             fileDao.insertMessageAttachment(MessageAttachmentEntity(
-                                id = attachmentId!!,
+                                id = attachmentId,
                                 messageId = messageId,
                                 fileId = uploaded.id
                             ))
@@ -1437,7 +1467,7 @@ class ChatRepositoryImpl(
                 supabase.postgrest["messages"].upsert(dto)
                 
                 // Step 2: Sync attachment reference if exists (MUST succeed before completion)
-                if (uploadedFile != null && attachmentId != null) {
+                if (uploadedFile != null) {
                     supabase.postgrest["message_attachment"].insert(buildJsonObject {
                         put("id", attachmentId)
                         put("message_id", messageId)
@@ -1728,6 +1758,7 @@ class ChatRepositoryImpl(
         storageLimit = storageLimit,
         storageUsed = storageUsed,
         isFamilyOwner = isFamilyOwner,
+        familyId = familyId,
         avatarVisibility = privacy.avatarVisibility,
         coverVisibility = privacy.coverVisibility,
         phoneVisibility = privacy.phoneVisibility,
@@ -1774,7 +1805,7 @@ class ChatRepositoryImpl(
     override suspend fun archiveChat(chatId: String, isArchived: Boolean) { chatDao.updateArchived(chatId, isArchived) }
     override suspend fun blockUser(userId: String, isBlocked: Boolean) { userDao.updateBlocked(userId, isBlocked) }
     override suspend fun clearChat(chatId: String) {
-        val currentUserId = getCurrentUserId() ?: return
+        getCurrentUserId() ?: return
         repositoryScope.launch {
             try {
                 // 1. Find all messages in this chat with attachments
@@ -1861,6 +1892,16 @@ class ChatRepositoryImpl(
     override suspend fun startCall(chatId: String, type: String, callId: String): String {
         val currentUserId = getCurrentUserId() ?: throw Exception("Unauthorized")
         val chat = chatDao.getChatById(chatId) ?: throw Exception("Chat not found")
+
+        // --- PARENTAL CONTROL CHECK ---
+        if (chat.peerId != null) {
+            val pcManager = AppModule.provideParentalControlManager(context)
+            val isUnknown = !chat.isFavorite
+            if (!pcManager.canCall(chat.peerId!!, isUnknown)) {
+                throw Exception("Calls restricted by Parental Controls")
+            }
+        }
+
         try {
             getSupabase().postgrest["call_sessions"].insert(buildJsonObject { put("id", callId); put("chat_id", chatId); put("caller_id", currentUserId); put("receiver_id", chat.peerId ?: ""); put("type", type); put("state", "calling") })
             sendMessage(chatId, "Started a ${if (type.uppercase() == "VIDEO") "video call" else "voice call"}", MessageType.CALL_LOG)
@@ -2061,6 +2102,13 @@ class ChatRepositoryImpl(
 
     override suspend fun downloadMedia(message: Message, onProgress: ((Float) -> Unit)?): Result<DownloadResult> = withContext(Dispatchers.IO) {
         try {
+            // --- PARENTAL CONTROL CHECK ---
+            val pcManager = AppModule.provideParentalControlManager(context)
+            val fileEntity = fileDao.getFilesForMessage(message.id).firstOrNull()
+            if (fileEntity != null && pcManager.isMediaDownloadRestricted(fileEntity.fileSize ?: 0L)) {
+                return@withContext Result.failure(Exception("Download size restricted by Parental Controls"))
+            }
+
             // 0. Check lock
             val currentUserId = getCurrentUserId()
             if (message.mediaLocked && message.senderId != currentUserId) {

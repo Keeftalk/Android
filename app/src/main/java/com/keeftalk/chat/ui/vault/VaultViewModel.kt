@@ -2,6 +2,7 @@ package com.keeftalk.chat.ui.vault
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.keeftalk.chat.domain.model.*
 import com.keeftalk.chat.domain.repository.VaultRepository
 import com.keeftalk.chat.domain.repository.SecurityRepository
@@ -12,8 +13,7 @@ import com.keeftalk.chat.data.cloud.GoogleDriveService
 import com.keeftalk.chat.data.cloud.DropboxService
 import com.keeftalk.chat.data.cloud.DropboxItem
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import java.io.File
 import kotlin.time.Duration.Companion.minutes
 
@@ -44,10 +44,13 @@ data class VaultUiState(
     val selectedItemIds: Set<String> = emptySet(),
     val storageTips: List<VaultStorageTip> = emptyList(),
     val importState: CloudImportCoordinator.ImportState = CloudImportCoordinator.ImportState.Idle,
+    val activeUploads: Map<String, UploadProgress> = emptyMap(),
     val dropboxItems: List<DropboxItem> = emptyList(),
     val dropboxPath: String = "",
     val dropboxSelectedIds: Set<String> = emptySet(),
     val isDropboxLoading: Boolean = false,
+    val showUpgradeDialog: Boolean = false,
+    val pendingLargeFiles: List<File> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -74,7 +77,9 @@ class VaultViewModel(
     private val cloudImportCoordinator: CloudImportCoordinator,
     private val googlePhotosService: GooglePhotosService,
     private val googleDriveService: GoogleDriveService,
-    private val dropboxService: DropboxService
+    private val dropboxService: DropboxService,
+    private val authRepository: com.keeftalk.chat.domain.repository.AuthRepository,
+    val prefs: com.keeftalk.chat.data.prefs.UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VaultUiState())
@@ -96,6 +101,25 @@ class VaultViewModel(
         observeImportState()
         observeCloudImportResults()
         startPeriodicSync()
+        startAutoLockObserver()
+    }
+
+    private var autoLockJob: Job? = null
+    private fun startAutoLockObserver() {
+        autoLockJob?.cancel()
+        autoLockJob = viewModelScope.launch {
+            prefs.fullSettingsFlow.collectLatest { settings ->
+                val vaultSettings = settings.vaultSettings
+                if (vaultSettings.autoLockVault) {
+                    while (currentCoroutineContext().isActive) {
+                        delay(vaultSettings.autoLockTimeoutMinutes.minutes)
+                        if (!_uiState.value.isVaultLocked) {
+                            _uiState.update { it.copy(isVaultLocked = true) }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun observeImportState() {
@@ -238,11 +262,13 @@ class VaultViewModel(
             combine(
                 repository.getStorageInfo(),
                 repository.getAllItems(),
-                _uiState.map { it.trashItems }.distinctUntilChanged()
-            ) { info, allItems, trashItems ->
+                _uiState.map { it.trashItems }.distinctUntilChanged(),
+                repository.activeUploads
+            ) { info, allItems, trashItems, activeUploads ->
                 _uiState.update { it.copy(
                     storageInfo = info,
-                    storageTips = generateStorageTips(info, allItems, trashItems)
+                    storageTips = generateStorageTips(info, allItems, trashItems),
+                    activeUploads = activeUploads
                 ) }
             }.collect()
         }
@@ -295,10 +321,11 @@ class VaultViewModel(
         // 4. Storage Pressure
         val usageRatio = info.cloudBytesUsed.toFloat() / info.cloudBytesLimit.toFloat()
         if (usageRatio > 0.9f) {
+            val limitStr = formatSize(info.cloudBytesLimit)
             tips.add(VaultStorageTip(
                 id = "storage_full",
                 title = "Storage Almost Full",
-                description = "You've used ${"%.1f".format(usageRatio * 100)}% of your 5GB cloud storage. Consider upgrading your plan.",
+                description = "You've used ${"%.1f".format(usageRatio * 100)}% of your $limitStr cloud storage. Consider upgrading your plan.",
                 actionLabel = "Upgrade",
                 action = StorageTipAction.UPGRADE_PLAN,
                 severity = TipSeverity.CRITICAL
@@ -423,12 +450,54 @@ class VaultViewModel(
     }
 
     fun uploadFile(file: File) {
+        uploadFiles(listOf(file))
+    }
+
+    fun uploadFiles(files: List<File>) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true) }
-            repository.uploadFile(file, _currentParentId.value) { progress ->
-                // Update progress in UI if needed
+            val profile = authRepository.currentUserProfile.first()
+            val maxAllowed = profile?.planType?.maxFileSize ?: SubscriptionPlan.FREE.maxFileSize
+            
+            val (oversized, allowed) = files.partition { it.length() > maxAllowed }
+            
+            if (oversized.isNotEmpty()) {
+                _uiState.update { it.copy(showUpgradeDialog = true, pendingLargeFiles = oversized) }
             }
-            _uiState.update { it.copy(isSyncing = false) }
+            
+            allowed.forEach { startUpload(it) }
+        }
+    }
+
+    private fun startUpload(file: File) {
+        viewModelScope.launch {
+            repository.uploadFile(file, _currentParentId.value) { _, _ -> }
+                .onSuccess {
+                    _events.emit(VaultEvent.ShowToast("Upload complete: ${file.name}"))
+                }
+                .onFailure { error ->
+                    if (error !is CancellationException) {
+                        Log.e("VaultVM", "Upload failed: ${error.message}")
+                    }
+                }
+        }
+    }
+
+    fun dismissUpgradeDialog() {
+        _uiState.update { it.copy(showUpgradeDialog = false, pendingLargeFiles = emptyList()) }
+    }
+
+    fun cancelUpload(uploadId: String) {
+        repository.cancelUpload(uploadId)
+    }
+
+    fun clearUploadError(uploadId: String) {
+        repository.cancelUpload(uploadId)
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            repository.shutdown()
+            com.keeftalk.chat.util.AppDependencies.authRepository.logout()
         }
     }
 

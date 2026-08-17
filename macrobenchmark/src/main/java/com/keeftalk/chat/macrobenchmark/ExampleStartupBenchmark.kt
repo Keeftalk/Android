@@ -2,7 +2,6 @@ package com.keeftalk.chat.macrobenchmark
 
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.StartupMode
-import androidx.benchmark.macro.StartupType
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule

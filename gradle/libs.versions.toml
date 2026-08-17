@@ -28,6 +28,7 @@ core = "1.6.1"
 runner = "1.6.2"
 emoji2 = "1.5.0"
 coilCompose = "2.7.0"
+glide = "4.16.0"
 retrofit = "2.12.0"
 converterMoshi = "2.12.0"
 kotlinxCoroutinesAndroid = "1.10.2"
@@ -54,6 +55,7 @@ asynclayoutinflater = "1.1.0"
 benchmark = "1.4.1"
 slf4j = "1.7.36"
 material = "1.4.0"
+playBilling = "9.1.0"
 ktor = "3.5.1"
 ktorClientContentNegotiation = "3.1.1"
 googleServices = "4.5.0"
@@ -81,7 +83,8 @@ media3 = "1.5.1"
 securityCrypto = "1.1.0-alpha06"
 argon2kt = "1.6.0"
 sqlcipher = "4.5.4"
-billing = "7.1.1"
+hilt = "2.60.1"
+hiltNavigationCompose = "1.4.0"
 
 [libraries]
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
@@ -135,6 +138,8 @@ androidx-emoji2-bundled = { group = "androidx.emoji2", name = "emoji2-bundled", 
 coil-gif = { group = "io.coil-kt", name = "coil-gif", version.ref = "coilCompose" }
 coil-video = { group = "io.coil-kt", name = "coil-video", version.ref = "coilCompose" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
+glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
+glide-ksp = { group = "com.github.bumptech.glide", name = "compiler", version.ref = "glide" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 converter-moshi = { group = "com.squareup.retrofit2", name = "converter-moshi", version.ref = "converterMoshi" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
@@ -189,7 +194,10 @@ android-activation = { group = "com.sun.mail", name = "android-activation", vers
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 readability4j = { group = "net.dankito.readability4j", name = "readability4j", version.ref = "readability4j" }
-play-billing = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
+play-billing = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "playBilling" }
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -200,3 +208,4 @@ google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDev
 jetbrains-kotlin-plugin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "jetbrainsKotlinPluginSerialization" }
 googleServices = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }

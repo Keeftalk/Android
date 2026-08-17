@@ -21,7 +21,7 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles")
     fun getAllProfiles(): Flow<List<ProfileEntity>>
 
-    @Query("SELECT * FROM profiles WHERE username LIKE '%' || :query || '%' OR fullName LIKE '%' || :query || '%'")
+    @Query("SELECT * FROM profiles WHERE username LIKE '%' || :query || '%' OR full_name LIKE '%' || :query || '%'")
     suspend fun searchProfiles(query: String): List<ProfileEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -2,7 +2,14 @@ package com.keeftalk.chat.ui.screens.editor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.graphics.Color
+import android.graphics.RectF
+import android.net.Uri
 import com.keeftalk.chat.domain.model.*
+import com.keeftalk.chat.ui.screens.editor.signal.model.SignalEditorModel
+import com.keeftalk.chat.ui.screens.editor.signal.model.EditorElement
+import com.keeftalk.chat.ui.screens.editor.signal.renderers.UriGlideRenderer
+import com.keeftalk.chat.ui.screens.editor.signal.renderers.FaceBlurRenderer
 import com.keeftalk.chat.util.FaceDetectionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,154 +20,116 @@ class MediaReviewViewModel : ViewModel() {
 
     private val faceDetectionManager = FaceDetectionManager()
 
-    private val _editorStates = MutableStateFlow<Map<Long, EditorModel>>(emptyMap())
+    private val _editorStates = MutableStateFlow<Map<Long, SignalEditorModel>>(emptyMap())
     val editorStates = _editorStates.asStateFlow()
 
-    private val _reviewItems = MutableStateFlow<List<EditorModel>>(emptyList())
+    private val _reviewItems = MutableStateFlow<List<ReviewItem>>(emptyList())
     val reviewItems = _reviewItems.asStateFlow()
 
-    private val undoStacks = mutableMapOf<Long, Stack<EditorModel>>()
-    private val redoStacks = mutableMapOf<Long, Stack<EditorModel>>()
+    private val _captions = MutableStateFlow<Map<Long, String>>(emptyMap())
+    val captions = _captions.asStateFlow()
 
-    fun setMediaItems(items: List<MediaItem>) {
-        val models = items.map { EditorModel(mediaItem = it) }
-        setReviewItems(models)
+    private val _videoTrimRanges = MutableStateFlow<Map<Long, LongRange>>(emptyMap())
+    val videoTrimRanges = _videoTrimRanges.asStateFlow()
+
+    sealed class ReviewItem {
+        data class Media(val item: MediaItem) : ReviewItem()
+        data class Doc(val item: DocumentModel) : ReviewItem()
+        
+        val id: Long get() = when(this) {
+            is Media -> item.id
+            is Doc -> item.id
+        }
+        
+        val uri: Uri get() = when(this) {
+            is Media -> item.uri
+            is Doc -> item.uri
+        }
+        
+        val displayName: String get() = when(this) {
+            is Media -> item.displayName
+            is Doc -> item.name
+        }
     }
 
-    fun setDocumentItems(items: List<DocumentModel>) {
-        val models = items.map { EditorModel(documentItem = it) }
-        setReviewItems(models)
+    fun setMediaItems(items: List<MediaItem>) {
+        setMixedItems(items, emptyList())
     }
 
     fun setMixedItems(media: List<MediaItem>, docs: List<DocumentModel>) {
-        val models = media.map { EditorModel(mediaItem = it) } + docs.map { EditorModel(documentItem = it) }
-        setReviewItems(models)
-    }
-
-    fun setReviewItems(models: List<EditorModel>) {
-        _reviewItems.value = models
+        val items = media.map { ReviewItem.Media(it) } + docs.map { ReviewItem.Doc(it) }
+        _reviewItems.value = items
+        
         val currentStates = _editorStates.value.toMutableMap()
-        models.forEach { model ->
-            val id = model.mediaItem?.id ?: model.documentItem?.id ?: 0L
-            if (!currentStates.containsKey(id)) {
-                currentStates[id] = model
-                undoStacks[id] = Stack()
-                redoStacks[id] = Stack()
+        items.forEach { item ->
+            if (!currentStates.containsKey(item.id)) {
+                val model = SignalEditorModel(Color.BLACK)
+                // Only setup UriGlideRenderer for images or things Glide can handle
+                val isImage = item is ReviewItem.Media && item.item.isImage
+                if (isImage) {
+                    val renderer = UriGlideRenderer(item.uri, decryptable = false, maxWidth = 2048, maxHeight = 2048)
+                    val element = EditorElement(renderer)
+                    element.flags.setSelectable(false).persist()
+                    model.addElementWithoutPushUndo(element)
+                }
+                currentStates[item.id] = model
             }
         }
         _editorStates.value = currentStates
     }
 
     fun updateCaption(itemId: Long, caption: String) {
-        val currentState = _editorStates.value[itemId] ?: return
-        val newState = currentState.copy(caption = caption)
-        val states = _editorStates.value.toMutableMap()
-        states[itemId] = newState
-        _editorStates.value = states
-    }
-
-    fun updateEditedText(itemId: Long, text: String) {
-        val currentState = _editorStates.value[itemId] ?: return
-        val newState = currentState.copy(editedText = text)
-        val states = _editorStates.value.toMutableMap()
-        states[itemId] = newState
-        _editorStates.value = states
-    }
-
-    private fun pushUndo(itemId: Long, state: EditorModel) {
-        val stack = undoStacks.getOrPut(itemId) { Stack() }
-        stack.push(state)
-        if (stack.size > 50) stack.removeAt(0)
-        redoStacks[itemId]?.clear()
-    }
-
-    fun executeCommand(itemId: Long, command: EditorCommand) {
-        val currentState = _editorStates.value[itemId] ?: return
-        pushUndo(itemId, currentState)
-
-        val newState = command.execute(currentState)
-        val states = _editorStates.value.toMutableMap()
-        states[itemId] = newState
-        _editorStates.value = states
+        val newCaptions = _captions.value.toMutableMap()
+        newCaptions[itemId] = caption
+        _captions.value = newCaptions
     }
 
     fun undo(itemId: Long) {
-        val uStack = undoStacks[itemId]
-        if (uStack?.isNotEmpty() == true) {
-            val currentState = _editorStates.value[itemId] ?: return
-            val rStack = redoStacks.getOrPut(itemId) { Stack() }
-            rStack.push(currentState)
-
-            val previousState = uStack.pop()
-            val states = _editorStates.value.toMutableMap()
-            states[itemId] = previousState
-            _editorStates.value = states
-        }
+        _editorStates.value[itemId]?.undo()
     }
 
     fun redo(itemId: Long) {
-        val rStack = redoStacks[itemId]
-        if (rStack?.isNotEmpty() == true) {
-            val currentState = _editorStates.value[itemId] ?: return
-            val uStack = undoStacks.getOrPut(itemId) { Stack() }
-            uStack.push(currentState)
-
-            val nextState = rStack.pop()
-            val states = _editorStates.value.toMutableMap()
-            states[itemId] = nextState
-            _editorStates.value = states
-        }
-    }
-
-    fun detectAndBlurFaces(itemId: Long, context: android.content.Context) {
-        val state = _editorStates.value[itemId] ?: return
-        val uri = state.mediaItem?.uri ?: state.documentItem?.uri ?: return
-        viewModelScope.launch {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream) ?: return@launch
-                val faces = faceDetectionManager.detectFaces(bitmap)
-
-                val newBlurRegions = faces.map { rect ->
-                    // Map absolute bitmap coordinates to normalized coordinates
-                    val normalizedX = rect.left.toFloat() / bitmap.width
-                    val normalizedY = rect.top.toFloat() / bitmap.height
-                    val normalizedWidth = rect.width().toFloat() / bitmap.width
-                    val normalizedHeight = rect.height().toFloat() / bitmap.height
-
-                    BlurRegion(
-                        path = androidx.compose.ui.graphics.Path().apply {
-                            addRect(androidx.compose.ui.geometry.Rect(normalizedX, normalizedY, normalizedX + normalizedWidth, normalizedY + normalizedHeight))
-                        },
-                        isFace = true
-                    )
-                }
-                if (newBlurRegions.isNotEmpty()) {
-                    executeCommand(itemId, EditorCommand.AddBlurRegion(newBlurRegions.first())) // TODO: Support multiple
-                    // Actually, we should probably add all at once.
-                }
-            } catch (_: Exception) {
-                android.util.Log.e("MEDIA_EDITOR_DEBUG", "Face detection failed")
-            }
-        }
+        _editorStates.value[itemId]?.redo()
     }
 
     fun updateVideoTrim(itemId: Long, start: Long, end: Long) {
-        val state = _editorStates.value[itemId] ?: return
-        val states = _editorStates.value.toMutableMap()
-        states[itemId] = state.copy(videoTrimRange = start..end)
-        _editorStates.value = states
+        val newRanges = _videoTrimRanges.value.toMutableMap()
+        newRanges[itemId] = start..end
+        _videoTrimRanges.value = newRanges
     }
 
-    fun addTextElement(itemId: Long, text: String, color: androidx.compose.ui.graphics.Color) {
-        val newElement = TextElement(
-            id = UUID.randomUUID().toString(),
-            text = text,
-            color = color,
-            fontSize = 50f,
-            x = 0.5f,
-            y = 0.5f
-        )
-        executeCommand(itemId, EditorCommand.AddTextElement(newElement))
+    fun detectAndBlurFaces(itemId: Long, context: android.content.Context) {
+        val model = _editorStates.value[itemId] ?: return
+        val mainImage = model.getMainImage() ?: return
+        val renderer = mainImage.renderer as? UriGlideRenderer ?: return
+        val bitmap = renderer.getBitmap() ?: return
+
+        viewModelScope.launch {
+            try {
+                val faces = faceDetectionManager.detectFaces(bitmap)
+                if (faces.isNotEmpty()) {
+                    model.pushUndoPoint()
+                    faces.forEach { rect ->
+                        val faceRenderer = FaceBlurRenderer()
+                        val faceElement = EditorElement(faceRenderer, -1) // Z_MASK
+                        
+                        // Map rect to normalized coordinates in FULL_BOUNDS (-1000..1000)
+                        val normalizedRect = RectF(
+                            (rect.left.toFloat() / bitmap.width * 2000) - 1000,
+                            (rect.top.toFloat() / bitmap.height * 2000) - 1000,
+                            (rect.right.toFloat() / bitmap.width * 2000) - 1000,
+                            (rect.bottom.toFloat() / bitmap.height * 2000) - 1000
+                        )
+                        faceElement.localMatrix.setRectToRect(com.keeftalk.chat.ui.screens.editor.signal.Bounds.FULL_BOUNDS, normalizedRect, android.graphics.Matrix.ScaleToFit.FILL)
+                        
+                        model.addElementWithoutPushUndo(faceElement)
+                    }
+                    // Trigger refresh
+                    _editorStates.value = _editorStates.value.toMutableMap().apply { this[itemId] = model }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MEDIA_EDITOR_DEBUG", "Face detection failed", e)
+            }
+        }
     }
 }

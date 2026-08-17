@@ -3,12 +3,9 @@ package com.keeftalk.chat.domain.model
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.IntSize
-import com.keeftalk.chat.ui.screens.editor.graphics.EditorElement
-
 data class EditorModel(
     val mediaItem: MediaItem? = null,
     val documentItem: DocumentModel? = null,
-    val rootElement: EditorElement? = null,
     val drawingPaths: List<DrawingPath> = emptyList(),
     val textElements: List<TextElement> = emptyList(),
     val stickers: List<StickerElement> = emptyList(),
@@ -17,7 +14,8 @@ data class EditorModel(
     val rotation: Float = 0f,
     val videoTrimRange: LongRange? = null,
     val editedText: String? = null,
-    val caption: String = ""
+    val caption: String = "",
+    val signalState: Any? = null // For storing SignalEditorModel state
 )
 
 data class DrawingPath(

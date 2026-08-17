@@ -19,7 +19,7 @@ END $$;
 -- Subscriptions Table (Authority for entitlements)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id TEXT NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     plan public.subscription_plan NOT NULL DEFAULT 'FREE',
     status TEXT NOT NULL DEFAULT 'active', -- 'active', 'cancelled', 'expired', 'in_grace_period'
     purchase_token TEXT UNIQUE,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
 -- Families Table
 CREATE TABLE IF NOT EXISTS public.families (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id TEXT NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     name TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.families (
 -- Family Members
 CREATE TABLE IF NOT EXISTS public.family_members (
     family_id UUID REFERENCES public.families(id) ON DELETE CASCADE,
-    user_id TEXT REFERENCES public.profiles(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     joined_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (family_id, user_id)
 );
@@ -50,35 +50,48 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='plan_type') THEN
         ALTER TABLE public.profiles ADD COLUMN plan_type public.subscription_plan DEFAULT 'FREE';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='storage_limit') THEN
         ALTER TABLE public.profiles ADD COLUMN storage_limit BIGINT DEFAULT 5368709120; -- 5GB
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='storage_used') THEN
         ALTER TABLE public.profiles ADD COLUMN storage_used BIGINT DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_family_owner') THEN
         ALTER TABLE public.profiles ADD COLUMN is_family_owner BOOLEAN DEFAULT FALSE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='family_id') THEN
+        ALTER TABLE public.profiles ADD COLUMN family_id UUID REFERENCES public.families(id) ON DELETE SET NULL;
     END IF;
 END $$;
 
 -- 3. STORAGE ACCOUNTING FUNCTIONS
-CREATE OR REPLACE FUNCTION public.calculate_user_storage_usage(target_user_id TEXT)
+CREATE OR REPLACE FUNCTION public.calculate_user_storage_usage(target_user_id UUID)
 RETURNS BIGINT AS $$
 DECLARE
     f_id UUID;
     total_usage BIGINT;
 BEGIN
-    -- Check if user is in a family
-    SELECT family_id INTO f_id FROM public.family_members WHERE user_id = target_user_id;
+    -- Check if user is in a family (Directly from profile)
+    SELECT family_id INTO f_id FROM public.profiles WHERE id = target_user_id;
 
     IF f_id IS NOT NULL THEN
         -- Shared family usage: sum of all files owned by all family members
         SELECT SUM(COALESCE(file_size, 0) + COALESCE(thumbnail_size, 0))
         INTO total_usage
         FROM public.files
-        WHERE owner_id IN (SELECT user_id FROM public.family_members WHERE family_id = f_id)
+        WHERE owner_id::uuid IN (SELECT id FROM public.profiles WHERE family_id = f_id)
         AND (status != 'DELETED' OR status IS NULL);
     ELSE
         -- Personal usage
         SELECT SUM(COALESCE(file_size, 0) + COALESCE(thumbnail_size, 0))
         INTO total_usage
         FROM public.files
-        WHERE owner_id = target_user_id
+        WHERE owner_id::uuid = target_user_id
         AND (status != 'DELETED' OR status IS NULL);
     END IF;
 
@@ -90,19 +103,19 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.update_profile_storage_usage()
 RETURNS TRIGGER AS $$
 DECLARE
-    target_id TEXT;
+    target_id UUID;
     f_id UUID;
 BEGIN
-    target_id := COALESCE(NEW.owner_id, OLD.owner_id);
+    target_id := COALESCE(NEW.owner_id, OLD.owner_id)::uuid;
 
-    -- Find if this user is in a family
-    SELECT family_id INTO f_id FROM public.family_members WHERE user_id = target_id;
+    -- Find if this user is in a family (Directly from profile)
+    SELECT family_id INTO f_id FROM public.profiles WHERE id = target_id;
 
     IF f_id IS NOT NULL THEN
         -- Update all members of the family to keep their 'storage_used' in sync for the UI
         UPDATE public.profiles
         SET storage_used = public.calculate_user_storage_usage(target_id)
-        WHERE id IN (SELECT user_id FROM public.family_members WHERE family_id = f_id);
+        WHERE family_id = f_id;
     ELSE
         -- Update only the user
         UPDATE public.profiles
@@ -130,7 +143,7 @@ DECLARE
 BEGIN
     -- Get plan and current usage from profile SSOT
     SELECT plan_type, storage_limit, storage_used INTO u_plan, u_limit, u_used
-    FROM public.profiles WHERE id = NEW.owner_id;
+    FROM public.profiles WHERE id = NEW.owner_id::uuid;
 
     -- 1. Check total quota
     IF (u_used + NEW.file_size) > u_limit THEN
@@ -159,7 +172,7 @@ FOR EACH ROW EXECUTE FUNCTION public.check_file_upload_limits();
 
 -- 5. ENTITLEMENT SYNC FUNCTION (Called by Edge Function)
 CREATE OR REPLACE FUNCTION public.sync_subscription_entitlement(
-    target_user_id TEXT,
+    target_user_id UUID,
     new_plan public.subscription_plan,
     new_limit BIGINT,
     new_status TEXT,
@@ -168,6 +181,8 @@ CREATE OR REPLACE FUNCTION public.sync_subscription_entitlement(
     new_order_id TEXT
 )
 RETURNS VOID AS $$
+DECLARE
+    f_id UUID;
 BEGIN
     -- 1. Update or Insert Subscription Record
     INSERT INTO public.subscriptions (user_id, plan, status, purchase_token, order_id, expiry_date, updated_at)
@@ -183,18 +198,20 @@ BEGIN
         storage_limit = new_limit
     WHERE id = target_user_id;
 
-    -- 3. If Family plan, ensure family record exists
+    -- 3. If Family plan, ensure family record exists and link it
     IF new_plan = 'FAMILY_MONTHLY' THEN
         INSERT INTO public.families (owner_id)
         VALUES (target_user_id)
-        ON CONFLICT DO NOTHING;
+        ON CONFLICT (owner_id) DO NOTHING; -- Assuming owner_id UNIQUE for families if one owner per family
+
+        SELECT id INTO f_id FROM public.families WHERE owner_id = target_user_id;
 
         -- Auto-add owner to their own family members if not present
         INSERT INTO public.family_members (family_id, user_id)
-        SELECT id, owner_id FROM public.families WHERE owner_id = target_user_id
+        VALUES (f_id, target_user_id)
         ON CONFLICT DO NOTHING;
 
-        UPDATE public.profiles SET is_family_owner = TRUE WHERE id = target_user_id;
+        UPDATE public.profiles SET is_family_owner = TRUE, family_id = f_id WHERE id = target_user_id;
     END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -203,7 +220,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.sync_family_member_benefits()
 RETURNS TRIGGER AS $$
 DECLARE
-    f_owner_id TEXT;
+    f_owner_id UUID;
     owner_plan public.subscription_plan;
 BEGIN
     -- If a new family member is added
@@ -214,7 +231,8 @@ BEGIN
         IF owner_plan = 'FAMILY_MONTHLY' THEN
             UPDATE public.profiles
             SET plan_type = 'PLUS_MONTHLY', -- Inherit Plus benefits
-                storage_limit = 2199023255552 -- 2TB (Shared pool)
+                storage_limit = 2199023255552, -- 2TB (Shared pool)
+                family_id = NEW.family_id
             WHERE id = NEW.user_id;
         END IF;
     END IF;
@@ -224,7 +242,9 @@ BEGIN
         UPDATE public.profiles
         SET plan_type = 'FREE',
             storage_limit = 5368709120, -- 5GB
-            storage_used = public.calculate_user_storage_usage(OLD.user_id)
+            storage_used = public.calculate_user_storage_usage(OLD.user_id),
+            family_id = NULL,
+            is_family_owner = FALSE -- Just in case
         WHERE id = OLD.user_id;
     END IF;
 

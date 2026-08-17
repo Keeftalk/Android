@@ -57,7 +57,22 @@ object AppModule {
     private var translationManager: com.keeftalk.chat.util.TranslationManager? = null
 
     @Volatile
+    private var connectivityObserver: com.keeftalk.chat.util.ConnectivityObserver? = null
+
+    @Volatile
     private var authRepository: AuthRepository? = null
+
+    @Volatile
+    private var securityManager: com.keeftalk.chat.security.crypto.SecurityManager? = null
+
+    fun provideSecurityManager(context: Context): com.keeftalk.chat.security.crypto.SecurityManager {
+        return securityManager ?: synchronized(this) {
+            securityManager ?: com.keeftalk.chat.security.crypto.SecurityManager(
+                context.applicationContext,
+                com.keeftalk.chat.security.crypto.KeyManager
+            ).also { securityManager = it }
+        }
+    }
 
     @Volatile
     private var privacyRepository: com.keeftalk.chat.domain.repository.PrivacyRepository? = null
@@ -76,6 +91,9 @@ object AppModule {
 
     @Volatile
     private var chatSettingsRepository: com.keeftalk.chat.domain.repository.ChatSettingsRepository? = null
+
+    @Volatile
+    private var settingsRepository: com.keeftalk.chat.domain.repository.SettingsRepository? = null
 
     @Volatile
     private var appCustomizationRepository: com.keeftalk.chat.domain.repository.AppCustomizationRepository? = null
@@ -124,6 +142,9 @@ object AppModule {
     private var backgroundSyncManager: com.keeftalk.chat.data.sync.BackgroundSyncManager? = null
 
     @Volatile
+    private var parentalControlManager: com.keeftalk.chat.util.ParentalControlManager? = null
+
+    @Volatile
     private var fileRepository: com.keeftalk.chat.domain.repository.FileRepository? = null
 
     @Volatile
@@ -163,6 +184,9 @@ object AppModule {
 
     @Volatile
     private var billingManager: com.keeftalk.chat.data.billing.BillingManager? = null
+
+    @Volatile
+    private var bugReportRepository: com.keeftalk.chat.domain.repository.BugReportRepository? = null
 
     @Volatile
     private var supabaseClient: SupabaseClient? = null
@@ -470,6 +494,12 @@ object AppModule {
         }
     }
 
+    fun provideConnectivityObserver(context: Context): com.keeftalk.chat.util.ConnectivityObserver {
+        return connectivityObserver ?: synchronized(this) {
+            connectivityObserver ?: com.keeftalk.chat.util.NetworkConnectivityObserver(context.applicationContext).also { connectivityObserver = it }
+        }
+    }
+
     fun provideConversationKeyManager(context: Context): com.keeftalk.chat.security.crypto.ConversationKeyManager {
         return conversationKeyManager ?: synchronized(this) {
             conversationKeyManager ?: com.keeftalk.chat.security.crypto.ConversationKeyManager(
@@ -537,6 +567,8 @@ object AppModule {
                     db.fileDao(),
                     provideFileUploadManager(context),
                     provideUserPreferencesRepository(context),
+                    provideSettingsRepository(context),
+                    provideConnectivityObserver(context),
                     com.keeftalk.chat.util.KeeftalkExecutors.BOUNDED_IO.asCoroutineDispatcher()
                 )
                 PerformanceProfiler.endStage("ChatRepository Creation", category = PerformanceProfiler.Category.DI)
@@ -732,6 +764,15 @@ object AppModule {
         }
     }
 
+    fun provideParentalControlManager(context: Context): com.keeftalk.chat.util.ParentalControlManager {
+        return parentalControlManager ?: synchronized(this) {
+            parentalControlManager ?: com.keeftalk.chat.util.ParentalControlManager(
+                context.applicationContext,
+                provideUserPreferencesRepository(context)
+            ).also { parentalControlManager = it }
+        }
+    }
+
     fun provideSecurityRepository(context: Context): com.keeftalk.chat.domain.repository.SecurityRepository {
         return securityRepository ?: synchronized(this) {
             securityRepository ?: com.keeftalk.chat.data.repository.SecurityRepositoryImpl(
@@ -741,12 +782,29 @@ object AppModule {
         }
     }
 
+    fun provideBugReportRepository(context: Context): com.keeftalk.chat.domain.repository.BugReportRepository {
+        return bugReportRepository ?: synchronized(this) {
+            bugReportRepository ?: com.keeftalk.chat.data.repository.BugReportRepositoryImpl(
+                context.applicationContext
+            ).also { bugReportRepository = it }
+        }
+    }
+
     fun provideChatSettingsRepository(context: Context): com.keeftalk.chat.domain.repository.ChatSettingsRepository {
         return chatSettingsRepository ?: synchronized(this) {
             chatSettingsRepository ?: com.keeftalk.chat.data.repository.ChatSettingsRepositoryImpl(
                 context.applicationContext,
                 provideUserPreferencesRepository(context)
             ).also { chatSettingsRepository = it }
+        }
+    }
+
+    fun provideSettingsRepository(context: Context): com.keeftalk.chat.domain.repository.SettingsRepository {
+        return settingsRepository ?: synchronized(this) {
+            settingsRepository ?: com.keeftalk.chat.data.repository.SettingsRepositoryImpl(
+                context.applicationContext,
+                provideUserPreferencesRepository(context)
+            ).also { settingsRepository = it }
         }
     }
 
@@ -788,7 +846,8 @@ object AppModule {
                     db.syncQueueDao(),
                     db.fileDao(),
                     provideFileUploadManager(context),
-                    prefs
+                    prefs,
+                    provideAuthRepository(context)
                 )
             }.also { noteRepository = it }
         }
@@ -936,6 +995,7 @@ object AppModule {
                 context.applicationContext,
                 provideFileRepository(context),
                 provideAuthRepository(context),
+                provideSecurityManager(context),
                 { provideSupabaseClientAsync(context) }
             ).also { fileUploadManager = it }
         }
@@ -946,6 +1006,7 @@ object AppModule {
             fileDownloadManager ?: com.keeftalk.chat.util.FileDownloadManager(
                 context.applicationContext,
                 provideCryptoManager(context),
+                provideAuthRepository(context),
                 { provideSupabaseClientAsync(context) }
             ).also { fileDownloadManager = it }
         }

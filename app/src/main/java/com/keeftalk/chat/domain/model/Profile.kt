@@ -5,8 +5,31 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class SubscriptionPlan {
-    FREE, PLUS_MONTHLY, PLUS_YEARLY, PRO_MONTHLY, FAMILY_MONTHLY
+enum class SubscriptionPlan(
+    val storageLimit: Long,
+    val maxFileSize: Long,
+    val displayName: String
+) {
+    FREE(5L * 1024 * 1024 * 1024, 100L * 1024 * 1024, "Free"),
+    PLUS_MONTHLY(100L * 1024 * 1024 * 1024, 1024L * 1024 * 1024, "Plus"),
+    PLUS_YEARLY(100L * 1024 * 1024 * 1024, 1024L * 1024 * 1024, "Plus"),
+    PRO_MONTHLY(500L * 1024 * 1024 * 1024, 5L * 1024 * 1024 * 1024, "Pro"),
+    FAMILY_MONTHLY(2L * 1024 * 1024 * 1024 * 1024, 5L * 1024 * 1024 * 1024, "Family");
+
+    fun formatStorageLimit(): String {
+        return when {
+            storageLimit >= 1024L * 1024 * 1024 * 1024 -> "${storageLimit / (1024L * 1024 * 1024 * 1024)} TB"
+            storageLimit >= 1024L * 1024 * 1024 -> "${storageLimit / (1024L * 1024 * 1024)} GB"
+            else -> "${storageLimit / (1024L * 1024)} MB"
+        }
+    }
+
+    fun formatMaxFileSize(): String {
+        return when {
+            maxFileSize >= 1024L * 1024 * 1024 -> "${maxFileSize / (1024L * 1024 * 1024)} GB"
+            else -> "${maxFileSize / (1024L * 1024)} MB"
+        }
+    }
 }
 
 @Serializable
@@ -38,11 +61,13 @@ data class Profile(
     @SerialName("plan_type")
     val planType: SubscriptionPlan = SubscriptionPlan.FREE,
     @SerialName("storage_limit")
-    val storageLimit: Long = 5L * 1024 * 1024 * 1024,
+    val storageLimit: Long = SubscriptionPlan.FREE.storageLimit,
     @SerialName("storage_used")
     val storageUsed: Long = 0L,
     @SerialName("is_family_owner")
     val isFamilyOwner: Boolean = false,
+    @SerialName("family_id")
+    val familyId: String? = null,
     val privacy: PrivacySettings = PrivacySettings(),
     @SerialName("notification_settings")
     val notifications: com.keeftalk.chat.data.prefs.NotificationPreferences = com.keeftalk.chat.data.prefs.NotificationPreferences()

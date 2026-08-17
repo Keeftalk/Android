@@ -274,7 +274,7 @@ class ShareViewModel(
                 _uiState.value.sharedFiles.forEach { sharedFile ->
                     val tempFile = copyToTempFile(context, sharedFile.uri, sharedFile.name)
                     if (tempFile != null) {
-                        vaultRepository.uploadFile(tempFile, folderId) { /* progress */ }
+                        vaultRepository.uploadFile(tempFile, folderId) { _, _ -> /* progress */ }
                     }
                 }
                 _uiState.value = _uiState.value.copy(isProcessing = false, isFinished = true)

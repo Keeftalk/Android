@@ -1,6 +1,7 @@
 package com.keeftalk.chat.ui.vault
 
 import android.content.Intent
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -81,7 +82,19 @@ fun VaultScreen(
     fabActionFlow: kotlinx.coroutines.flow.SharedFlow<FabActionType>? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val fullSettings by viewModel.prefs.fullSettingsFlow.collectAsState(com.keeftalk.chat.domain.model.UserSettings(userId = ""))
+    val vaultSettings = fullSettings.vaultSettings
     
+    val currentActivity = LocalActivity.current
+    DisposableEffect(vaultSettings.screenshotProtection) {
+        if (vaultSettings.screenshotProtection) {
+            currentActivity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            currentActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
     BackHandler(enabled = true) {
         if (uiState.navigationStack.isNotEmpty()) {
             viewModel.navigateBack()
@@ -190,24 +203,20 @@ fun VaultScreen(
     var movePickerStack by remember { mutableStateOf<List<VaultFolder>>(emptyList()) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            val file = com.keeftalk.chat.util.StorageUtils.getFileFromUri(context, it)
-            if (file != null) {
-                viewModel.uploadFile(file)
-            }
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        val files = uris.mapNotNull { com.keeftalk.chat.util.StorageUtils.getFileFromUri(context, it) }
+        if (files.isNotEmpty()) {
+            viewModel.uploadFiles(files)
         }
     }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
-        uris.forEach { uri ->
-            val file = com.keeftalk.chat.util.StorageUtils.getFileFromUri(context, uri)
-            if (file != null) {
-                viewModel.uploadFile(file)
-            }
+        val files = uris.mapNotNull { com.keeftalk.chat.util.StorageUtils.getFileFromUri(context, it) }
+        if (files.isNotEmpty()) {
+            viewModel.uploadFiles(files)
         }
     }
 
@@ -482,6 +491,52 @@ fun VaultScreen(
                     )
                 }
 
+                if (uiState.showUpgradeDialog) {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.dismissUpgradeDialog() },
+                        title = { Text("Upgrade Recommended") },
+                        text = { 
+                            Text("Some files are larger than your current plan's limit (${formatVaultSize(100L * 1024 * 1024)}). Upgrade to Keeftalk Plus to upload files up to 1GB.")
+                        },
+                        confirmButton = {
+                            Button(onClick = { 
+                                // Navigate to subscription screen
+                                viewModel.dismissUpgradeDialog()
+                                onSettingsClick() // Assuming settings has subscription or we add a specific one
+                            }) {
+                                Text("Upgrade Plan")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { viewModel.dismissUpgradeDialog() }) {
+                                Text("Dismiss")
+                            }
+                        }
+                    )
+                }
+
+                val keyErrorUpload = uiState.activeUploads.values.find { it.isError && it.errorMessage?.contains("Encryption context missing") == true }
+                if (keyErrorUpload != null) {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.clearUploadError(keyErrorUpload.id) },
+                        title = { Text("Encryption Error") },
+                        text = { Text(keyErrorUpload.errorMessage!!) },
+                        confirmButton = {
+                            TextButton(onClick = { 
+                                viewModel.logout()
+                                onBack() // Go to login
+                            }) {
+                                Text("Log Out Now")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { viewModel.clearUploadError(keyErrorUpload.id) }) {
+                                Text("Dismiss")
+                            }
+                        }
+                    )
+                }
+
                 Column(
                     modifier = Modifier
                         .padding(innerPadding)
@@ -579,7 +634,12 @@ fun VaultScreen(
         
         // Cloud Import Progress Overlay
         val importState = uiState.importState
+
         if (importState is CloudImportCoordinator.ImportState.Progress) {
+            val title = "Importing from Cloud"
+            val progress = importState.percentage
+            val subtitle = "Processing ${importState.current} of ${importState.total}..."
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -597,20 +657,20 @@ fun VaultScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "Importing from Cloud",
+                            title,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         LinearProgressIndicator(
-                            progress = { importState.percentage },
+                            progress = { progress },
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
                             color = MaterialTheme.colorScheme.primary,
                             trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "Processing ${importState.current} of ${importState.total}...",
+                            subtitle,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -873,6 +933,16 @@ fun VaultTabPage(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalItemSpacing = 10.dp
             ) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    Column {
+                        uiState.activeUploads.forEach { (id, upload) ->
+                            UploadingCard(
+                                upload = upload,
+                                onCancel = { viewModel.clearUploadError(id) }
+                            )
+                        }
+                    }
+                }
                 item(span = StaggeredGridItemSpan.FullLine) {
                     VaultStorageCard(info = uiState.storageInfo, onAnalyzeClick = onAnalyzeStorage)
                 }

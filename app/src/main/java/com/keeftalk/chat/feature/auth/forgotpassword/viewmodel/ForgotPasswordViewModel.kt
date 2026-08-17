@@ -33,10 +33,12 @@ class ForgotPasswordViewModel(
         val identifier = _forgotPasswordState.value.identifier
         if (identifier.isBlank()) return
 
+        android.util.Log.d("ForgotPasswordVM", "Finding account for: $identifier")
         viewModelScope.launch {
             _forgotPasswordState.update { it.copy(isLoading = true, error = null) }
             authRepository.findProfilesByIdentifier(identifier)
                 .onSuccess { profiles ->
+                    android.util.Log.d("ForgotPasswordVM", "Found ${profiles.size} profiles")
                     when {
                         profiles.isEmpty() -> {
                             _forgotPasswordState.update { it.copy(isLoading = false, error = "No account found with this information") }
@@ -68,19 +70,46 @@ class ForgotPasswordViewModel(
         _forgotPasswordState.update { it.copy(selectedProfile = profile, step = ForgotPasswordStep.CONFIRM_PROFILE) }
     }
 
-    fun sendResetLink() {
+    fun onOtpChange(otp: String) {
+        if (otp.length <= 6) {
+            _forgotPasswordState.update { it.copy(otp = otp, error = null) }
+        }
+    }
+
+    fun sendOtp() {
         val profile = _forgotPasswordState.value.selectedProfile ?: return
         val email = profile.email ?: return
 
+        android.util.Log.d("ForgotPasswordVM", "Sending reset OTP to: ${profile.id}")
         viewModelScope.launch {
             _forgotPasswordState.update { it.copy(isLoading = true, error = null) }
-            val result = authRepository.resetPassword(email)
+            val result = authRepository.sendPasswordResetOtp(email)
             result.onSuccess {
-                _forgotPasswordState.update { it.copy(isLoading = false, step = ForgotPasswordStep.CONFIRMATION) }
+                android.util.Log.d("ForgotPasswordVM", "Reset OTP sent successfully")
+                _forgotPasswordState.update { it.copy(isLoading = false, step = ForgotPasswordStep.VERIFY_OTP) }
                 startCountdown()
             }.onFailure { e ->
-                _forgotPasswordState.update { it.copy(isLoading = false, error = e.message ?: "Failed to send reset link") }
+                _forgotPasswordState.update { it.copy(isLoading = false, error = e.message ?: "Failed to send reset code") }
             }
+        }
+    }
+
+    fun verifyOtp() {
+        val profile = _forgotPasswordState.value.selectedProfile ?: return
+        val email = profile.email ?: return
+        val otp = _forgotPasswordState.value.otp
+
+        if (otp.length != 6) return
+
+        viewModelScope.launch {
+            _forgotPasswordState.update { it.copy(isLoading = true, error = null) }
+            authRepository.verifyPasswordResetOtp(email, otp)
+                .onSuccess {
+                    _forgotPasswordState.update { it.copy(isLoading = false, step = ForgotPasswordStep.CREATE_NEW_PASSWORD) }
+                }
+                .onFailure { e ->
+                    _forgotPasswordState.update { it.copy(isLoading = false, error = e.message ?: "Invalid or expired code") }
+                }
         }
     }
 
@@ -109,14 +138,6 @@ class ForgotPasswordViewModel(
         }
     }
 
-    fun togglePasswordVisibility() {
-        _resetPasswordState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
-    }
-
-    fun toggleConfirmPasswordVisibility() {
-        _resetPasswordState.update { it.copy(isConfirmPasswordVisible = !it.isConfirmPasswordVisible) }
-    }
-
     fun updatePassword() {
         if (!_resetPasswordState.value.passwordRequirements.allMet) return
 
@@ -125,6 +146,7 @@ class ForgotPasswordViewModel(
             val result = authRepository.updatePassword(_resetPasswordState.value.newPassword)
             result.onSuccess {
                 _resetPasswordState.update { it.copy(isLoading = false, isSuccess = true) }
+                _forgotPasswordState.update { it.copy(step = ForgotPasswordStep.CONFIRMATION) }
             }.onFailure { e ->
                 _resetPasswordState.update { it.copy(isLoading = false, error = e.message ?: "Failed to update password") }
             }

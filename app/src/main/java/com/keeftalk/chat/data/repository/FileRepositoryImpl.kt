@@ -202,15 +202,17 @@ class FileRepositoryImpl(
             val ownerEnvelope = fileMeta.envelopes.find { it.type == EnvelopeType.OWNER }
             if (ownerEnvelope != null) {
                 val currentUserId = AppModule.provideUserPreferencesRepository(context).getUserIdFast()
-                if (file.ownerId == currentUserId) {
+                if (file.ownerId == currentUserId && currentUserId != null) {
                     try {
-                        if (!KeyManager.isInitialized()) {
-                            KeyManager.restoreAEK(context)
-                        }
+                        // Ensure AEK is ready (will suspend if recovery is needed)
+                        val securityManager = AppModule.provideSecurityManager(context)
+                        securityManager.getEncryptionContext()
+                        
                         val fpk = KeyManager.getFileProtectionKey()
                         return@withContext Result.success(StorageCryptoService.unwrapKey(ownerEnvelope.wrappedKey, fpk))
                     } catch (e: Exception) {
                         Log.d("FILE_PIPELINE", "OWNER_UNWRAP_FAILED | fileId=${file.id} | message=${e.message}")
+                        if (e is SecurityRecoveryRequiredException) throw e
                     }
                 } else {
                     Log.d("FILE_PIPELINE", "OWNER_UNWRAP_SKIPPED | fileId=${file.id} | reason=User is not owner")

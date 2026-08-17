@@ -32,6 +32,10 @@ data class UserSecuritySettingsDto(
         appLockEnabled = appLockEnabled,
         appLockTimeoutSeconds = appLockTimeoutSeconds,
         biometricUnlockEnabled = biometricUnlockEnabled,
+        encryptedAccountKey = encryptedAccountKey,
+        keySalt = keySalt,
+        keyNonce = keyNonce,
+        verificationTag = verificationTag,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

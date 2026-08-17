@@ -33,6 +33,7 @@ fun PremiumTextField(
     label: String,
     icon: ImageVector,
     isPassword: Boolean = false,
+    initialPasswordVisible: Boolean = false,
     error: String? = null,
     success: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -40,7 +41,7 @@ fun PremiumTextField(
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    var passwordVisible by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(initialPasswordVisible) }
     
     val borderColor by animateColorAsState(
         targetValue = when {

@@ -7,13 +7,16 @@ data class ForgotPasswordState(
     val step: ForgotPasswordStep = ForgotPasswordStep.ENTER_IDENTITY,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val countdown: Int = 0
+    val countdown: Int = 0,
+    val otp: String = ""
 )
 
 enum class ForgotPasswordStep {
     ENTER_IDENTITY,
     SELECT_PROFILE,
     CONFIRM_PROFILE,
+    VERIFY_OTP,
+    CREATE_NEW_PASSWORD,
     CONFIRMATION
 }
 

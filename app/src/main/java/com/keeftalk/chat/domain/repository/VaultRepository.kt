@@ -13,10 +13,13 @@ interface VaultRepository {
     fun getSharedItems(): Flow<List<VaultItem>>
     suspend fun markItemAsShared(itemId: String): Result<Unit>
 
+    val activeUploads: Flow<Map<String, UploadProgress>>
+    fun cancelUpload(id: String)
+
     suspend fun downloadFile(item: VaultItem, onProgress: (Float) -> Unit = {}): Result<File>
     suspend fun getDecryptedFile(item: VaultItem): Result<File>
 
-    suspend fun uploadFile(file: File, parentId: String? = null, onProgress: (Float) -> Unit): Result<VaultItem>
+    suspend fun uploadFile(file: File, parentId: String? = null, onProgress: (Long, Long) -> Unit): Result<VaultItem>
     suspend fun createFolder(name: String, parentId: String? = null, color: Int? = null, icon: String? = null): Result<VaultFolder>
     suspend fun updateFolder(folder: VaultFolder): Result<Unit>
     suspend fun getFolder(folderId: String): VaultFolder?

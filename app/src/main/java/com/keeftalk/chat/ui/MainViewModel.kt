@@ -67,6 +67,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val authRepository: AuthRepository
         get() = AppModule.provideAuthRepository(getApplication())
 
+    val securityManager: com.keeftalk.chat.security.crypto.SecurityManager
+        get() = AppModule.provideSecurityManager(getApplication())
+
+    val securityState = securityManager.state.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.keeftalk.chat.security.crypto.SecurityState.INITIALIZING)
+
     val chatRepository: ChatRepository
         get() = AppModule.provideChatRepository(getApplication())
 

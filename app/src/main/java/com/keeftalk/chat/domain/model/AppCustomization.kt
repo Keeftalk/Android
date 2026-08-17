@@ -21,7 +21,7 @@ enum class FabAction {
     NEW_GROUP, // Mandatory
     QR, // Mandatory
     AI,
-    ACCESSIBILITY
+    DISPLAY
 }
 
 @Serializable
@@ -48,7 +48,7 @@ data class AppCustomization(
         FabAction.NEW_GROUP,
         FabAction.QR,
         FabAction.AI,
-        FabAction.ACCESSIBILITY
+        FabAction.DISPLAY
     ),
     val fabSizeMultiplier: Float = 0.8f,
     val secondaryFabSizeMultiplier: Float = 0.8f,

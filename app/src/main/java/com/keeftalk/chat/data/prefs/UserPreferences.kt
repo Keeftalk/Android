@@ -92,5 +92,14 @@ data class UserPreferences(
 
     // Weather Settings
     val weatherLocationMode: String = "AUTO", // "AUTO" or "MANUAL"
-    val weatherManualLocation: String? = null
+    val weatherManualLocation: String? = null,
+
+    // Module Integrations
+    val emailIntegrationEnabled: Boolean = true,
+    val smsBridgeEnabled: Boolean = false,
+    val voipEnabled: Boolean = true,
+    val walletEnabled: Boolean = false,
+    val calendarSyncEnabled: Boolean = true,
+    val notesSyncEnabled: Boolean = true,
+    val cloudBackupEnabled: Boolean = true
 )

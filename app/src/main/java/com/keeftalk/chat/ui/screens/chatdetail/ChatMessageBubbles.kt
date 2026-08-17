@@ -752,7 +752,7 @@ fun ImageMessageContent(
                 model = mediaUri, 
                 contentDescription = null, 
                 modifier = Modifier.fillMaxSize(), 
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Fit
             )
         }
         
@@ -800,7 +800,7 @@ fun VideoMessageContent(
                     .clickable { if (transferProgress == null) onDownloadClick() },
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(model = message.thumbnailUrl ?: mediaUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                AsyncImage(model = message.thumbnailUrl ?: mediaUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                 if (transferProgress != null) {
                     Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(progress = { transferProgress }, color = Color.White, modifier = Modifier.size(48.dp))
@@ -1366,7 +1366,13 @@ fun MessageBubble(
                                 if (!isMediaMessage) return@remember false
                                 val fname = message.fileName?.lowercase() ?: ""
                                 val content = message.content.lowercase().trim()
-                                content == fname || content.matches(Regex("^[0-9_]+\\.[a-z0-9]+$")) || (fname.isNotBlank() && content.contains(fname))
+                                
+                                // Catch common filename patterns to avoid displaying them as captions
+                                content == fname || 
+                                content.matches(Regex("^[0-9_]+\\.[a-z0-9]+$")) || 
+                                content.matches(Regex("^img[-_][0-9]+[-_]wa[0-9]+\\.[a-z0-9]+$")) || // WhatsApp style
+                                content.matches(Regex("^vid[-_][0-9]+[-_]wa[0-9]+\\.[a-z0-9]+$")) ||
+                                (fname.isNotBlank() && content.contains(fname))
                             }
                             
                             if (message.content.isNotBlank() && !isPlaceholderContent && !isFilenameContent) {

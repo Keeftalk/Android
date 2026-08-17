@@ -30,6 +30,9 @@ class VaultRepositoryImpl(
 ) : VaultRepository {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val _activeUploads = MutableStateFlow<Map<String, UploadProgress>>(emptyMap())
+    override val activeUploads: Flow<Map<String, UploadProgress>> = _activeUploads.asStateFlow()
+    private val uploadJobs = mutableMapOf<String, Job>()
 
     private suspend fun getSupabase(): SupabaseClient {
         return AppModule.provideSupabaseClientAsync(context)
@@ -178,47 +181,109 @@ class VaultRepositoryImpl(
         }
     }
 
-    override suspend fun uploadFile(file: File, parentId: String?, onProgress: (Float) -> Unit): Result<VaultItem> = withContext(Dispatchers.IO) {
+    override suspend fun uploadFile(file: File, parentId: String?, onProgress: (Long, Long) -> Unit): Result<VaultItem> = withContext(Dispatchers.IO) {
+        val uploadId = file.absolutePath
+        val startTime = System.currentTimeMillis()
+        
         try {
-            Log.i("VAULT_PIPELINE", "START | fileName=${file.name} | parentId=$parentId")
-            val supabase = getSupabase()
-            val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not authenticated")
+            Log.i("VAULT_PIPELINE", "START_REQUEST | fileName=${file.name} | parentId=$parentId")
             
-            val result = fileUploadManager.uploadFile(file, SourceType.UPLOAD, userId)
+            // Create a repository-scoped job for the actual upload to ensure lifecycle persistence
+            val deferred = CompletableDeferred<Result<VaultItem>>()
             
-            if (result.isSuccess) {
-                val uploadedFile = result.getOrThrow()
-                Log.d("VAULT_PIPELINE", "FILE_UPLOAD SUCCESS | fileId=${uploadedFile.id}")
-                
-                val vaultItem = VaultItem(
-                    id = UUID.randomUUID().toString(),
-                    userId = userId,
-                    file = uploadedFile,
-                    folderId = parentId,
-                    title = file.name
-                )
-                
-                vaultDao.insertItem(vaultItem.toEntity())
-                Log.d("VAULT_PIPELINE", "LOCAL_DB_INSERT SUCCESS | itemId=${vaultItem.id}")
-                
-                // PART 4: Sync Vault record to cloud
-                val payload = Json.encodeToString(vaultItem.toEntity())
-                syncQueueDao.insert(VaultSyncQueueEntity(itemId = vaultItem.id, operation = "SAVE", payload = payload))
-                Log.i("VAULT_PIPELINE", "SYNC_QUEUE_INSERTED | itemId=${vaultItem.id}")
-                
-                scope.launch { processSyncQueue() }
-                
-                Result.success(decryptVaultItem(vaultItem))
-            } else {
-                val error = result.exceptionOrNull() ?: Exception("Upload failed")
-                Log.e("VAULT_PIPELINE", "FAILED | stage=fileUpload | message=${error.message}")
-                Result.failure(error)
+            val job = scope.launch {
+                try {
+                    // GATE: Wait for Auth + Security to be READY before proceeding
+                    // This is now INSIDE the repository scope to survive UI cancellation
+                    authRepository.awaitReady()
+
+                    val user = authRepository.getAuthenticatedUser() ?: throw Exception("Not authenticated")
+                    val userId = user.id
+
+                    _activeUploads.update { it + (uploadId to UploadProgress(
+                        id = uploadId,
+                        fileName = file.name,
+                        progress = 0f,
+                        totalBytes = file.length(),
+                        startTimeMillis = startTime
+                    )) }
+
+                    val result = fileUploadManager.uploadFile(file, SourceType.UPLOAD, userId) { uploaded, total ->
+                        _activeUploads.update { state ->
+                            state[uploadId]?.let { current ->
+                                state + (uploadId to current.copy(
+                                    progress = if (total > 0) uploaded.toFloat() / total else 0f,
+                                    uploadedBytes = uploaded,
+                                    totalBytes = total
+                                ))
+                            } ?: state
+                        }
+                        onProgress(uploaded, total)
+                    }
+                    
+                    if (result.isSuccess) {
+                        val uploadedFile = result.getOrThrow()
+                        val vaultItem = VaultItem(
+                            id = UUID.randomUUID().toString(),
+                            userId = userId,
+                            file = uploadedFile,
+                            folderId = parentId,
+                            title = file.name
+                        )
+                        
+                        vaultDao.insertItem(vaultItem.toEntity())
+                        val payload = Json.encodeToString(vaultItem.toEntity())
+                        syncQueueDao.insert(VaultSyncQueueEntity(itemId = vaultItem.id, operation = "SAVE", payload = payload))
+                        
+                        scope.launch { processSyncQueue() }
+                        
+                        val decrypted = decryptVaultItem(vaultItem)
+                        _activeUploads.update { it - uploadId }
+                        deferred.complete(Result.success(decrypted))
+                    } else {
+                        val error = result.exceptionOrNull() ?: Exception("Upload failed")
+                        _activeUploads.update { state ->
+                            state[uploadId]?.let { current ->
+                                state + (uploadId to current.copy(isError = true, errorMessage = error.message))
+                            } ?: state
+                        }
+                        deferred.complete(Result.failure(error))
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) {
+                        _activeUploads.update { it - uploadId }
+                        throw e
+                    }
+                    _activeUploads.update { state ->
+                        state[uploadId]?.let { current ->
+                            state + (uploadId to current.copy(isError = true, errorMessage = e.message))
+                        } ?: state
+                    }
+                    deferred.complete(Result.failure(e))
+                } finally {
+                    synchronized(uploadJobs) { uploadJobs.remove(uploadId) }
+                }
             }
+
+            synchronized(uploadJobs) { uploadJobs[uploadId] = job }
+            
+            // The suspend function waits for the repository-scoped job to finish
+            // If the UI scope is cancelled, this wait will be cancelled, but the 'job' in 'scope' continues.
+            deferred.await()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e("VAULT_PIPELINE", "FAILED | stage=uploadFile | message=${e.message}", e)
             NotesLogger.e("VAULT", "Upload failed", throwable = e)
             Result.failure(e)
         }
+    }
+
+    override fun cancelUpload(id: String) {
+        synchronized(uploadJobs) {
+            uploadJobs[id]?.cancel()
+            uploadJobs.remove(id)
+        }
+        _activeUploads.update { it - id }
     }
 
     override suspend fun createFolder(name: String, parentId: String?, color: Int?, icon: String?): Result<VaultFolder> = withContext(Dispatchers.IO) {
@@ -471,20 +536,20 @@ class VaultRepositoryImpl(
     override suspend fun getStorageInfo(): Flow<VaultStorageInfo> {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: return flowOf(
-            VaultStorageInfo(0, 5L * 1024 * 1024 * 1024, 0, 0, 0, emptyMap())
+            VaultStorageInfo(0, SubscriptionPlan.FREE.storageLimit, 0, 0, 0, emptyMap())
         )
 
         return combine(
-            fileDao.getAccountCloudBytesFlow(userId),
             vaultDao.getTrashSizeFlow(),
             vaultDao.getAllItems(),
             authRepository.currentUserProfile
-        ) { cloudBytes, trashBytes, allItems, profile ->
-            val cloudTotal = cloudBytes ?: 0L
+        ) { trashBytes, allItems, profile ->
+            // --- SSOT: Cloud Storage truth is in the profile's storageUsed field ---
+            val cloudTotal = profile?.storageUsed ?: 0L
             val trashTotal = trashBytes ?: 0L
             val domainItems = allItems.map { it.toDomain() }
             val count = domainItems.size
-            val limit = profile?.storageLimit ?: 5L * 1024 * 1024 * 1024
+            val limit = profile?.storageLimit ?: SubscriptionPlan.FREE.storageLimit
             
             val categories = domainItems.groupBy { it.file?.fileType ?: FileType.OTHER }
                 .mapValues { entry -> 

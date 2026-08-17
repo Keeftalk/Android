@@ -104,6 +104,8 @@ class ProfileViewModel(
                 Log.d(TAG, "SUPABASE_PROFILE_FETCH userId=$userId")
                 authRepository.getProfile(userId).onSuccess {
                     _profile.value = it
+                    // Trigger relationship fetch in background
+                    relationshipRepository.getRelationship(userId)
                 }.onFailure {
                     Log.e(TAG, "SUPABASE_ERROR message=${it.message}")
                     _error.value = it.message

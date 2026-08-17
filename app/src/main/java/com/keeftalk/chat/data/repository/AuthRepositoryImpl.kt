@@ -19,7 +19,7 @@ import com.keeftalk.chat.security.crypto.Argon2idManager
 import com.keeftalk.chat.security.crypto.KeyManager
 import com.keeftalk.chat.security.crypto.EncryptedObject
 import com.keeftalk.chat.data.remote.UserSecuritySettingsDto
-import java.util.Base64
+import android.util.Base64
 import javax.crypto.SecretKey
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.handleDeeplinks
@@ -46,13 +46,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.*
 import java.util.*
 
@@ -69,46 +66,67 @@ class AuthRepositoryImpl(
         return AppModule.provideSupabaseClientAsync(context)
     }
 
+    private val securityManager get() = AppModule.provideSecurityManager(context)
+
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val initDeferred = CompletableDeferred<Unit>()
 
     init {
         // Deferred initialization: Moved to startSessionObservation()
     }
 
+    override suspend fun awaitReady() {
+        // 1. Wait for Supabase/Session observation to start and settle
+        initDeferred.await()
+        
+        // 2. Wait for SecurityManager to be READY
+        securityManager.getEncryptionContext()
+    }
+
     override fun startSessionObservation() {
-        com.keeftalk.chat.util.StartupOrchestrator.enqueue(com.keeftalk.chat.util.StartupOrchestrator.Tier.TIER_3_POST_RENDER) {
-            com.keeftalk.chat.util.PerformanceProfiler.logEvent("AuthRepository.startSessionObservation() started (Tier 3)")
-            repositoryScope.launch {
-                getSupabase().auth.sessionStatus.collect { status ->
-                    if (status is SessionStatus.Authenticated) {
-                        val userId = status.session.user?.id
-                        if (userId != null) {
-                            if (!prefs.isLoggedFast()) {
-                                PerformanceProfiler.logEvent("Auth: Session Restored", info = "userId=$userId", category = PerformanceProfiler.Category.NETWORK)
-                                prefs.updateUserId(userId)
-                                prefs.updateIsLogged(true)
-                            }
-                            
-                            // --- NEW E2EE ARCHITECTURE: AEK RESTORATION ---
-                            if (KeyManager.getAEK() == null) {
-                                val restored = KeyManager.restoreAEK(context)
-                                if (restored) {
-                                    Log.i(TAG, "AEK successfully restored from local storage.")
-                                } else {
-                                    Log.w(TAG, "Failed to restore AEK locally. User may need to re-login for E2EE.")
-                                }
+        Log.i(TAG, "AuthRepository.startSessionObservation() started")
+        repositoryScope.launch {
+            val startTime = System.currentTimeMillis()
+            getSupabase().auth.sessionStatus.collect { status ->
+                if (status is SessionStatus.Authenticated) {
+                    val userId = status.session.user?.id
+                    if (userId != null) {
+                        if (!prefs.isLoggedFast()) {
+                            PerformanceProfiler.logEvent("Auth: Session Restored", info = "userId=$userId", category = PerformanceProfiler.Category.NETWORK)
+                            prefs.updateUserId(userId)
+                            prefs.updateIsLogged(true)
+                        }
+                        
+                        // --- NEW E2EE ARCHITECTURE: AEK RESTORATION ---
+                        securityManager.initializeForUser(userId)
+                        
+                        if (securityManager.state.value == com.keeftalk.chat.security.crypto.SecurityState.RECOVERY_REQUIRED) {
+                            repositoryScope.launch {
+                                attemptAutomaticRecovery(userId)
                             }
                         }
-                    } else if (status is SessionStatus.NotAuthenticated) {
-                        if (prefs.isLoggedFast()) {
-                            Log.d(TAG, "Syncing fast cache: No session found")
-                            prefs.updateIsLogged(false)
-                        }
+                        if (!initDeferred.isCompleted) initDeferred.complete(Unit)
                     }
+                } else if (status is SessionStatus.NotAuthenticated) {
+                    val durationSinceStart = System.currentTimeMillis() - startTime
+                    // Dampen transient NotAuthenticated during the first 5 seconds of cold start
+                    if (durationSinceStart < 5000 && prefs.isLoggedFast()) {
+                        Log.d(TAG, "Dampening transient NotAuthenticated during startup (duration=${durationSinceStart}ms)")
+                        return@collect
+                    }
+
+                    securityManager.reset()
+                    if (prefs.isLoggedFast()) {
+                        Log.d(TAG, "Syncing fast cache: No session found")
+                        prefs.updateIsLogged(false)
+                    }
+                    if (!initDeferred.isCompleted) initDeferred.complete(Unit)
                 }
             }
         }
     }
+
+    override val isEncryptionContextAvailable: Flow<Boolean> = securityManager.state.map { it == com.keeftalk.chat.security.crypto.SecurityState.READY }
 
     private var lastProfileSync = 0L
     private val SYNC_INTERVAL = 30_000L // 30 seconds
@@ -236,9 +254,7 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun login(identifier: String, password: String): Result<Unit> = try {
-        Log.d(TAG, "ENDPOINT: auth/login | identifier type detection started")
         val supabase = getSupabase()
-        Log.d(TAG, "ENDPOINT: auth/login | Supabase client obtained")
         
         val identifierType = AuthUtils.detectIdentifierType(identifier)
         val email = when (identifierType) {
@@ -269,15 +285,19 @@ class AuthRepositoryImpl(
             Log.w(TAG, "Profile fetch/cache failed (this is expected if email is not verified): ${e.message}")
         }
         
-        prefs.updateUserId(user.id)
-        prefs.updateIsLogged(true)
-
         // --- NEW E2EE ARCHITECTURE: AEK RECOVERY ---
         try {
             recoverAccountEncryptionKey(user.id, password)
+            // ONLY mark as logged in if AEK is successfully recovered or initialized
+            prefs.updateUserId(user.id)
+            prefs.updateIsLogged(true)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            Log.e(TAG, "Failed to recover AEK on login", e)
+            Log.e(TAG, "CRITICAL: Failed to recover/initialize AEK on login for user ${user.id}. E2EE features will be disabled until re-login.", e)
+            // If E2EE is mandatory, we should logout and fail here. 
+            // For now, we still allow login but flag the missing context.
+            prefs.updateUserId(user.id)
+            prefs.updateIsLogged(true)
         }
         
         Result.success(Unit)
@@ -308,9 +328,7 @@ class AuthRepositoryImpl(
         val finalUsername = username.ifBlank { "user_${UUID.randomUUID().toString().take(8)}" }
         val normalizedPhone = AuthUtils.normalizePhone(phone)
         
-        Log.d(TAG, "ENDPOINT: auth/signup | signup started")
         val supabase = getSupabase()
-        Log.d(TAG, "ENDPOINT: auth/signup | Supabase client obtained")
         
         supabase.auth.signUpWith(
             Email,
@@ -334,7 +352,19 @@ class AuthRepositoryImpl(
         val user = supabase.auth.currentUserOrNull()
         if (user != null) {
             Log.d(TAG, "Auth signup success for user: ${user.id}")
-            prefs.updateUserId(user.id)
+            
+            // --- NEW E2EE ARCHITECTURE: AEK INITIALIZATION ON SIGNUP ---
+            // If the user is automatically logged in after signup, we must initialize their encryption context.
+            try {
+                initializeAccountEncryptionKey(user.id, password)
+                prefs.updateUserId(user.id)
+                prefs.updateIsLogged(true)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize AEK during auto-login after signup", e)
+                // We allow them to be logged in but flag the missing context
+                prefs.updateUserId(user.id)
+                prefs.updateIsLogged(true)
+            }
         } else {
             Log.d(TAG, "Auth signup success (confirmation required). User will need to verify email before first login.")
         }
@@ -364,7 +394,9 @@ class AuthRepositoryImpl(
         }
 
         // 2. Clear all sensitive in-memory keys
-        KeyManager.clearAEK(context)
+        val userId = prefs.getUserIdFast()
+        KeyManager.clearAEK(context, userId)
+        securityManager.reset()
         AppModule.provideConversationKeyManager(context).clearCache()
 
         // 3. Clear all local caches and databases (including decrypted remnants)
@@ -375,12 +407,28 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun getCurrentSession(): Profile? {
-        val user = getSupabase().auth.currentUserOrNull() ?: return null
+        val user = getAuthenticatedUser() ?: return null
         return fetchAndCacheProfile(user.id)
     }
 
+    override suspend fun getAuthenticatedUser(): io.github.jan.supabase.auth.user.UserInfo? {
+        val supabase = getSupabase()
+        val user = supabase.auth.currentUserOrNull()
+        if (user != null) return user
+
+        Log.d(TAG, "No user found, waiting for session status to be Authenticated...")
+        return try {
+            withTimeout(5000) {
+                supabase.auth.sessionStatus.first { it is SessionStatus.Authenticated }
+            }
+            supabase.auth.currentUserOrNull()
+        } catch (e: Exception) {
+            Log.w(TAG, "Timeout or error waiting for authentication: ${e.message}")
+            null
+        }
+    }
+
     override suspend fun updateProfile(profile: Profile): Result<Unit> = try {
-        Log.d(TAG, "ENDPOINT: postgrest/profiles/upsert | REQUEST: $profile")
         val supabase = getSupabase()
         val profileMap = buildJsonObject {
             put("id", profile.id)
@@ -396,6 +444,11 @@ class AuthRepositoryImpl(
             put("join_date", profile.joinDate)
             put("is_verified", profile.isVerified)
             put("last_seen", profile.lastSeen)
+            put("plan_type", profile.planType.name)
+            put("storage_limit", profile.storageLimit)
+            put("storage_used", profile.storageUsed)
+            put("is_family_owner", profile.isFamilyOwner)
+            put("family_id", profile.familyId)
             // Flatten privacy
             put("avatar_visibility", profile.privacy.avatarVisibility)
             put("cover_visibility", profile.privacy.coverVisibility)
@@ -506,28 +559,8 @@ class AuthRepositoryImpl(
     override suspend fun updateFcmToken(token: String): Result<Unit> {
         return try {
             Log.d(TAG, "updateFcmToken called")
-        val supabase = getSupabase()
-            
-            // Wait for session to be fully authenticated if it's currently initializing
-            var user = supabase.auth.currentUserOrNull()
-            if (user == null) {
-                Log.d(TAG, "No user found, waiting for session status to be Authenticated...")
-                // Wait up to 5 seconds for authentication
-                try {
-                    withTimeout(5000) {
-                        supabase.auth.sessionStatus.first { it is SessionStatus.Authenticated }
-                    }
-                    user = supabase.auth.currentUserOrNull()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Timeout or error waiting for authentication: ${e.message}. FCM token update deferred.")
-                    return Result.failure(Exception("Not authenticated"))
-                }
-            }
-
-            if (user == null) {
-                Log.w(TAG, "User still null after waiting. Skipping token update.")
-                return Result.failure(Exception("Not authenticated"))
-            }
+            val user = getAuthenticatedUser() ?: return Result.failure(Exception("Not authenticated"))
+            val supabase = getSupabase()
 
             val userId = user.id
             val maxAttempts = 3
@@ -579,45 +612,136 @@ class AuthRepositoryImpl(
         Result.failure(e)
     }
 
-    override suspend fun resetPassword(email: String): Result<Unit> = try {
-        Log.d(TAG, "ENDPOINT: auth/resetPasswordForEmail | EMAIL: $email")
-        getSupabase().auth.resetPasswordForEmail(email)
+    override suspend fun refreshProfile(userId: String): Result<Unit> = try {
+        fetchAndCacheProfile(userId)
         Result.success(Unit)
     } catch (e: Exception) {
-        Log.e(TAG, "ENDPOINT: auth/resetPasswordForEmail | ERROR: ${e.message}")
+        Result.failure(e)
+    }
+
+    override suspend fun optimisticUpdateStorageUsed(userId: String, delta: Long) {
+        withContext(Dispatchers.IO) {
+            val current = profileDao.getProfile(userId)
+            if (current != null) {
+                val updated = current.copy(storageUsed = (current.storageUsed + delta).coerceAtLeast(0L))
+                profileDao.insertProfile(updated)
+                Log.d(TAG, "Optimistically updated storage_used for $userId: ${updated.storageUsed} (delta: $delta)")
+            }
+        }
+    }
+
+    override suspend fun sendPasswordResetOtp(email: String): Result<Unit> = try {
+        getSupabase().auth.resetPasswordForEmail(email = email)
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to send password reset OTP", e)
+        Result.failure(e)
+    }
+
+    override suspend fun verifyPasswordResetOtp(email: String, otp: String): Result<Unit> = try {
+        getSupabase().auth.verifyEmailOtp(
+            type = io.github.jan.supabase.auth.OtpType.Email.RECOVERY,
+            email = email,
+            token = otp
+        )
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to verify password reset OTP", e)
         Result.failure(e)
     }
 
     override suspend fun updatePassword(newPassword: String): Result<Unit> = try {
         Log.d(TAG, "ENDPOINT: auth/updateUser (password update)")
+        val supabase = getSupabase()
         
-        // --- NEW E2EE ARCHITECTURE: RE-ENCRYPT AEK ---
-        val userId = getSupabase().auth.currentUserOrNull()?.id
-        val currentAEK = KeyManager.getAEK()
-        if (userId != null && currentAEK != null) {
-            val newSalt = Argon2idManager.generateSalt()
-            val newKEK = Argon2idManager.deriveKey(newPassword, newSalt)
-            val encryptedAEK = KeyManager.encryptAEK(currentAEK, newKEK)
-            val verificationTag = KeyManager.generateVerificationTag(currentAEK)
-            
-            getSupabase().postgrest["user_security_settings"].update(buildJsonObject {
-                put("encrypted_account_key", encryptedAEK.ciphertext)
-                put("key_salt", Base64.getEncoder().encodeToString(newSalt))
-                put("key_nonce", encryptedAEK.iv)
-                put("verification_tag", Json.encodeToString(verificationTag))
-            }) {
-                filter { eq("user_id", userId) }
+        // --- NEW E2EE ARCHITECTURE: RE-ENCRYPT OR RESET AEK ---
+        var currentAEK = KeyManager.getAEK()
+        if (currentAEK == null) {
+            // Try to restore from local storage if not in memory (common in forgot password flows on same device)
+            val userId = supabase.auth.currentUserOrNull()?.id
+            if (userId != null) {
+                KeyManager.restoreAEK(context, userId)
+                currentAEK = KeyManager.getAEK()
             }
-            Log.i(TAG, "AEK re-encrypted with new password successfully.")
+        }
+        
+        val userId = supabase.auth.currentUserOrNull()?.id
+        if (userId != null) {
+            if (currentAEK != null) {
+                val newSalt = Argon2idManager.generateSalt()
+                val newKEK = Argon2idManager.deriveKey(newPassword, newSalt)
+                val encryptedAEK = KeyManager.encryptAEK(currentAEK, newKEK)
+                val verificationTag = KeyManager.generateVerificationTag(currentAEK)
+                
+                // Use upsert to handle cases where settings might not exist yet
+                supabase.postgrest["user_security_settings"].upsert(buildJsonObject {
+                    put("user_id", userId)
+                    put("encrypted_account_key", encryptedAEK.ciphertext)
+                    put("key_salt", Base64.encodeToString(newSalt, Base64.NO_WRAP))
+                    put("key_nonce", encryptedAEK.iv)
+                    put("verification_tag", Json.encodeToString(verificationTag))
+                })
+                Log.i(TAG, "AEK re-encrypted with new password successfully.")
+            } else {
+                // No local key found. If this is a reset, we must start a new encryption context.
+                // Old data encrypted with the lost key will be orphaned.
+                Log.w(TAG, "No local AEK found during password update. Initializing NEW context.")
+                initializeAccountEncryptionKey(userId, newPassword)
+            }
         }
 
-        getSupabase().auth.updateUser {
+        supabase.auth.updateUser {
             password = newPassword
         }
         Result.success(Unit)
     } catch (e: Exception) {
         Log.e(TAG, "ENDPOINT: auth/updateUser | ERROR: ${e.message}")
         Result.failure(e)
+    }
+
+    override suspend fun recoverSecurityContext(password: String): Result<Unit> = try {
+        val user = getSupabase().auth.currentUserOrNull() ?: throw Exception("Not logged in")
+        recoverAccountEncryptionKey(user.id, password)
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to recover security context", e)
+        Result.failure(e)
+    }
+
+    private suspend fun attemptAutomaticRecovery(userId: String) = withContext(Dispatchers.IO) {
+        val token = KeyManager.getRecoveryToken(context, userId) ?: return@withContext
+        Log.i(TAG, "Attempting automatic AEK recovery with token for user $userId...")
+        try {
+            val supabase = getSupabase()
+            val settings = supabase.postgrest["user_security_settings"]
+                .select { filter { eq("user_id", userId) } }
+                .decodeSingleOrNull<UserSecuritySettingsDto>()
+            
+            if (settings?.encryptedAccountKey != null && settings.keyNonce != null) {
+                val encryptedAEK = EncryptedObject(
+                    version = 1,
+                    keyId = "kek",
+                    iv = settings.keyNonce,
+                    ciphertext = settings.encryptedAccountKey
+                )
+                
+                val aek = KeyManager.decryptAEK(encryptedAEK, token)
+                
+                // AEK Verification
+                settings.verificationTag?.let { tagJson ->
+                    val tag = Json.decodeFromString<EncryptedObject>(tagJson)
+                    if (!KeyManager.validateAEK(aek, tag)) {
+                        throw Exception("Auto-recovery AEK Validation Failed.")
+                    }
+                }
+
+                securityManager.onRecoverySuccess(aek)
+                KeyManager.persistAEK(context, userId, aek)
+                Log.i(TAG, "Automatic AEK recovery SUCCESSFUL for user $userId.")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Automatic AEK recovery failed: ${e.message}")
+        }
     }
 
     private suspend fun recoverAccountEncryptionKey(userId: String, password: String) = withContext(Dispatchers.IO) {
@@ -643,7 +767,7 @@ class AuthRepositoryImpl(
             
             if (settings?.encryptedAccountKey != null && settings.keySalt != null && settings.keyNonce != null) {
                 Log.d(TAG, "Found encrypted AEK on server. Deriving KEK...")
-                val salt = Base64.getDecoder().decode(settings.keySalt)
+                val salt = Base64.decode(settings.keySalt, Base64.NO_WRAP)
                 val kek = Argon2idManager.deriveKey(password, salt)
                 
                 val encryptedAEK = EncryptedObject(
@@ -663,9 +787,10 @@ class AuthRepositoryImpl(
                     }
                 }
 
-                KeyManager.setAEK(aek)
-                KeyManager.persistAEK(context, aek)
-                Log.i(TAG, "AEK successfully recovered from cloud and persisted locally.")
+                securityManager.onRecoverySuccess(aek)
+                KeyManager.persistAEK(context, userId, aek)
+                KeyManager.persistRecoveryToken(context, userId, kek)
+                Log.i(TAG, "AEK successfully recovered from cloud and persisted locally for user $userId.")
                 
                 // Restore conversation keys
                 AppModule.provideSecureBackupManager(context).restoreConversationKeys()
@@ -675,8 +800,9 @@ class AuthRepositoryImpl(
             }
         } catch (e: Exception) {
             Log.e(TAG, "AEK Recovery Failed: ${e.message}")
-            if (e.message?.contains("Tag mismatch") == true || e is javax.crypto.AEADBadTagException) {
-                throw Exception("Wrong encryption password. Recovery aborted.")
+            val msg = e.message ?: ""
+            if (msg.contains("Tag mismatch") || msg.contains("BAD_DECRYPT") || e is javax.crypto.AEADBadTagException) {
+                throw Exception("Wrong encryption password. Your Account Encryption Key cannot be restored with this password. If you recently changed your password on another device, try your old password or perform a Security Reset.")
             }
             throw e
         }
@@ -696,7 +822,7 @@ class AuthRepositoryImpl(
                 getSupabase().postgrest["user_security_settings"].upsert(buildJsonObject {
                     put("user_id", userId)
                     put("encrypted_account_key", encryptedAEK.ciphertext)
-                    put("key_salt", Base64.getEncoder().encodeToString(salt))
+                    put("key_salt", Base64.encodeToString(salt, Base64.NO_WRAP))
                     put("key_nonce", encryptedAEK.iv)
                     put("verification_tag", Json.encodeToString(verificationTag))
                 })
@@ -707,7 +833,7 @@ class AuthRepositoryImpl(
                     getSupabase().postgrest["user_security_settings"].upsert(buildJsonObject {
                         put("user_id", userId)
                         put("encrypted_account_key", encryptedAEK.ciphertext)
-                        put("key_salt", Base64.getEncoder().encodeToString(salt))
+                        put("key_salt", Base64.encodeToString(salt, Base64.NO_WRAP))
                         put("key_nonce", encryptedAEK.iv)
                     })
                 } else {
@@ -715,8 +841,9 @@ class AuthRepositoryImpl(
                 }
             }
             
-            KeyManager.setAEK(aek)
-            KeyManager.persistAEK(context, aek)
+            securityManager.onRecoverySuccess(aek)
+            KeyManager.persistAEK(context, userId, aek)
+            KeyManager.persistRecoveryToken(context, userId, kek)
             Log.i(TAG, "New AEK successfully initialized, uploaded (fallback used=$userId), and persisted.")
         } catch (e: Exception) {
             Log.e(TAG, "CRITICAL: Failed to initialize new AEK for userId=$userId", e)
@@ -752,8 +879,9 @@ class AuthRepositoryImpl(
                 }.decodeList<Profile>()
             }
             AuthUtils.IdentifierType.PHONE -> {
+                val normalizedPhone = AuthUtils.normalizePhone(identifier)
                 supabase.postgrest["profiles"].select {
-                    filter { eq("phone", identifier) }
+                    filter { eq("phone", normalizedPhone) }
                 }.decodeList<Profile>()
             }
             AuthUtils.IdentifierType.USERNAME -> {
@@ -877,6 +1005,23 @@ class AuthRepositoryImpl(
         ))
 
         return profile
+    }
+
+    override suspend fun resetSecuritySettings(): Result<Unit> = try {
+        val supabase = getSupabase()
+        val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
+        Log.w(TAG, "Resetting security settings for user: $userId. E2EE data will be orphaned.")
+        
+        supabase.postgrest["user_security_settings"].delete {
+            filter { eq("user_id", userId) }
+        }
+        
+        KeyManager.clearAEK(context, userId)
+        securityManager.reset()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to reset security settings", e)
+        Result.failure(e)
     }
 
     override fun shutdown() {

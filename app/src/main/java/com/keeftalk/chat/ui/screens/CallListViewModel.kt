@@ -481,7 +481,6 @@ class CallListViewModel(
         viewModelScope.launch {
             try {
                 repository.syncContacts()
-                _events.emit(DialerEvent.Error("Contacts synced with Supabase"))
             } catch (e: Exception) {
                 _events.emit(DialerEvent.Error("Sync failed: ${e.message}"))
             }
@@ -492,7 +491,6 @@ class CallListViewModel(
         viewModelScope.launch {
             try {
                 repository.syncCallLogs()
-                _events.emit(DialerEvent.Error("Call logs synced with Supabase"))
             } catch (e: Exception) {
                 _events.emit(DialerEvent.Error("Sync failed: ${e.message}"))
             }

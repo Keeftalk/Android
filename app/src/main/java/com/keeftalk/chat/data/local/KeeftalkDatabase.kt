@@ -58,7 +58,7 @@ import com.keeftalk.chat.data.local.entities.*
         FeedArticleEntity::class,
         WeatherCacheEntity::class,
     ],
-    version = 96,
+    version = 99,
     exportSchema = false
 )
 @TypeConverters(KeeftalkConverters::class)

@@ -2,20 +2,29 @@ package com.keeftalk.chat.data.service
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.Point
+import android.graphics.Typeface
 import androidx.compose.ui.graphics.*
 import androidx.exifinterface.media.ExifInterface
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Effect
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
-import com.keeftalk.chat.ui.screens.editor.graphics.*
+import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.TextureOverlay
 import com.keeftalk.chat.domain.model.EditorModel
 import com.keeftalk.chat.domain.model.MessageType
 import com.keeftalk.chat.domain.repository.ChatRepository
+import com.keeftalk.chat.ui.screens.editor.signal.Renderer
+import com.keeftalk.chat.ui.screens.editor.signal.RendererContext
+import com.keeftalk.chat.ui.screens.editor.signal.model.SignalEditorModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -28,6 +37,10 @@ class MediaExportPipeline(
     private val chatRepository: ChatRepository,
 ) {
 
+    private val typefaceProvider = object : RendererContext.TypefaceProvider {
+        override fun getSelectedTypeface(context: Context, renderer: Renderer, invalidate: RendererContext.Invalidate): Typeface = Typeface.DEFAULT
+    }
+
     suspend fun exportAndSend(
         chatId: String,
         editorModels: List<EditorModel>
@@ -37,8 +50,6 @@ class MediaExportPipeline(
                 model.mediaItem?.isImage == true -> exportImage(model)
                 model.mediaItem?.isVideo == true -> exportVideo(model)
                 model.documentItem?.type == com.keeftalk.chat.domain.model.DocumentType.PDF -> {
-                    // CRITICAL: If no annotations are present, we MUST copy the original file 
-                    // to preserve multi-page content. exportPdf() currently renders to a 1-page bitmap.
                     if (model.drawingPaths.isEmpty() && model.blurRegions.isEmpty() && model.textElements.isEmpty()) {
                         model.documentItem.uri.let { uri ->
                             val file = File(context.cacheDir, "temp_${UUID.randomUUID()}_${model.documentItem.name}")
@@ -53,7 +64,6 @@ class MediaExportPipeline(
                 }
                 model.documentItem != null && model.editedText != null -> exportText(model)
                 else -> model.documentItem?.uri?.let { uri ->
-                    // Just copy the original file if no edits
                     val file = File(context.cacheDir, "temp_${UUID.randomUUID()}_${model.documentItem.name}")
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         FileOutputStream(file).use { output -> input.copyTo(output) }
@@ -80,15 +90,14 @@ class MediaExportPipeline(
     }
 
     private suspend fun exportPdf(model: EditorModel): File? = withContext(Dispatchers.IO) {
-        // Simple PDF export: Render annotated bitmap into a single-page PDF for now
-        // A more advanced version would use a PDF library to overlay on existing PDF
         try {
-            val bitmap = renderAnnotatedBitmap(model) ?: return@withContext null
+            val uri = model.mediaItem?.uri ?: model.documentItem?.uri ?: return@withContext null
+            val sourceBitmap = renderPdfPageToBitmap(uri) ?: return@withContext null
             val pdfFile = File(context.cacheDir, "exported_${UUID.randomUUID()}.pdf")
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
+            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(sourceBitmap.width, sourceBitmap.height, 1).create()
             val page = pdfDocument.startPage(pageInfo)
-            page.canvas.drawBitmap(bitmap, 0f, 0f, null)
+            page.canvas.drawBitmap(sourceBitmap, 0f, 0f, null)
             pdfDocument.finishPage(page)
             FileOutputStream(pdfFile).use { pdfDocument.writeTo(it) }
             pdfDocument.close()
@@ -106,74 +115,6 @@ class MediaExportPipeline(
         } catch (e: Exception) {
             null
         }
-    }
-
-    private fun renderAnnotatedBitmap(model: EditorModel): Bitmap? {
-        val uri = model.mediaItem?.uri ?: model.documentItem?.uri ?: return null
-        
-        // If it's a PDF, we need to render the first page to a bitmap first
-        val sourceBitmap = if (model.documentItem?.type == com.keeftalk.chat.domain.model.DocumentType.PDF) {
-            renderPdfPageToBitmap(uri)
-        } else {
-            context.contentResolver.openInputStream(uri).use {
-                BitmapFactory.decodeStream(it)
-            }
-        } ?: return null
-
-        val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(mutableBitmap.asImageBitmap())
-        val bitmapWidth = mutableBitmap.width.toFloat()
-        val bitmapHeight = mutableBitmap.height.toFloat()
-
-        // 1. Draw paths
-        model.drawingPaths.forEach { drawingPath ->
-            canvas.save()
-            val refSize = drawingPath.referenceSize
-            if (refSize != null && refSize.width > 0 && refSize.height > 0) {
-                val scaleX = bitmapWidth / refSize.width
-                val scaleY = bitmapHeight / refSize.height
-                val matrix = android.graphics.Matrix()
-                matrix.postScale(scaleX, scaleY)
-                canvas.nativeCanvas.concat(matrix)
-            }
-
-            val renderer = BezierDrawingRenderer(
-                color = drawingPath.color,
-                strokeWidth = drawingPath.strokeWidth,
-                path = drawingPath.path,
-                isEraser = drawingPath.isEraser
-            )
-            renderer.draw(canvas)
-            canvas.restore()
-        }
-
-        // 2. Blur regions
-        model.blurRegions.forEach { region ->
-            val bounds = android.graphics.RectF()
-            region.path.asAndroidPath().computeBounds(bounds, true)
-            val rect = android.graphics.Rect(
-                (bounds.left * bitmapWidth).toInt().coerceIn(0, mutableBitmap.width),
-                (bounds.top * bitmapHeight).toInt().coerceIn(0, mutableBitmap.height),
-                (bounds.right * bitmapWidth).toInt().coerceIn(0, mutableBitmap.width),
-                (bounds.bottom * bitmapHeight).toInt().coerceIn(0, mutableBitmap.height)
-            )
-            if (rect.width() > 0 && rect.height() > 0) {
-                applyMosaicBlur(mutableBitmap, rect)
-            }
-        }
-
-        // 3. Text elements
-        model.textElements.forEach { textElement ->
-            canvas.save()
-            val renderer = TextRenderer(textElement.text, textElement.color, textElement.fontSize * (bitmapWidth / 1080f))
-            val matrix = android.graphics.Matrix()
-            matrix.postTranslate(textElement.x * bitmapWidth, textElement.y * bitmapHeight)
-            canvas.nativeCanvas.concat(matrix)
-            renderer.draw(canvas)
-            canvas.restore()
-        }
-
-        return mutableBitmap
     }
 
     private fun renderPdfPageToBitmap(uri: Uri): Bitmap? {
@@ -194,33 +135,40 @@ class MediaExportPipeline(
 
     private suspend fun exportImage(model: EditorModel): File? = withContext(Dispatchers.IO) {
         try {
-            val annotatedBitmap = renderAnnotatedBitmap(model) ?: return@withContext null
+            val uri = model.mediaItem?.uri ?: return@withContext null
+            val signalModel = model.signalState as? SignalEditorModel
             val tempFile = File(context.cacheDir, "exported_${UUID.randomUUID()}.jpg")
-            FileOutputStream(tempFile).use { out ->
-                annotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            
+            if (signalModel != null) {
+                android.util.Log.d("MEDIA_EDITOR_DEBUG", "Exporting image with Signal state. Changed: ${signalModel.isChanged()}")
+                val bitmap = signalModel.render(context, typefaceProvider)
+                FileOutputStream(tempFile).use { output ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+                }
+                bitmap.recycle()
+            } else {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+                }
             }
+            
             stripMetadata(tempFile)
             tempFile
         } catch (e: Exception) {
+            android.util.Log.e("MEDIA_EDITOR_DEBUG", "Image export failed", e)
             null
         }
     }
 
     private suspend fun exportVideo(model: EditorModel): File? = withContext(Dispatchers.Main) {
         val mediaUri = model.mediaItem?.uri ?: return@withContext null
-        android.util.Log.d("MEDIA_EDITOR_DEBUG", "Exporting video: $mediaUri")
+        val signalModel = model.signalState as? SignalEditorModel
         val outputFile = File(context.cacheDir, "exported_${UUID.randomUUID()}.mp4")
         val deferred = kotlinx.coroutines.CompletableDeferred<File?>()
 
         try {
-            val transformer = Transformer.Builder(context)
-                .build()
-            
-            val mediaItemBuilder = MediaItem.Builder()
-                .setUri(mediaUri)
-            
+            val mediaItemBuilder = MediaItem.Builder().setUri(mediaUri)
             model.videoTrimRange?.let { range ->
-                android.util.Log.d("MEDIA_EDITOR_DEBUG", "Trimming video: ${range.first}ms to ${range.last}ms")
                 mediaItemBuilder.setClippingConfiguration(
                     MediaItem.ClippingConfiguration.Builder()
                         .setStartPositionMs(range.first)
@@ -229,30 +177,42 @@ class MediaExportPipeline(
                 )
             }
 
-            val mediaItem = mediaItemBuilder.build()
-            val editedMediaItem = EditedMediaItem.Builder(mediaItem)
+            val editedMediaItemBuilder = EditedMediaItem.Builder(mediaItemBuilder.build())
                 .setRemoveAudio(false)
-                .build()
 
-            val listener = object : Transformer.Listener {
-                override fun onCompleted(composition: androidx.media3.transformer.Composition, exportResult: ExportResult) {
-                    android.util.Log.d("MEDIA_EDITOR_DEBUG", "Video export COMPLETED")
-                    deferred.complete(outputFile)
-                }
+            if (signalModel != null) {
+                val retriever = android.media.MediaMetadataRetriever()
+                retriever.setDataSource(context, mediaUri)
+                val width = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt() ?: 1024
+                val height = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt() ?: 1024
+                retriever.release()
 
-                override fun onError(composition: androidx.media3.transformer.Composition, exportResult: ExportResult, exportException: ExportException) {
-                    android.util.Log.e("MEDIA_EDITOR_DEBUG", "Video export FAILED", exportException)
-                    deferred.complete(null)
+                val overlayBitmap = withContext(Dispatchers.IO) {
+                    signalModel.renderAnnotationsOnly(context, Point(width, height), typefaceProvider)
                 }
+                
+                val overlay = BitmapOverlay.createStaticBitmapOverlay(overlayBitmap)
+                val overlayEffect = OverlayEffect(com.google.common.collect.ImmutableList.of(overlay as TextureOverlay))
+                
+                editedMediaItemBuilder.setEffects(Effects(
+                    listOf<AudioProcessor>(),
+                    listOf<Effect>(overlayEffect)
+                ))
             }
 
-            transformer.addListener(listener)
-            transformer.start(editedMediaItem, outputFile.absolutePath)
-            
-            val result = deferred.await()
-            result
+            val transformer = Transformer.Builder(context).build()
+            transformer.addListener(object : Transformer.Listener {
+                override fun onCompleted(composition: androidx.media3.transformer.Composition, exportResult: ExportResult) {
+                    deferred.complete(outputFile)
+                }
+                override fun onError(composition: androidx.media3.transformer.Composition, exportResult: ExportResult, exportException: ExportException) {
+                    deferred.complete(null)
+                }
+            })
+
+            transformer.start(editedMediaItemBuilder.build(), outputFile.absolutePath)
+            deferred.await()
         } catch (e: Exception) {
-            android.util.Log.e("MEDIA_EDITOR_DEBUG", "Video export setup failed", e)
             null
         }
     }
@@ -271,22 +231,5 @@ class MediaExportPipeline(
             attributes.forEach { exifInterface.setAttribute(it, null) }
             exifInterface.saveAttributes()
         } catch (_: Exception) {}
-    }
-
-    private fun applyMosaicBlur(bitmap: Bitmap, rect: android.graphics.Rect) {
-        val mosaicSize = 40
-        val width = rect.width()
-        val height = rect.height()
-        
-        val small = Bitmap.createScaledBitmap(
-            Bitmap.createBitmap(bitmap, rect.left, rect.top, width, height),
-            (width / mosaicSize).coerceAtLeast(1),
-            (height / mosaicSize).coerceAtLeast(1),
-            false
-        )
-        val blurred = Bitmap.createScaledBitmap(small, width, height, false)
-        
-        val canvas = android.graphics.Canvas(bitmap)
-        canvas.drawBitmap(blurred, rect.left.toFloat(), rect.top.toFloat(), null)
     }
 }

@@ -38,7 +38,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.3-Alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         signingConfig = signingConfigs.getByName("release")
@@ -83,6 +83,19 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = false
+        }
     }
 
     packaging {
@@ -174,6 +187,8 @@ dependencies {
     implementation(libs.play.billing)
     implementation(libs.argon2kt)
     implementation(libs.coil.compose)
+    implementation(libs.glide)
+    ksp(libs.glide.ksp)
     implementation(libs.coil.gif)
     implementation(libs.coil.video)
     implementation(libs.converter.moshi)

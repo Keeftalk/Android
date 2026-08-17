@@ -35,16 +35,20 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.keeftalk.chat.ui.theme.LocalAppIcons
+import com.keeftalk.chat.ui.components.BugReportBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HelpScreen(onBack: () -> Unit) {
+fun HelpScreen(
+    viewModel: BugReportViewModel,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val faqCategories = remember { getFaqCategories() }
     var searchQuery by remember { mutableStateOf(value = "") }
     var selectedTopic by remember { mutableStateOf<Topic?>(null) }
+    var showBugReport by remember { mutableStateOf(false) }
 
     val filteredFaqs = remember(searchQuery, faqCategories, selectedTopic) {
         val baseList = if (selectedTopic != null) {
@@ -127,7 +131,7 @@ fun HelpScreen(onBack: () -> Unit) {
 
                     item {
                         HelpSectionHeader(title = "Quick Actions")
-                        PremiumTaskCards(context, uriHandler)
+                        PremiumTaskCards(uriHandler, onReportBugClick = { showBugReport = true })
                     }
 
                     item {
@@ -174,11 +178,18 @@ fun HelpScreen(onBack: () -> Unit) {
                     }
                 } else {
                     item {
-                        TopicActionFooter(context, topic)
+                        TopicActionFooter(context, topic, onReportBugClick = { showBugReport = true })
                     }
                 }
             }
         }
+    }
+
+    if (showBugReport) {
+        BugReportBottomSheet(
+            viewModel = viewModel,
+            onDismiss = { showBugReport = false }
+        )
     }
 }
 
@@ -334,7 +345,7 @@ fun TopicTile(topic: Topic, modifier: Modifier, onClick: () -> Unit) {
 }
 
 @Composable
-fun PremiumTaskCards(context: Context, uriHandler: UriHandler) {
+fun PremiumTaskCards(uriHandler: UriHandler, onReportBugClick: () -> Unit) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -344,7 +355,7 @@ fun PremiumTaskCards(context: Context, uriHandler: UriHandler) {
             description = "Encountered a bug? Send us a detailed report to help us fix it.",
             icon = Icons.Default.BugReport,
             color = MaterialTheme.colorScheme.error,
-            onClick = { contactSupport(context, "Bug Report") }
+            onClick = onReportBugClick
         )
         PremiumTaskCard(
             title = "Security & Privacy Center",
@@ -470,7 +481,7 @@ fun TopicDetailHeader(topic: Topic) {
 }
 
 @Composable
-fun TopicActionFooter(context: Context, topic: Topic) {
+fun TopicActionFooter(context: Context, topic: Topic, onReportBugClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -484,13 +495,13 @@ fun TopicActionFooter(context: Context, topic: Topic) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { contactSupport(context, "${topic.title} Detailed Inquiry") },
+            onClick = onReportBugClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp)
         ) {
-            Icon(Icons.Default.Email, contentDescription = null)
+            Icon(Icons.Default.BugReport, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Contact ${topic.title} Specialist")
+            Text("Report a ${topic.title} Bug")
         }
     }
 }

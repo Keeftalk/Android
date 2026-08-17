@@ -72,9 +72,9 @@ class ConversationKeyManager(
 
             // 6. Decrypt and cache
             try {
-                if (!KeyManager.isInitialized()) {
-                    KeyManager.restoreAEK(context)
-                }
+                // Ensure AEK is ready (will suspend if recovery is needed)
+                val securityManager = AppModule.provideSecurityManager(context)
+                securityManager.getEncryptionContext()
                 
                 val protectionKey = if (entity.version >= 2) {
                     KeyManager.getConversationProtectionKey()
@@ -175,9 +175,10 @@ class ConversationKeyManager(
     private suspend fun saveAndSyncKey(conversationId: String, userId: String, key: SecretKey, epoch: Int = 1) {
         withContext(Dispatchers.IO) {
             try {
-                if (!KeyManager.isInitialized()) {
-                    KeyManager.restoreAEK(context)
-                }
+                // Ensure AEK is ready
+                val securityManager = AppModule.provideSecurityManager(context)
+                securityManager.getEncryptionContext()
+                
                 val cpk = KeyManager.getConversationProtectionKey()
                 val encrypted = StorageCryptoService.encrypt(key.encoded, cpk)
                 

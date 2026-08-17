@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.keeftalk.chat.macrobenchmark-mergeDebugResources-15:/values-is/values-is.xml",
+            "map": [
+                {
+                    "source": "/home/m-abidi/.gradle/caches/9.5.0/transforms/968eb820412953a376ba5a5b46047567/transformed/core-1.9.0/res/values-is/values-is.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "100",
+                        "endOffsets": "151"
+                    }
+                }
+            ]
+        }
+    ]
+}

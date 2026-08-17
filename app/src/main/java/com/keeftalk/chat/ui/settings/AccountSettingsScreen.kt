@@ -25,19 +25,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keeftalk.chat.domain.model.Profile
+import com.keeftalk.chat.ui.theme.LocalAppIcons
+import java.text.SimpleDateFormat
+import java.util.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.keeftalk.chat.ui.theme.LocalAppIcons
 
 enum class AccountSubSetting {
     // Identity
     ID_USER, ID_NAME, ID_BIO, ID_QR,
     // Security
-    SEC_PASS, ID_2FA, SEC_AEK, SEC_SESSIONS, SEC_LOG, SEC_RECOVERY,
+    SEC_PASS, SEC_2FA, SEC_AEK, SEC_SESSIONS, SEC_LOG, SEC_RECOVERY, SEC_APP_LOCK,
     // Modules
     MOD_EMAIL, MOD_SMS, MOD_VOIP, MOD_WALLET, MOD_CALENDAR,
     // Cloud
     CLOUD_VAULT, CLOUD_NOTES, CLOUD_BACKUP, CLOUD_CACHE,
     // Privacy
-    PRIV_PERMS, PRIV_BLOCKED,
+    PRIV_VISIBILITY, PRIV_INTERACTIONS, PRIV_PERMS, PRIV_BLOCKED,
     // Subscription
     SUB_STORAGE
 }
@@ -107,7 +113,8 @@ fun AccountSettingsScreen(
                     AccountControlSection(title = "Security & Trust") {
                         ControlTileGrid {
                             CompactAccountTile("Password", "Auth credentials", Icons.Rounded.Password, Color(0xFFE91E63)) { selectedSubSetting = AccountSubSetting.SEC_PASS }
-                            CompactAccountTile("2-Step Verification", "MFA setup", Icons.Rounded.VpnKey, Color(0xFF2196F3)) { selectedSubSetting = AccountSubSetting.ID_2FA }
+                            CompactAccountTile("2-Step Verification", "MFA setup", Icons.Rounded.VpnKey, Color(0xFF2196F3)) { selectedSubSetting = AccountSubSetting.SEC_2FA }
+                            CompactAccountTile("App Lock", "Biometric protection", Icons.Rounded.LockPerson, Color(0xFF009688)) { selectedSubSetting = AccountSubSetting.SEC_APP_LOCK }
                             CompactAccountTile("Encryption Key", "AEK status", Icons.Rounded.Security, Color(0xFF455A64)) { selectedSubSetting = AccountSubSetting.SEC_AEK }
                             CompactAccountTile("Active Sessions", "Logged devices", Icons.Rounded.Devices, Color(0xFF4CAF50)) { selectedSubSetting = AccountSubSetting.SEC_SESSIONS }
                             CompactAccountTile("Security Activity", "Action logs", Icons.Rounded.HistoryEdu, Color(0xFF795548)) { selectedSubSetting = AccountSubSetting.SEC_LOG }
@@ -136,6 +143,8 @@ fun AccountSettingsScreen(
 
                     AccountControlSection(title = "Privacy & Safety") {
                         ControlTileGrid {
+                            CompactAccountTile("Profile Visibility", "Online status & info", Icons.Rounded.Visibility, Color(0xFF6C63FF)) { selectedSubSetting = AccountSubSetting.PRIV_VISIBILITY }
+                            CompactAccountTile("Interactions", "Receipts & typing", Icons.Rounded.Message, Color(0xFF00CCCC)) { selectedSubSetting = AccountSubSetting.PRIV_INTERACTIONS }
                             CompactAccountTile("Permissions", "System access", Icons.Rounded.Rule, Color(0xFF607D8B)) { selectedSubSetting = AccountSubSetting.PRIV_PERMS }
                             CompactAccountTile("Blocked List", "Restricted users", Icons.Rounded.Block, Color(0xFFFFC107)) { selectedSubSetting = AccountSubSetting.PRIV_BLOCKED }
                         }
@@ -175,27 +184,30 @@ fun AccountSubSettingDetail(
         Spacer(modifier = Modifier.height(24.dp))
 
         when (setting) {
-            AccountSubSetting.ID_USER -> UserHandleView()
-            AccountSubSetting.ID_NAME -> NameView()
-            AccountSubSetting.ID_BIO -> BioView()
-            AccountSubSetting.ID_QR -> QrCodeView()
-            AccountSubSetting.SEC_PASS -> PasswordView()
-            AccountSubSetting.ID_2FA -> TwoFactorView()
-            AccountSubSetting.SEC_AEK -> MasterKeyView()
-            AccountSubSetting.SEC_SESSIONS -> SessionsView()
-            AccountSubSetting.SEC_LOG -> ActivityLogView()
-            AccountSubSetting.SEC_RECOVERY -> RecoveryView()
+            AccountSubSetting.ID_USER -> UserHandleView(profile, viewModel)
+            AccountSubSetting.ID_NAME -> NameView(profile, viewModel)
+            AccountSubSetting.ID_BIO -> BioView(profile, viewModel)
+            AccountSubSetting.ID_QR -> QrCodeView(profile)
+            AccountSubSetting.SEC_PASS -> PasswordView(viewModel)
+            AccountSubSetting.SEC_2FA -> Security2FAView(viewModel)
+            AccountSubSetting.SEC_APP_LOCK -> SecurityAppLockView(viewModel)
+            AccountSubSetting.SEC_AEK -> MasterKeyView(viewModel)
+            AccountSubSetting.SEC_SESSIONS -> SessionsView(viewModel)
+            AccountSubSetting.SEC_LOG -> ActivityLogView(viewModel)
+            AccountSubSetting.SEC_RECOVERY -> RecoveryView(viewModel)
             AccountSubSetting.MOD_EMAIL -> EmailView()
-            AccountSubSetting.MOD_SMS -> SmsView()
-            AccountSubSetting.MOD_VOIP -> VoipView()
-            AccountSubSetting.MOD_WALLET -> WalletView()
-            AccountSubSetting.MOD_CALENDAR -> CalendarView()
-            AccountSubSetting.CLOUD_VAULT -> VaultView()
-            AccountSubSetting.CLOUD_NOTES -> NotesView()
-            AccountSubSetting.CLOUD_BACKUP -> BackupView()
-            AccountSubSetting.CLOUD_CACHE -> CacheView()
+            AccountSubSetting.MOD_SMS -> SmsView(viewModel)
+            AccountSubSetting.MOD_VOIP -> VoipView(viewModel)
+            AccountSubSetting.MOD_WALLET -> WalletView(viewModel)
+            AccountSubSetting.MOD_CALENDAR -> CalendarView(viewModel)
+            AccountSubSetting.CLOUD_VAULT -> VaultView(profile)
+            AccountSubSetting.CLOUD_NOTES -> NotesView(viewModel)
+            AccountSubSetting.CLOUD_BACKUP -> BackupView(viewModel)
+            AccountSubSetting.CLOUD_CACHE -> CacheView(profile)
+            AccountSubSetting.PRIV_VISIBILITY -> PrivacyVisibilityView(viewModel)
+            AccountSubSetting.PRIV_INTERACTIONS -> PrivacyInteractionsView(viewModel)
             AccountSubSetting.PRIV_PERMS -> PermsView()
-            AccountSubSetting.PRIV_BLOCKED -> BlockedView()
+            AccountSubSetting.PRIV_BLOCKED -> BlockedView(viewModel)
             AccountSubSetting.SUB_STORAGE -> SubscriptionView(profile, onSubscriptionPlansClick)
         }
     }
@@ -224,63 +236,119 @@ fun CompactSubSettingHeader(setting: AccountSubSetting) {
 
 // --- COMPACT SUB-VIEWS ---
 
-@Composable fun UserHandleView() { 
+@Composable fun UserHandleView(profile: Profile?, viewModel: SettingsViewModel) { 
+    var text by remember { mutableStateOf(profile?.username ?: "") }
     Column {
-        PremiumTextField("@m_abidi", "Username", Icons.Rounded.AlternateEmail)
+        PremiumTextField(text, "Username", Icons.Rounded.AlternateEmail) { text = it }
         StatusIndicator("Username available", true)
         Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = { viewModel.updateProfile(username = text) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Update Username")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
         InfoCard("Handles are unique and used for cross-network identification.")
     }
 }
-@Composable fun NameView() { PremiumTextField("Mohamed Abidi", "Display Name", Icons.Rounded.Badge) }
-@Composable fun BioView() { PremiumTextField("Android Dev | Security Expert", "Bio", Icons.Rounded.Info, false, 3) }
-@Composable fun QrCodeView() { 
+@Composable fun NameView(profile: Profile?, viewModel: SettingsViewModel) { 
+    var text by remember { mutableStateOf(profile?.fullName ?: "") }
+    Column {
+        PremiumTextField(text, "Display Name", Icons.Rounded.Badge) { text = it }
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = { viewModel.updateProfile(fullName = text) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Update Name")
+        }
+    }
+}
+@Composable fun BioView(profile: Profile?, viewModel: SettingsViewModel) { 
+    var text by remember { mutableStateOf(profile?.bio ?: "") }
+    Column {
+        PremiumTextField(text, "Bio", Icons.Rounded.Info, false, 3) { text = it }
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = { viewModel.updateProfile(bio = text) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Update Bio")
+        }
+    }
+}
+@Composable fun QrCodeView(profile: Profile?) { 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Surface(modifier = Modifier.size(200.dp), shape = RoundedCornerShape(24.dp), color = Color.White, tonalElevation = 8.dp) {
-            Box(contentAlignment = Alignment.Center) { Text("QR CODE MOCKUP", color = Color.Black, fontWeight = FontWeight.Bold) }
+            Box(contentAlignment = Alignment.Center) {
+                com.keeftalk.chat.ui.screens.MyQrCode(userId = profile?.id ?: "")
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
         Text("Your personal QR code for quick peer sharing.", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
     }
 }
-@Composable fun PasswordView() { 
+@Composable fun PasswordView(viewModel: SettingsViewModel) { 
+    var showDialog by remember { mutableStateOf(false) }
+    var currentPass by remember { mutableStateOf("") }
+    var newPass by remember { mutableStateOf("") }
+    
     Column {
-        SecureField("Current Password")
+        SecureField(currentPass, "Current Password") { currentPass = it }
         Spacer(modifier = Modifier.height(12.dp))
-        SecureField("New Password")
+        SecureField(newPass, "New Password") { newPass = it }
         Spacer(modifier = Modifier.height(24.dp))
-        LinearProgressIndicator(progress = { 0.8f }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = Color(0xFF2ECC71))
+        
+        Button(onClick = { showDialog = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("Change Password")
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
         TextButton(onClick = {}, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Forgot Password?", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
     }
+    
+    if (showDialog) {
+        ChangePasswordDialog(
+            onDismiss = { showDialog = false },
+            onConfirm = { current, new ->
+                viewModel.changePassword(current, new)
+                showDialog = false
+            }
+        )
+    }
 }
-@Composable fun TwoFactorView() { 
+@Composable fun Security2FAView(viewModel: SettingsViewModel) {
+    val settings by viewModel.securitySettings.collectAsState()
+    var showPinDialog by remember { mutableStateOf<PinDialogMode?>(null) }
+    
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         InfoCard("Secure your account with multi-factor authentication methods.")
         
         MfaMethodItem(
+            title = "Two-Step Verification",
+            subtitle = if (settings?.twoFactorEnabled == true) "Active" else "Inactive",
+            icon = Icons.Rounded.VerifiedUser,
+            active = settings?.twoFactorEnabled == true,
+            onRevoke = if (settings?.twoFactorEnabled == true) { { showPinDialog = PinDialogMode.DISABLE } } else null
+        )
+
+        if (settings?.twoFactorEnabled != true) {
+            Button(onClick = { showPinDialog = PinDialogMode.ENABLE }, modifier = Modifier.fillMaxWidth()) {
+                Text("Enable 2FA")
+            }
+        }
+        
+        MfaMethodItem(
             title = "Email Link",
-            subtitle = "Verify via secure login link sent to your mail",
+            subtitle = "Verify via secure login link",
             icon = Icons.Rounded.Email,
             active = true
         )
-        
-        MfaMethodItem(
-            title = "SMS OTP",
-            subtitle = "6-digit verification code",
-            icon = Icons.Rounded.Sms,
-            active = false
-        )
-        
-        MfaMethodItem(
-            title = "Passkeys",
-            subtitle = "Biometric or hardware keys",
-            icon = Icons.Rounded.Key,
-            active = true,
-            onRevoke = {}
+    }
+
+    if (showPinDialog != null) {
+        PinEntryDialog(
+            mode = showPinDialog!!,
+            onDismiss = { showPinDialog = null },
+            onConfirm = { pin, recoveryEmail ->
+                if (showPinDialog == PinDialogMode.ENABLE) viewModel.enable2FA(pin, recoveryEmail)
+                else viewModel.disable2FA(pin)
+                showPinDialog = null
+            }
         )
     }
 }
@@ -312,40 +380,119 @@ fun MfaMethodItem(title: String, subtitle: String, icon: ImageVector, active: Bo
     }
 }
 
-@Composable fun MasterKeyView() {
+@Composable fun MasterKeyView(viewModel: SettingsViewModel) {
+    val settings by viewModel.securitySettings.collectAsState()
+    val hasKey = settings?.encryptedAccountKey != null
+    
     Column {
-        PremiumStatusBox("Key Hardware Backed", "Android StrongBox Secure", true)
+        PremiumStatusBox(
+            if (hasKey) "Key Hardware Backed" else "Key Not Initialized", 
+            if (hasKey) "Android StrongBox Secure" else "Manual setup required", 
+            hasKey
+        )
         Spacer(modifier = Modifier.height(16.dp))
         PremiumActionCard("Rotate Master Key", "Full re-encryption", Icons.Rounded.RotateRight) {
-            // TODO: Implementation for key rotation
+            // TODO: Trigger key rotation
         }
         InfoCard("The Account Encryption Key (AEK) never leaves your device.")
     }
 }
-@Composable fun SessionsView() { 
+
+@Composable fun SecurityAppLockView(viewModel: SettingsViewModel) {
+    val settings by viewModel.securitySettings.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = context as? androidx.fragment.app.FragmentActivity
+    val biometricManager = remember { activity?.let { com.keeftalk.chat.util.BiometricAuthManager(it) } }
+    
+    var isAuthenticating by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        PremiumToggleItem(
+            title = "App Lock",
+            subtitle = if (settings?.appLockEnabled == true) "Secured" else "Inactive",
+            checked = settings?.appLockEnabled == true,
+            onCheckedChange = { newValue: Boolean ->
+                if (newValue && activity != null) {
+                    isAuthenticating = true
+                    biometricManager?.showBiometricPrompt(
+                        activity = activity,
+                        title = "Confirm Security",
+                        subtitle = "Authenticate to enable lock",
+                        onSuccess = {
+                            viewModel.updateAppLock(true, settings?.appLockTimeoutSeconds ?: 0, true)
+                            isAuthenticating = false
+                        },
+                        onError = {
+                            isAuthenticating = false
+                        }
+                    )
+                } else {
+                    viewModel.updateAppLock(false, settings?.appLockTimeoutSeconds ?: 0, false)
+                }
+            }
+        )
+
+        if (settings?.appLockEnabled == true) {
+            InfoCard("Lock timeout is currently set to ${settings?.appLockTimeoutSeconds ?: 0} seconds.")
+        }
+        
+        if (isAuthenticating) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
+    }
+}
+@Composable fun SessionsView(viewModel: SettingsViewModel) { 
+    val sessions by viewModel.activeSessions.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SessionItem("Pixel 8 Pro", "Tunis, TN", true)
-        SessionItem("Desktop App", "London, UK", false)
-        Button({}, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Logout All Other") }
+        InfoCard("Devices currently logged into your Keeftalk account.")
+        sessions.forEach { session ->
+            SessionItem(
+                device = session.deviceName ?: "Unknown Device",
+                location = "${session.country ?: "Unknown"} • ${session.ipAddress?.take(7) ?: ""}",
+                isCurrent = session.isCurrent,
+                onLogout = { viewModel.logoutSession(session.id) }
+            )
+        }
+        if (sessions.size > 1) {
+            Button(onClick = { viewModel.logoutAllOtherSessions() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { 
+                Text("Logout All Other Devices") 
+            }
+        }
     }
 }
-@Composable fun ActivityLogView() { 
+@Composable fun ActivityLogView(viewModel: SettingsViewModel) { 
+    val events by viewModel.securityEvents.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        LogItem("Login", "Tunis, TN", "2 mins ago")
-        LogItem("Vault Access", "Pixel 8 Pro", "1 hour ago")
-        LogItem("Key Rotated", "System", "3 days ago")
+        events.forEach { event ->
+            LogItem(
+                action = event.eventType.name.replace("_", " "),
+                detail = event.description ?: "",
+                time = formatTimestamp(event.createdAt)
+            )
+        }
     }
 }
-@Composable fun RecoveryView() { 
+@Composable fun RecoveryView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.securitySettings.collectAsState()
+    val profile by viewModel.currentUserProfile.collectAsState()
+    
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         InfoCard("Manage your backup recovery methods. At least one verified email is required.")
         
-        RecoveryManageItem("m.abidi@keeftalk.com", "Primary Email", verified = true, canDelete = false)
-        RecoveryManageItem("backup@work.com", "Secondary Email", verified = false, canDelete = true)
-        RecoveryManageItem("+216 22 123 456", "Recovery Phone", verified = true, canDelete = true)
+        profile?.email?.let {
+            RecoveryManageItem(it, "Primary Email", verified = true, canDelete = false)
+        }
+        
+        settings?.recoveryEmail?.let {
+            RecoveryManageItem(it, "Recovery Email", verified = true, canDelete = true)
+        }
+        
+        profile?.phone?.let {
+            RecoveryManageItem(it, "Recovery Phone", verified = true, canDelete = true)
+        }
         
         Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = {}, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+        Button(onClick = { /* TODO */ }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
             Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Add Recovery Method")
@@ -387,45 +534,231 @@ fun RecoveryManageItem(value: String, type: String, verified: Boolean, canDelete
 }
 
 @Composable fun EmailView() { 
+    // In a real app, this would come from a Repository. For now, we show a professional placeholder that navigates.
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        IntegrationCard("Gmail", "m.abidi@gmail.com", "Synced")
-        Button({}, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) { Text("Add Account") }
+        InfoCard("Connected professional email accounts for unified inbox.")
+        IntegrationCard("Keeftalk Mail", "Internal", "Active")
+        Button(onClick = { /* TODO: Link more */ }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) { 
+            Text("Link External Account") 
+        }
     }
 }
-@Composable fun SmsView() { PremiumToggleItem("SMS Gateway", "Relay carrier messages", true) }
-@Composable fun VoipView() { PremiumToggleItem("Ultra-Secure VoIP", "Force WebRTC E2EE", true) }
-@Composable fun WalletView() { StatusCard("Digital Wallet: SOON", Color.Gray, Icons.Rounded.AccountBalanceWallet) }
-@Composable fun CalendarView() { PremiumToggleItem("Calendar Sync", "Active", true) }
-@Composable fun VaultView() { 
-    Column {
-        StorageVisualizer(4.2f, 10f)
-        Spacer(modifier = Modifier.height(24.dp))
-        PremiumToggleItem("Zero-Knowledge", "Always Active", true)
+
+@Composable fun PrivacyVisibilityView(viewModel: SettingsViewModel) {
+    val settings by viewModel.fullSettings.collectAsState()
+    val prefs = settings.privacySettings
+    var showVisibilityPicker by remember { mutableStateOf<String?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PremiumActionCard("Profile Photo", prefs.profilePhotoVisibility.name, Icons.Rounded.Portrait) {
+            showVisibilityPicker = "profilePhotoVisibility"
+        }
+        PremiumActionCard("About Info", prefs.aboutVisibility.name, Icons.Rounded.Info) {
+            showVisibilityPicker = "aboutVisibility"
+        }
+        PremiumActionCard("Last Seen", prefs.lastSeenVisibility.name, Icons.Rounded.History) {
+            showVisibilityPicker = "lastSeenVisibility"
+        }
+        PremiumActionCard("Connections", prefs.connectionsVisibility.name, Icons.Rounded.People) {
+            showVisibilityPicker = "connectionsVisibility"
+        }
+    }
+
+    if (showVisibilityPicker != null) {
+        val key = showVisibilityPicker!!
+        val options = listOf("EVERYONE", "CONTACTS", "NOBODY")
+        val selected = when(key) {
+            "profilePhotoVisibility" -> prefs.profilePhotoVisibility.name
+            "aboutVisibility" -> prefs.aboutVisibility.name
+            "lastSeenVisibility" -> prefs.lastSeenVisibility.name
+            "connectionsVisibility" -> prefs.connectionsVisibility.name
+            else -> ""
+        }
+
+        AlertDialog(
+            onDismissRequest = { showVisibilityPicker = null },
+            title = { Text("Select Visibility") },
+            text = {
+                Column {
+                    options.forEach { option ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                viewModel.updatePrivacySetting(key, option)
+                                showVisibilityPicker = null
+                            }.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (option == selected), onClick = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(option.lowercase().replaceFirstChar { it.uppercase() })
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showVisibilityPicker = null }) { Text("Cancel") } }
+        )
     }
 }
-@Composable fun NotesView() { PremiumToggleItem("Notes Cloud Sync", "Real-time", true) }
-@Composable fun BackupView() { SyncStatusItem("Full Backup", "1.8 GB", "12h ago") }
-@Composable fun CacheView() { 
+
+@Composable fun PrivacyInteractionsView(viewModel: SettingsViewModel) {
+    val settings by viewModel.fullSettings.collectAsState()
+    val prefs = settings.privacySettings
+    
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PremiumToggleItem(
+            title = "Read Receipts",
+            subtitle = "Allow others to see when you've read messages",
+            checked = prefs.readReceiptsEnabled,
+            onCheckedChange = { enabled: Boolean -> viewModel.updatePrivacySetting("readReceiptsEnabled", enabled) }
+        )
+        PremiumToggleItem(
+            title = "Typing Indicators",
+            subtitle = "Show when you are typing",
+            checked = prefs.typingIndicatorsEnabled,
+            onCheckedChange = { enabled: Boolean -> viewModel.updatePrivacySetting("typingIndicatorsEnabled", enabled) }
+        )
+        PremiumToggleItem(
+            title = "Screenshot Protection",
+            subtitle = "Block screenshots in private chats",
+            checked = prefs.screenshotProtectionEnabled,
+            onCheckedChange = { enabled: Boolean -> viewModel.updatePrivacySetting("screenshotProtectionEnabled", enabled) }
+        )
+    }
+}
+@Composable fun SmsView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.fullSettings.collectAsState()
+    val prefs = settings.chatSettings // We'll move bridge to chat or generic
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        PremiumToggleItem(
+            title = "SMS Bridge", 
+            subtitle = "Relay carrier messages via Keeftalk", 
+            checked = false, // TODO: Map to actual setting
+            onCheckedChange = { viewModel.updateModuleIntegration("smsBridgeEnabled", it) }
+        )
+        InfoCard("Experimental: Requires carrier support and app as default SMS handler.")
+    }
+}
+@Composable fun VoipView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.fullSettings.collectAsState()
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        PremiumToggleItem(
+            title = "Ultra-Secure VoIP", 
+            subtitle = "Force WebRTC Peer-to-Peer E2EE", 
+            checked = settings.callSettings.videoQuality == "HD",
+            onCheckedChange = { viewModel.updateModuleIntegration("voipEnabled", it) }
+        )
+        InfoCard("Ensures the highest level of call privacy using peer-to-peer streams.")
+    }
+}
+@Composable fun WalletView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.fullSettings.collectAsState()
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        PremiumToggleItem(
+            title = "Digital Wallet", 
+            subtitle = "Enable Keeftalk Pay features", 
+            checked = false,
+            onCheckedChange = { viewModel.updateModuleIntegration("walletEnabled", it) }
+        )
+        StatusCard("Wallet: SOON", Color.Gray, Icons.Rounded.AccountBalanceWallet)
+    }
+}
+@Composable fun CalendarView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.fullSettings.collectAsState()
+    PremiumToggleItem(
+        title = "Calendar Sync", 
+        subtitle = "Synchronize agenda with secure cloud", 
+        checked = settings.calendarSettings.offlineModeEnabled,
+        onCheckedChange = { viewModel.updateModuleIntegration("calendarSyncEnabled", it) }
+    )
+}
+@Composable fun VaultView(profile: Profile?) { 
+    val used = profile?.storageUsed ?: 0L
+    val limit = profile?.storageLimit ?: com.keeftalk.chat.domain.model.SubscriptionPlan.FREE.storageLimit
+    val usedGb = used.toFloat() / (1024 * 1024 * 1024)
+    val limitGb = limit.toFloat() / (1024 * 1024 * 1024)
+    
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        StorageVisualizer(usedGb, limitGb, isError = used > limit)
+        PremiumStatusBox("Zero-Knowledge Vault", "Encryption keys stored on-device", true)
+        InfoCard("Your Vault is protected by the Account Encryption Key (AEK).")
+    }
+}
+@Composable fun NotesView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.fullSettings.collectAsState()
+    PremiumToggleItem(
+        title = "Notes Cloud Sync", 
+        subtitle = "Real-time synchronization for secure notes", 
+        checked = settings.noteSettings.syncNotesAcrossDevices,
+        onCheckedChange = { viewModel.updateModuleIntegration("notesSyncEnabled", it) }
+    )
+}
+@Composable fun BackupView(viewModel: SettingsViewModel) { 
+    val settings by viewModel.fullSettings.collectAsState()
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        PremiumToggleItem(
+            title = "System Backup", 
+            subtitle = "Periodic cloud snapshots of app state", 
+            checked = true,
+            onCheckedChange = { viewModel.updateModuleIntegration("cloudBackupEnabled", it) }
+        )
+        SyncStatusItem("Global State Backup", "Encrypted Snapshot", "Last check: Just now")
+    }
+}
+@Composable fun CacheView(profile: Profile?) { 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var cacheSize by remember { mutableStateOf("Calculating...") }
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val size = context.cacheDir.walk().filter { it.isFile }.map { it.length() }.sum()
+            cacheSize = "%.2f MB".format(size.toFloat() / (1024 * 1024))
+        }
+    }
+
     Column {
-        StorageVisualizer(0.45f, 1f)
+        InfoCard("Current application cache: $cacheSize")
         Spacer(modifier = Modifier.height(24.dp))
-        Button({}, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Clear Cache") }
+        Button(onClick = { 
+            context.cacheDir.deleteRecursively()
+            cacheSize = "0.00 MB"
+        }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { 
+            Text("Clear Cache") 
+        }
     }
 }
 @Composable fun PermsView() { 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun hasPerm(perm: String) = androidx.core.content.ContextCompat.checkSelfPermission(context, perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        PermissionItem("Camera", true)
-        PermissionItem("Microphone", true)
-        PermissionItem("Location", false)
+        PermissionItem("Camera", hasPerm(android.Manifest.permission.CAMERA))
+        PermissionItem("Microphone", hasPerm(android.Manifest.permission.RECORD_AUDIO))
+        PermissionItem("Contacts", hasPerm(android.Manifest.permission.READ_CONTACTS))
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        InfoCard("System permissions are managed via Android Settings.")
     }
 }
-@Composable fun BlockedView() { BlockedItem("Spam User", "@spambot_1") }
+@Composable fun BlockedView(viewModel: SettingsViewModel) { 
+    val blockedUsers by viewModel.blockedUsers.collectAsState(initial = emptyList())
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (blockedUsers.isEmpty()) {
+            InfoCard("No restricted contacts.")
+        } else {
+            blockedUsers.forEach { user ->
+                BlockedItem(user.name, "@${user.username}") {
+                    viewModel.unblockUser(user.id)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun SubscriptionView(profile: com.keeftalk.chat.domain.model.Profile?, onUpgradeClick: () -> Unit) {
     val plan = profile?.planType ?: com.keeftalk.chat.domain.model.SubscriptionPlan.FREE
     val used = profile?.storageUsed ?: 0L
-    val limit = profile?.storageLimit ?: (5L * 1024 * 1024 * 1024)
+    val limit = profile?.storageLimit ?: plan.storageLimit
     val usedGb = used.toFloat() / (1024 * 1024 * 1024)
     val limitGb = limit.toFloat() / (1024 * 1024 * 1024)
     val isOverQuota = used > limit
@@ -446,21 +779,21 @@ fun SubscriptionView(profile: com.keeftalk.chat.domain.model.Profile?, onUpgrade
         StoragePulseCard(used = usedGb, total = limitGb, isOverQuota = isOverQuota)
         
         MembershipStatusCard(
-            planName = "Keeftalk ${plan.name.split("_")[0].lowercase().replaceFirstChar { it.uppercase() }}", 
+            planName = "Keeftalk ${plan.displayName}", 
             active = plan != com.keeftalk.chat.domain.model.SubscriptionPlan.FREE,
             onClick = onUpgradeClick
         )
         
-        AccountControlSection(title = "${plan.name.split("_")[0].lowercase().replaceFirstChar { it.uppercase() }} Advantages") {
+        AccountControlSection(title = "${plan.displayName} Advantages") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AdvantageItem("End-to-End Encryption (E2EE)")
                 AdvantageItem("Hardware-Backed Account Keys")
-                AdvantageItem("${if (limitGb >= 1000) (limitGb/1024).toInt().toString() + "TB" else limitGb.toInt().toString() + "GB"} High-Speed Cloud Storage")
+                AdvantageItem("${plan.formatStorageLimit()} High-Speed Cloud Storage")
+                AdvantageItem("${plan.formatMaxFileSize()} Max Upload Size")
                 AdvantageItem("Unlimited Module Sync (Vault, Notes)")
                 AdvantageItem("Priority Community Support")
                 if (plan != com.keeftalk.chat.domain.model.SubscriptionPlan.FREE) {
                     AdvantageItem("Original Quality Media")
-                    AdvantageItem("Larger File Sharing")
                 }
             }
         }
@@ -507,7 +840,7 @@ fun StoragePulseCard(used: Float, total: Float, isOverQuota: Boolean = false) {
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("${(used / total * 100).toInt()}% consumed", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = if (isOverQuota) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-                Text("${if (total >= 1000) (total).toInt().toString() + "GB" else total.toInt().toString() + "GB"} total", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${if (total >= 1024) "%.1f TB".format(total/1024) else "%.0f GB".format(total)} total", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -589,8 +922,8 @@ fun AdvantageItem(text: String) {
         }
     }
 }
-@Composable fun PremiumTextField(value: String, label: String, icon: ImageVector, singleLine: Boolean = true, minLines: Int = 1) {
-    OutlinedTextField(value = value, onValueChange = {}, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), leadingIcon = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }, singleLine = singleLine, minLines = minLines)
+@Composable fun PremiumTextField(value: String, label: String, icon: ImageVector, singleLine: Boolean = true, minLines: Int = 1, onValueChange: (String) -> Unit) {
+    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), leadingIcon = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }, singleLine = singleLine, minLines = minLines)
 }
 @Composable fun StatusIndicator(text: String, success: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
@@ -599,8 +932,8 @@ fun AdvantageItem(text: String) {
         Text(text, color = if (success) Color(0xFF2ECC71) else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
     }
 }
-@Composable fun SecureField(label: String) {
-    OutlinedTextField(value = "••••••••", onValueChange = {}, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), leadingIcon = { Icon(Icons.Rounded.Lock, null, modifier = Modifier.size(20.dp)) })
+@Composable fun SecureField(value: String, label: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), leadingIcon = { Icon(Icons.Rounded.Lock, null, modifier = Modifier.size(20.dp)) })
 }
 @Composable fun StatusCard(title: String, color: Color, icon: ImageVector) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = color.copy(alpha = 0.1f), border = BorderStroke(1.dp, color.copy(alpha = 0.2f))) {
@@ -609,11 +942,11 @@ fun AdvantageItem(text: String) {
         }
     }
 }
-@Composable fun PremiumToggleItem(title: String, subtitle: String, checked: Boolean) {
+@Composable fun PremiumToggleItem(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit = {}) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium); Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Switch(checked = checked, onCheckedChange = {}, modifier = Modifier.scale(0.8f))
+            Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = Modifier.scale(0.8f))
         }
     }
 }
@@ -631,13 +964,13 @@ fun AdvantageItem(text: String) {
         Column(modifier = Modifier.padding(16.dp)) { Text(title, fontWeight = FontWeight.Bold, color = if (active) Color(0xFF2ECC71) else MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium); Text(subtitle, style = MaterialTheme.typography.labelSmall) }
     }
 }
-@Composable fun SessionItem(device: String, location: String, isCurrent: Boolean) {
+@Composable fun SessionItem(device: String, location: String, isCurrent: Boolean, onLogout: () -> Unit = {}) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(if (device.contains("Pro")) Icons.Rounded.LaptopMac else Icons.Rounded.Smartphone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(16.dp)); Column(modifier = Modifier.weight(1f)) { Text(device, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium); Text(location, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (isCurrent) Text("Current", color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-            else IconButton({}) { Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+            else IconButton(onClick = onLogout) { Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
         }
     }
 }
@@ -673,12 +1006,12 @@ fun AdvantageItem(text: String) {
 @Composable fun PermissionItem(name: String, granted: Boolean) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(name, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium); Switch(checked = granted, onCheckedChange = {}, modifier = Modifier.graphicsLayer { scaleX = 0.7f; scaleY = 0.7f }) }
 }
-@Composable fun BlockedItem(name: String, identifier: String) {
+@Composable fun BlockedItem(name: String, identifier: String, onUnblock: () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.errorContainer), contentAlignment = Alignment.Center) { Text(name.take(1), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium) }
             Spacer(modifier = Modifier.width(12.dp)); Column(modifier = Modifier.weight(1f)) { Text(name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium); Text(identifier, style = MaterialTheme.typography.labelSmall) }
-            TextButton({}) { Text("Unblock", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) }
+            TextButton(onClick = onUnblock) { Text("Unblock", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall) }
         }
     }
 }
@@ -712,13 +1045,119 @@ fun AdvantageItem(text: String) {
 }
 
 fun AccountSubSetting.toDisplayName(): String = name.split("_").drop(1).joinToString(" ") { it.lowercase().replaceFirstChar { char -> char.uppercase() } }
+
+enum class PinDialogMode { ENABLE, DISABLE, CHANGE }
+
+@Composable
+fun PinEntryDialog(
+    mode: PinDialogMode,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String?) -> Unit
+) {
+    var pin by remember { mutableStateOf("") }
+    var recoveryEmail by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(when(mode) {
+            PinDialogMode.ENABLE -> "Enable Two-Step Verification"
+            PinDialogMode.DISABLE -> "Disable Two-Step Verification"
+            PinDialogMode.CHANGE -> "Change PIN"
+        }) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter a 6-digit PIN that you'll be asked for when you register your phone number with Keeftalk again.")
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pin = it },
+                    label = { Text("6-digit PIN") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (mode == PinDialogMode.ENABLE) {
+                    Text("Optionally add an email address to your account which will be used to reset two-step verification if you forget your PIN.")
+                    OutlinedTextField(
+                        value = recoveryEmail,
+                        onValueChange = { recoveryEmail = it },
+                        label = { Text("Recovery Email (Optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(pin, if (recoveryEmail.isBlank()) null else recoveryEmail) },
+                enabled = pin.length == 6
+            ) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun ChangePasswordDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var current by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change Password") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = current,
+                    onValueChange = { current = it },
+                    label = { Text("Current Password") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = new,
+                    onValueChange = { new = it },
+                    label = { Text("New Password") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    label = { Text("Confirm New Password") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(current, new) },
+                enabled = current.isNotEmpty() && new.isNotEmpty() && new == confirm
+            ) {
+                Text("Update Password")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 fun getIconForSubSetting(setting: AccountSubSetting): ImageVector = when (setting) {
     AccountSubSetting.ID_USER -> Icons.Rounded.AlternateEmail
     AccountSubSetting.ID_NAME -> Icons.Rounded.Badge
     AccountSubSetting.ID_BIO -> Icons.Rounded.Info
     AccountSubSetting.ID_QR -> Icons.Rounded.QrCode2
     AccountSubSetting.SEC_PASS -> Icons.Rounded.Password
-    AccountSubSetting.ID_2FA -> Icons.Rounded.VpnKey
+    AccountSubSetting.SEC_2FA -> Icons.Rounded.VpnKey
+    AccountSubSetting.SEC_APP_LOCK -> Icons.Rounded.LockPerson
     AccountSubSetting.SEC_AEK -> Icons.Rounded.Security
     AccountSubSetting.SEC_SESSIONS -> Icons.Rounded.Devices
     AccountSubSetting.SEC_LOG -> Icons.Rounded.HistoryEdu
@@ -732,6 +1171,8 @@ fun getIconForSubSetting(setting: AccountSubSetting): ImageVector = when (settin
     AccountSubSetting.CLOUD_NOTES -> Icons.Rounded.EditNote
     AccountSubSetting.CLOUD_BACKUP -> Icons.Rounded.CloudSync
     AccountSubSetting.CLOUD_CACHE -> Icons.Rounded.Storage
+    AccountSubSetting.PRIV_VISIBILITY -> Icons.Rounded.Visibility
+    AccountSubSetting.PRIV_INTERACTIONS -> Icons.AutoMirrored.Rounded.Message
     AccountSubSetting.PRIV_PERMS -> Icons.Rounded.Rule
     AccountSubSetting.PRIV_BLOCKED -> Icons.Rounded.Block
     AccountSubSetting.SUB_STORAGE -> Icons.Rounded.Storage
@@ -740,3 +1181,9 @@ fun getIconForSubSetting(setting: AccountSubSetting): ImageVector = when (settin
 fun Modifier.scale(scale: Float): Modifier = this.then(
     Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
 )
+
+fun formatTimestamp(timestamp: Long): String {
+    if (timestamp == 0L) return "Never"
+    val sdf = SimpleDateFormat("MMM d, yyyy HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp))
+}

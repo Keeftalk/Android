@@ -21,15 +21,19 @@ class DataStoreSessionManager(
     }
 
     override suspend fun loadSession(): UserSession {
-        if (isLoaded) {
-            return cachedSession ?: throw IllegalStateException("No session cached")
+        if (isLoaded && cachedSession != null) {
+            return cachedSession!!
         }
         
         com.keeftalk.chat.util.PerformanceProfiler.startStage("Auth: Load Session from Disk")
+        
+        var success = false
         val data = try {
-            kotlinx.coroutines.withTimeout(3000) {
+            val d = kotlinx.coroutines.withTimeout(3000) {
                 prefs.userPreferencesFlow.first().sessionData
             }
+            success = true
+            d
         } catch (e: Exception) {
             Log.e("SessionManager", "Failed to read from DataStore (timeout or error)", e)
             null
@@ -44,11 +48,15 @@ class DataStoreSessionManager(
             }
         } else null
         
-        cachedSession = session
-        isLoaded = true
+        // Only set isLoaded = true if we actually successfully queried the preference (even if it was empty)
+        if (success) {
+            cachedSession = session
+            isLoaded = true
+        }
+        
         com.keeftalk.chat.util.PerformanceProfiler.endStage("Auth: Load Session from Disk", if (session != null) "Found" else "Not found")
         
-        return session ?: throw IllegalStateException("No session found")
+        return session ?: throw IllegalStateException("No session found in storage")
     }
 
     override suspend fun deleteSession() {

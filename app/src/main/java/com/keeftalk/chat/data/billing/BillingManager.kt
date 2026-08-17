@@ -21,7 +21,13 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
 
     private val billingClient = BillingClient.newBuilder(context)
         .setListener(this)
-        .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+        .enablePendingPurchases(
+            PendingPurchasesParams.newBuilder()
+                .enableOneTimeProducts()
+                .enablePrepaidPlans()
+                .build()
+        )
+        .enableAutoServiceReconnection()
         .build()
 
     private val _productDetails = MutableStateFlow<List<ProductDetails>>(emptyList())
@@ -32,6 +38,9 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
 
     private val _isServiceConnected = MutableStateFlow(false)
     val isServiceConnected = _isServiceConnected.asStateFlow()
+
+    private val _isQuerying = MutableStateFlow(false)
+    val isQuerying = _isQuerying.asStateFlow()
 
     init {
         startConnection()
@@ -58,6 +67,8 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     }
 
     private fun queryProductDetails() {
+        Log.d("BillingManager", "Querying product details...")
+        _isQuerying.value = true
         val productList = listOf(
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(PLUS_MONTHLY)
@@ -81,17 +92,53 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             .setProductList(productList)
             .build()
 
-        billingClient.queryProductDetailsAsync(params) { billingResult, details ->
+        billingClient.queryProductDetailsAsync(params) { billingResult, result ->
+            _isQuerying.value = false
             if (billingResult.responseCode == BillingResponseCode.OK) {
-                _productDetails.value = details
+                Log.d("BillingManager", "Products queried successfully: ${result.productDetailsList.size} found")
+                result.productDetailsList.forEach { 
+                    Log.d("BillingManager", "Product: ${it.productId}, Title: ${it.title}")
+                }
+                _productDetails.value = result.productDetailsList
             } else {
-                Log.e("BillingManager", "Failed to query products: ${billingResult.debugMessage}")
+                Log.e("BillingManager", "Failed to query products: ${billingResult.responseCode} - ${billingResult.debugMessage}")
             }
         }
     }
 
     fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails) {
-        val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken ?: return
+        Log.d("BillingManager", "Attempting to launch purchase flow for: ${productDetails.productId}")
+        
+        if (!_isServiceConnected.value) {
+            Log.e("BillingManager", "Cannot launch purchase flow: Billing service not connected")
+            startConnection() // Attempt to reconnect
+            scope.launch {
+                _purchaseEvents.emit(PurchaseResult.Error("Billing service is connecting. Please try again in a moment."))
+            }
+            return
+        }
+
+        val subscriptionOfferDetails = productDetails.subscriptionOfferDetails
+        if (subscriptionOfferDetails.isNullOrEmpty()) {
+            Log.e("BillingManager", "No subscription offer details found for ${productDetails.productId}")
+            scope.launch {
+                _purchaseEvents.emit(PurchaseResult.Error("This plan is currently unavailable (no active offers found)."))
+            }
+            return
+        }
+
+        // Try to find the base plan offer (usually has no offerId) or take the first eligible offer
+        val offerDetails = subscriptionOfferDetails.find { it.offerId == null } 
+            ?: subscriptionOfferDetails.firstOrNull()
+            
+        val offerToken = offerDetails?.offerToken
+        if (offerToken.isNullOrBlank()) {
+            Log.e("BillingManager", "Offer token is null or blank for ${productDetails.productId}")
+            scope.launch {
+                _purchaseEvents.emit(PurchaseResult.Error("Could not initiate purchase: Invalid offer token."))
+            }
+            return
+        }
         
         val productDetailsParamsList = listOf(
             BillingFlowParams.ProductDetailsParams.newBuilder()
@@ -104,7 +151,26 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             .setProductDetailsParamsList(productDetailsParamsList)
             .build()
 
-        billingClient.launchBillingFlow(activity, billingFlowParams)
+        val billingResult = billingClient.launchBillingFlow(activity, billingFlowParams)
+        val responseCode = billingResult.responseCode
+        val debugMessage = billingResult.debugMessage
+        
+        Log.d("BillingManager", "Launch billing flow result: $responseCode $debugMessage")
+        
+        if (responseCode != BillingResponseCode.OK) {
+            val errorMessage = when (responseCode) {
+                BillingResponseCode.USER_CANCELED -> null // Handled in onPurchasesUpdated
+                BillingResponseCode.ITEM_ALREADY_OWNED -> "You already own this subscription."
+                BillingResponseCode.DEVELOPER_ERROR -> "Internal billing error. Please check your account configuration."
+                else -> debugMessage.ifBlank { "Billing error (code $responseCode)" }
+            }
+            
+            errorMessage?.let {
+                scope.launch {
+                    _purchaseEvents.emit(PurchaseResult.Error(it))
+                }
+            }
+        }
     }
 
     override fun onPurchasesUpdated(billingResult: BillingResult, purchases: List<Purchase>?) {
