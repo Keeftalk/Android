@@ -10,7 +10,7 @@ plugins {
 }
 
 android {
-    namespace = "com.keeftalk.chat"
+    namespace = "tn.keeftalk.chat"
     compileSdk = 37
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -34,7 +34,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.keeftalk.chat"
+        applicationId = "tn.keeftalk.chat"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
@@ -134,6 +134,7 @@ dependencies {
     implementation(libs.mlkit.translate)
     implementation(libs.mlkit.language.id)
     implementation(libs.mlkit.face.detection)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.libphonenumber)
     implementation(libs.androidx.compose.adaptive)
     implementation(libs.androidx.compose.adaptive.layout)

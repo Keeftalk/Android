@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.keeftalk.chat.macrobenchmark"
+    namespace = "tn.keeftalk.chat.macrobenchmark"
     compileSdk = 37
 
     defaultConfig {

@@ -1,5 +1,5 @@
-import com.keeftalk.chat.util.TimestampSerializer
-import com.keeftalk.chat.data.local.entities.VaultItemEntity
+import tn.keeftalk.chat.util.TimestampSerializer
+import tn.keeftalk.chat.data.local.entities.VaultItemEntity
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 

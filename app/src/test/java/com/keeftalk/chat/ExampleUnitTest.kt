@@ -1,4 +1,4 @@
-package com.keeftalk.chat
+package tn.keeftalk.chat
 
 import org.junit.Test
 

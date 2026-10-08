@@ -1,8 +1,8 @@
-package com.keeftalk.chat.feature.auth.forgotpassword.viewmodel
+package tn.keeftalk.chat.feature.auth.forgotpassword.viewmodel
 
-import com.keeftalk.chat.domain.model.Profile
-import com.keeftalk.chat.domain.repository.AuthRepository
-import com.keeftalk.chat.feature.auth.forgotpassword.state.ForgotPasswordStep
+import tn.keeftalk.chat.domain.model.Profile
+import tn.keeftalk.chat.domain.repository.AuthRepository
+import tn.keeftalk.chat.feature.auth.forgotpassword.state.ForgotPasswordStep
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -97,6 +97,8 @@ class ForgotPasswordViewModelTest {
         override val isLogged: Flow<Boolean> = flowOf(false)
         override val isEmailVerified: Flow<Boolean> = flowOf(false)
         override val isEncryptionContextAvailable: Flow<Boolean> = flowOf(true)
+
+        override suspend fun complete2FALogin(userId: String, password: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun getAuthenticatedUser(): io.github.jan.supabase.auth.user.UserInfo? = null
 

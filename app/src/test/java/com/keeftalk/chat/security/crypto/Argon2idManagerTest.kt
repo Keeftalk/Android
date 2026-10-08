@@ -1,4 +1,4 @@
-package com.keeftalk.chat.security.crypto
+package tn.keeftalk.chat.security.crypto
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotNull

@@ -1,4 +1,4 @@
-package com.keeftalk.chat.macrobenchmark
+package tn.keeftalk.chat.macrobenchmark
 
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.StartupMode
@@ -15,7 +15,7 @@ class ExampleStartupBenchmark {
 
     @Test
     fun startup() = benchmarkRule.measureRepeated(
-        packageName = "com.keeftalk.chat",
+        packageName = "tn.keeftalk.chat",
         metrics = listOf(androidx.benchmark.macro.StartupTimingMetric()),
         iterations = 5,
         startupMode = StartupMode.COLD

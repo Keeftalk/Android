@@ -1,4 +1,4 @@
-package com.keeftalk.chat.macrobenchmark
+package tn.keeftalk.chat.macrobenchmark
 
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,7 +13,7 @@ class BaselineProfileGenerator {
 
     @Test
     fun generate() = baselineProfileRule.collect(
-        packageName = "com.keeftalk.chat",
+        packageName = "tn.keeftalk.chat",
         includeInStartupProfile = true
     ) {
         pressHome()

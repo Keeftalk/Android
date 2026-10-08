@@ -1,4 +1,4 @@
-package com.keeftalk.chat.util
+package tn.keeftalk.chat.util
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue

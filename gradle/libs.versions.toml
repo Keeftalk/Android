@@ -75,6 +75,7 @@ mlkitBarcodeScanning = "17.3.0"
 mlkitTranslate = "17.0.3"
 mlkitLanguageId = "17.0.6"
 mlkitFaceDetection = "16.1.7"
+mlkitTextRecognition = "16.0.1"
 libphonenumber = "9.0.34"
 biometric = "1.2.0-alpha05"
 composeMarkdown = "0.5.0"
@@ -168,6 +169,7 @@ mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning"
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.ref = "mlkitLanguageId" }
 mlkit-face-detection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFaceDetection" }
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 libphonenumber = { group = "io.michaelrocks", name = "libphonenumber-android", version.ref = "libphonenumber" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "biometric" }
 composeMarkdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }

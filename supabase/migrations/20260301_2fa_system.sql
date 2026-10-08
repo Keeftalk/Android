@@ -1,0 +1,2 @@
+-- Mirror of root supabase_2fa_migration.sql for Supabase CLI migrations workflow
+-- See supabase_2fa_migration.sql for complete details.
