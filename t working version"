@@ -1,0 +1,292 @@
+ .../implementation_plan.artifact.md      |   55 [32m+[m
+ .../task.artifact.md                     |   10 [32m+[m
+ .../implementation_plan.artifact.md      |   46 [32m+[m
+ .../implementation_plan.artifact.md      |   42 [32m+[m
+ .../audit_and_fix_report.artifact.md     |   27 [32m+[m
+ .../audit_and_fix_report.artifact.md     |   57 [32m+[m
+ .idea/appInsightsSettings.xml            |    2 [32m+[m[31m-[m
+ .idea/deploymentTargetSelector.xml       |   19 [32m+[m[31m-[m
+ app/build.gradle.kts                     |    3 [32m+[m[31m-[m
+ app/google-services.json                 |   37 [31m-[m
+ app/proguard-rules.pro                   |    9 [32m+[m
+ app/release/app-arm64-v8a-release.apk    |  Bin [31m0[m -> [32m100516164[m bytes
+ app/release/app-armeabi-v7a-release.apk  |  Bin [31m0[m -> [32m76103152[m bytes
+ app/release/app-x86-release.apk          |  Bin [31m0[m -> [32m105328820[m bytes
+ app/release/app-x86_64-release.apk       |  Bin [31m0[m -> [32m109489330[m bytes
+ .../0/app-arm64-v8a-release.dm           |  Bin [31m0[m -> [32m24307[m bytes
+ .../0/app-armeabi-v7a-release.dm         |  Bin [31m0[m -> [32m24307[m bytes
+ .../0/app-x86-release.dm                 |  Bin [31m0[m -> [32m24307[m bytes
+ .../0/app-x86_64-release.dm              |  Bin [31m0[m -> [32m24307[m bytes
+ .../1/app-arm64-v8a-release.dm           |  Bin [31m0[m -> [32m24582[m bytes
+ .../1/app-armeabi-v7a-release.dm         |  Bin [31m0[m -> [32m24582[m bytes
+ .../1/app-x86-release.dm                 |  Bin [31m0[m -> [32m24582[m bytes
+ .../1/app-x86_64-release.dm              |  Bin [31m0[m -> [32m24582[m bytes
+ app/release/output-metadata.json         |   87 [32m+[m
+ app/src/main/AndroidManifest.xml         |   46 [32m+[m
+ app/src/main/assets/marked.min.js        |    5 [32m+[m
+ app/src/main/assets/mymaps.html          | 2235 [32m+++++++++++[m
+ .../keeftalk/chat/KeeftalkApplication.kt |   14 [32m+[m[31m-[m
+ .../tn/keeftalk/chat/MainActivity.kt     |  387 [32m+[m[31m-[m
+ ...eftalkAbstractAccountAuthenticator.kt |  110 [32m+[m
+ ...eeftalkAccountAuthenticatorService.kt |   19 [32m+[m
+ .../account/KeeftalkAccountSyncHelper.kt |   54 [32m+[m
+ .../chat/data/local/KeeftalkDatabase.kt  |  258 [32m+[m[31m-[m
+ .../data/local/dao/BrowserHistoryDao.kt  |   26 [32m+[m
+ .../chat/data/local/dao/DocDao.kt        |   71 [32m+[m
+ .../chat/data/local/dao/MarketDao.kt     |   62 [32m+[m
+ .../data/local/dao/NativeHabitDao.kt     |    3 [32m+[m
+ .../chat/data/local/dao/SavedPlaceDao.kt |   23 [32m+[m
+ .../data/local/entities/BookEntities.kt  |    1 [32m+[m
+ .../entities/BrowserHistoryEntity.kt     |   13 [32m+[m
+ .../data/local/entities/DocEntities.kt   |   80 [32m+[m
+ .../local/entities/MarketEntities.kt     |   79 [32m+[m
+ .../data/local/entities/ProfileEntity.kt |    3 [32m+[m
+ .../local/entities/SavedPlaceEntity.kt   |   39 [32m+[m
+ .../chat/data/prefs/UserPreferences.kt   |    2 [32m+[m[31m-[m
+ .../chat/data/remote/BookSyncDtos.kt     |  317 [32m++[m
+ .../chat/data/remote/DocSyncDtos.kt      |  300 [32m++[m
+ .../chat/data/remote/UserSettingsDto.kt  |  160 [32m+[m[31m-[m
+ .../AppCustomizationRepositoryImpl.kt    |   63 [32m+[m[31m-[m
+ .../repository/AuthRepositoryImpl.kt     |  121 [32m+[m[31m-[m
+ .../repository/BookRepositoryImpl.kt     |  181 [32m+[m[31m-[m
+ .../repository/CalendarRepositoryImpl.kt |    5 [32m+[m
+ .../repository/ChatRepositoryImpl.kt     |  176 [32m+[m[31m-[m
+ .../data/repository/DocRepositoryImpl.kt |  374 [32m++[m
+ .../repository/FileRepositoryImpl.kt     |   24 [32m+[m[31m-[m
+ .../repository/HabitsRepositoryImpl.kt   |    9 [32m+[m[31m-[m
+ .../repository/ReadingXpRepository.kt    |   45 [32m+[m[31m-[m
+ .../repository/SettingsRepositoryImpl.kt |   18 [32m+[m
+ .../repository/VaultRepositoryImpl.kt    |   19 [32m+[m[31m-[m
+ .../chat/data/service/BackupEngine.kt    |  354 [32m++[m
+ .../chat/data/service/BackupWorker.kt    |   69 [32m+[m
+ .../tn/keeftalk/chat/di/AppModule.kt     |  263 [32m+[m[31m-[m
+ .../domain/engine/EntitlementManager.kt  |  175 [32m+[m
+ .../domain/model/AppCustomization.kt     |   34 [32m+[m[31m-[m
+ .../chat/domain/model/BackupModels.kt    |   63 [32m+[m
+ .../chat/domain/model/BookModels.kt      |    6 [32m+[m[31m-[m
+ .../domain/model/CanonicalLocation.kt    |   17 [32m+[m
+ .../chat/domain/model/DocModels.kt       |   94 [32m+[m
+ .../chat/domain/model/Profile.kt         |    2 [32m+[m
+ .../domain/model/UserFeedSettings.kt     |   13 [32m+[m
+ .../chat/domain/model/UserMapSettings.kt |   12 [32m+[m
+ .../domain/model/UserMarketSettings.kt   |   12 [32m+[m
+ .../chat/domain/model/UserSettings.kt    |    6 [32m+[m
+ .../chat/domain/model/UserSmsSettings.kt |   12 [32m+[m
+ .../domain/model/UserTodoSettings.kt     |   12 [32m+[m
+ .../domain/model/UserVaultSettings.kt    |    6 [32m+[m[31m-[m
+ .../keeftalk/chat/domain/model/Vault.kt  |    1 [32m+[m
+ .../entitlement/EntitlementModels.kt     |   84 [32m+[m
+ .../AppCustomizationRepository.kt        |    1 [32m+[m
+ .../domain/repository/BookRepository.kt  |    3 [32m+[m[31m-[m
+ .../domain/repository/ChatRepository.kt  |    1 [32m+[m
+ .../domain/repository/DocRepository.kt   |   37 [32m+[m
+ .../repository/SettingsRepository.kt     |    6 [32m+[m
+ .../action/ExtensionActionDispatcher.kt  |  111 [32m+[m
+ .../bridge/ExtensionCapabilityBridge.kt  |   34 [32m+[m
+ .../calculator/SalatCalculator.kt        |  165 [32m+[m
+ .../extension/data/StoreRepository.kt    |  354 [32m++[m
+ .../ExtensionDiagnosticsManager.kt       |   68 [32m+[m
+ .../extension/lifecycle/ExtensionHost.kt |  264 [32m++[m
+ .../lifecycle/ExtensionRegistry.kt       |   14 [32m+[m
+ .../lifecycle/InstallationStorage.kt     |   49 [32m+[m
+ .../extension/model/DeclarativeCard.kt   |   42 [32m+[m
+ .../extension/model/DeclarativeScreen.kt |   42 [32m+[m
+ .../chat/extension/model/EmojiPack.kt    |   21 [32m+[m
+ .../extension/model/ExtensionAction.kt   |   26 [32m+[m
+ .../extension/model/ExtensionManifest.kt |   68 [32m+[m
+ .../extension/model/ExtensionType.kt     |   36 [32m+[m
+ .../chat/extension/model/IconPack.kt     |   16 [32m+[m
+ .../model/InstalledExtension.kt          |   20 [32m+[m
+ .../model/SecurityReviewReport.kt        |   38 [32m+[m
+ .../chat/extension/model/SoundPack.kt    |   18 [32m+[m
+ .../chat/extension/model/ThemePack.kt    |   33 [32m+[m
+ .../model/VerificationResult.kt          |   13 [32m+[m
+ .../parser/KtxpManifestParser.kt         |   43 [32m+[m
+ .../parser/KtxpPackageReader.kt          |  165 [32m+[m
+ .../persistence/ExtensionDao.kt          |   28 [32m+[m
+ .../persistence/ExtensionDatabase.kt     |   34 [32m+[m
+ .../persistence/ExtensionEntity.kt       |   61 [32m+[m
+ .../ExtensionStorageManager.kt           |   99 [32m+[m
+ .../DeclarativeScreenRegistry.kt         |   32 [32m+[m
+ .../registry/DictionaryRegistry.kt       |  262 [32m++[m
+ .../registry/EmojiPackRegistry.kt        |   26 [32m+[m
+ .../registry/FeedCardRegistry.kt         |   22 [32m+[m
+ .../registry/FileHandlerRegistry.kt      |   35 [32m+[m
+ .../registry/IconPackRegistry.kt         |   38 [32m+[m
+ .../registry/SoundPackRegistry.kt        |   38 [32m+[m
+ .../extension/registry/ThemeRegistry.kt  |   37 [32m+[m
+ .../renderer/DeclarativeCardRenderer.kt  |  178 [32m+[m
+ .../DeclarativeScreenRenderer.kt         |  251 [32m++[m
+ .../renderer/UnifiedAttachmentViewer.kt  |  109 [32m+[m
+ .../security/ExtensionPermissionGuard.kt |   27 [32m+[m
+ .../PackageSignatureDescriptor.kt        |   13 [32m+[m
+ .../security/PackageVerifier.kt          |  221 [32m++[m
+ .../security/PublisherTrustManager.kt    |   61 [32m+[m
+ .../state/ExtensionStateStore.kt         |   30 [32m+[m
+ .../ui/ExtensionDetailsScreen.kt         |  562 [32m+++[m
+ .../ui/ExtensionReviewScreen.kt          |  278 [32m++[m
+ .../ui/ExtensionSettingsScreen.kt        |  578 [32m+++[m
+ .../extension/ui/ExtensionViewModel.kt   |  266 [32m++[m
+ .../ExtensionScriptInterpreter.kt        |   58 [32m+[m
+ .../extension/workflow/WorkflowEngine.kt |  151 [32m+[m
+ .../KeeftalkFirebaseMessagingService.kt  |  223 [32m+[m[31m-[m
+ .../ui/screens/EmailSettingsScreen.kt    |    9 [32m+[m
+ .../finances/ui/FinancesToolScreens.kt   |    7 [32m+[m
+ .../feature/maps/data/MapProviders.kt    |  102 [32m+[m
+ .../maps/data/MyMapsRepository.kt        |   39 [32m+[m
+ .../chat/feature/maps/ui/MyMapsScreen.kt |  591 [32m+++[m
+ .../feature/maps/ui/MyMapsViewModel.kt   |  137 [32m+[m
+ .../feature/mydin/model/MyDinModels.kt   |  656 [32m++++[m
+ .../mydin/service/MyDinAudioService.kt   |  446 [32m+++[m
+ .../chat/feature/mydin/ui/MyDinScreen.kt | 2672 [32m++++++++++++++[m
+ .../mydin/viewmodel/MyDinViewModel.kt    | 1251 [32m+++++++[m
+ .../autofill/KeeftalkAutofillService.kt  |  178 [32m+[m
+ .../repository/SecretsRepositoryImpl.kt  |   19 [32m+[m[31m-[m
+ .../secrets/ui/SecretsSettingsScreen.kt  |   86 [32m+[m[31m-[m
+ .../crypto/BackupCryptoEngine.kt         |   93 [32m+[m
+ .../crypto/DatabaseKeyManager.kt         |   22 [32m+[m
+ .../tn/keeftalk/chat/ui/LogoutState.kt   |    8 [32m+[m
+ .../tn/keeftalk/chat/ui/MainViewModel.kt |   35 [32m+[m[31m-[m
+ .../chat/ui/books/BooksScreen.kt         |   46 [32m+[m
+ .../chat/ui/books/BooksViewModel.kt      |   96 [32m+[m[31m-[m
+ .../components/BooksSettingsScreen.kt    |   25 [32m+[m
+ .../ui/books/reader/BookReaderScreen.kt  |  600 [32m++[m[31m-[m
+ .../ui/books/reader/ReadMarkerOverlay.kt |    6 [32m+[m[31m-[m
+ .../books/reader/Sessioncelebration.kt   |    2 [32m+[m
+ .../books/reader/TextSelectionToolbar.kt |  170 [32m+[m[31m-[m
+ .../ui/browser/BrowserBottomSheet.kt     |  144 [32m+[m
+ .../ui/browser/BrowserHomeContent.kt     |  826 [32m++[m[31m---[m
+ .../chat/ui/browser/BrowserMenu.kt       |    3 [32m+[m
+ .../chat/ui/browser/BrowserPageView.kt   |  329 [32m+[m[31m-[m
+ .../chat/ui/browser/BrowserScreen.kt     |  163 [32m+[m[31m-[m
+ .../chat/ui/browser/BrowserViewModel.kt  |  129 [32m+[m[31m-[m
+ .../chat/ui/call/IncomingCallActivity.kt |   15 [32m+[m[31m-[m
+ .../chat/ui/components/AdaptiveFab.kt    |   91 [32m+[m[31m-[m
+ .../chat/ui/components/KeeftalkTopBar.kt |    6 [32m+[m[31m-[m
+ .../keeftalk/chat/ui/docs/DocsScreen.kt  |  529 [32m+++[m
+ .../chat/ui/docs/DocsViewModel.kt        |  138 [32m+[m
+ .../components/DocThumbnailGenerator.kt  |   70 [32m+[m
+ .../ui/docs/sheets/DocSettingsSheet.kt   |  176 [32m+[m
+ .../viewer/DocAssetDownloadManager.kt    |  128 [32m+[m
+ .../ui/docs/viewer/DocFormatParsers.kt   |  637 [32m++++[m
+ .../ui/docs/viewer/DocViewerScreen.kt    | 1144 [32m++++++[m
+ .../ui/docs/viewer/DocViewerViewModel.kt |  152 [32m+[m
+ .../ui/docs/viewer/MermaidDiagramView.kt |  249 [32m++[m
+ .../viewer/MermaidDownloadManager.kt     |   27 [32m+[m
+ .../chat/ui/emoji/EmojiPicker.kt         |   11 [32m+[m[31m-[m
+ .../keeftalk/chat/ui/feed/FeedScreen.kt  |   40 [32m+[m[31m-[m
+ .../chat/ui/feed/FeedViewModel.kt        |   21 [32m+[m[31m-[m
+ .../components/ArticleImageSlideshow.kt  |    2 [32m+[m[31m-[m
+ .../ui/feed/components/ArticleReader.kt  |   74 [32m+[m[31m-[m
+ .../components/ArticleReaderModal.kt     |    4 [32m+[m[31m-[m
+ .../chat/ui/habits/HabitsViewModel.kt    |    4 [32m+[m
+ .../chat/ui/market/MarketRepository.kt   |   26 [32m+[m[31m-[m
+ .../chat/ui/screens/CallViewModel.kt     |   17 [32m+[m[31m-[m
+ .../ui/screens/ChatDetailViewModel.kt    |    9 [32m+[m
+ .../ui/screens/LocationDetailScreen.kt   |   51 [32m+[m[31m-[m
+ .../ui/screens/LocationPickerScreen.kt   |  196 [32m+[m[31m-[m
+ .../ui/screens/NativeNoteEditorScreen.kt |  821 [32m++[m[31m--[m
+ .../ui/screens/NoteEditorViewModel.kt    |  814 [32m++[m[31m--[m
+ .../ui/screens/UnifiedNotesViewModel.kt  |    1 [31m-[m
+ .../chatdetail/ChatMessageBubbles.kt     |   72 [32m+[m[31m-[m
+ .../screens/editor/NoteRichTextUtils.kt  |  115 [32m+[m[31m-[m
+ .../ui/screens/editor/Richtextengine.kt  |  295 [32m++[m
+ .../editor/components/NoteBlockEditor.kt |  336 [32m+[m[31m-[m
+ .../editor/components/TextBlockEditor.kt |  236 [32m++[m
+ .../chat/ui/screens/todo/TodoScreen.kt   |   27 [32m+[m[31m-[m
+ .../ui/screens/todo/TodoViewModel.kt     |    4 [32m+[m
+ .../ui/settings/AccountSettingsScreen.kt |  224 [32m+[m[31m-[m
+ .../settings/AppCustomizationScreen.kt   |   19 [32m+[m[31m-[m
+ .../AppCustomizationViewModel.kt         |    8 [32m+[m[31m-[m
+ .../ui/settings/BackupRestoreScreen.kt   |  362 [32m++[m
+ .../ui/settings/BooksSettingsScreen.kt   |   21 [32m+[m
+ .../ui/settings/BrowserSettingsScreen.kt |   11 [32m+[m[31m-[m
+ .../settings/CalendarSettingsScreen.kt   |   10 [32m+[m
+ .../ui/settings/CallSettingsScreen.kt    |    9 [32m+[m
+ .../ui/settings/DisplaySettingsScreen.kt |   72 [32m+[m[31m-[m
+ .../ui/settings/FeedSettingsScreen.kt    |  127 [32m+[m
+ .../ui/settings/HabitSettingsScreen.kt   |    9 [32m+[m
+ .../chat/ui/settings/HelpScreen.kt       |    8 [32m+[m[31m-[m
+ .../ui/settings/MapSettingsScreen.kt     |   98 [32m+[m
+ .../ui/settings/MarketSettingsScreen.kt  |   98 [32m+[m
+ .../ui/settings/NoteSettingsScreen.kt    |   10 [32m+[m
+ .../SecurityPrivacyCenterScreen.kt       |   78 [32m+[m
+ .../ui/settings/SettingsComponents.kt    |    6 [32m+[m[31m-[m
+ .../chat/ui/settings/SettingsScreen.kt   |  139 [32m+[m[31m-[m
+ .../ui/settings/SettingsViewModel.kt     |   76 [32m+[m[31m-[m
+ .../ui/settings/SmsSettingsScreen.kt     |   81 [32m+[m
+ .../settings/SubscriptionPlansScreen.kt  |  134 [32m+[m[31m-[m
+ .../settings/TimeOnKeeftalkViewModel.kt  |    1 [32m+[m
+ .../ui/settings/TodoSettingsScreen.kt    |  107 [32m+[m
+ .../components/FeatureCloudSyncCard.kt   |  180 [32m+[m
+ .../chat/ui/theme/LucideIcons.kt         |   19 [32m+[m
+ .../tn/keeftalk/chat/ui/theme/Theme.kt   |   92 [32m+[m[31m-[m
+ .../chat/ui/theme/keef/KeefHomeView.kt   |   29 [32m+[m
+ .../chat/ui/vault/VaultComponents.kt     |  197 [32m+[m[31m-[m
+ .../chat/ui/vault/VaultMediaViewer.kt    |  148 [32m+[m[31m-[m
+ .../chat/ui/vault/VaultScreen.kt         |   87 [32m+[m[31m-[m
+ .../chat/ui/vault/VaultViewModel.kt      |   35 [32m+[m[31m-[m
+ .../chat/util/FileUploadManager.kt       |    4 [32m+[m[31m-[m
+ .../chat/util/PersistentAvatarManager.kt |   25 [32m+[m[31m-[m
+ .../chat/util/SoundEffectManager.kt      |   67 [32m+[m
+ .../NotificationChannelManager.kt        |   12 [32m+[m[31m-[m
+ .../NotificationDispatcher.kt            |   48 [32m+[m[31m-[m
+ .../drawable/ic_launcher_background.png  |  Bin [31m14249[m -> [32m237900[m bytes
+ app/src/main/res/drawable/ic_logo.png    |  Bin [31m0[m -> [32m159652[m bytes
+ .../main/res/drawable/ic_splash_fab.xml  |   27 [32m+[m[31m-[m
+ .../main/res/drawable/ic_splash_logo.xml |   13 [32m+[m
+ .../any_other_notification_use_this.mp3  |  Bin [31m0[m -> [32m74396[m bytes
+ .../res/raw/get_called_ring_ringtone.mp3 |  Bin [31m0[m -> [32m137926[m bytes
+ ...ng_inside_app_and_not_inside_chat.mp3 |  Bin [31m0[m -> [32m83591[m bytes
+ .../message_receiving_inside_chat.mp3    |  Bin [31m0[m -> [32m33024[m bytes
+ .../message_seen_while_inside_chat.mp3   |  Bin [31m0[m -> [32m33024[m bytes
+ .../raw/message_sending_inside_chat.mp3  |  Bin [31m0[m -> [32m33024[m bytes
+ ...ly_reading_goal_done_sound_effect.mp3 |  Bin [31m0[m -> [32m154368[m bytes
+ ...ew_nudged_bell_notification_sound.mp3 |  Bin [31m0[m -> [32m96966[m bytes
+ app/src/main/res/raw/ringback_tone.mp3   |  Bin [31m0[m -> [32m600960[m bytes
+ app/src/main/res/values/themes.xml       |    2 [32m+[m[31m-[m
+ app/src/main/res/xml/authenticator.xml   |    6 [32m+[m
+ .../res/xml/autofill_service_config.xml  |    4 [32m+[m
+ .../KeeftalkAccountAuthenticatorTest.kt  |   13 [32m+[m
+ .../chat/auth/SessionLifecycleTest.kt    |   18 [32m+[m[31m-[m
+ .../data/local/DatabaseBackupTest.kt     |   64 [32m+[m
+ .../chat/data/local/MigrationTest.kt     |   67 [32m+[m
+ .../repository/BookRepositorySyncTest.kt |  181 [32m+[m
+ .../repository/DocRepositorySyncTest.kt  |  132 [32m+[m
+ .../repository/HabitsRepositoryTest.kt   |    1 [32m+[m
+ .../PersistenceIntegrationTest.kt        |  109 [32m+[m
+ .../data/service/BackupEngineTest.kt     |   61 [32m+[m
+ .../BookHabitIntegrationManagerTest.kt   |    1 [32m+[m
+ .../engine/EntitlementManagerTest.kt     |   66 [32m+[m
+ .../extension/DictionaryRegistryTest.kt  |   56 [32m+[m
+ .../ExtensionPermissionGuardTest.kt      |   37 [32m+[m
+ .../ExtensionScriptInterpreterTest.kt    |   18 [32m+[m
+ .../ExtensionStorageManagerTest.kt       |   40 [32m+[m
+ .../extension/KtxpManifestParserTest.kt  |   76 [32m+[m
+ .../extension/KtxpPackageReaderTest.kt   |  107 [32m+[m
+ .../extension/PackageVerifierTest.kt     |   98 [32m+[m
+ .../extension/SalatCalculatorTest.kt     |   37 [32m+[m
+ .../extension/SampleKtxpGeneratorTest.kt | 1364 [32m+++++++[m
+ .../chat/extension/WorkflowEngineTest.kt |   77 [32m+[m
+ .../feature/mydin/MyDinViewModelTest.kt  |   99 [32m+[m
+ .../secrets/SecretsRepositoryTest.kt     |    3 [32m+[m
+ fix_all_5xx_errors.sql                   |   82 [32m+[m
+ fix_family_members_recursion.sql         |   47 [32m+[m
+ .../any_other_notification_use_this.mp3  |  Bin [31m0[m -> [32m74396[m bytes
+ .../get_called_ring-ringtone.mp3         |  Bin [31m0[m -> [32m137926[m bytes
+ ...ng_inside_App and not inside chat.mp3 |  Bin [31m0[m -> [32m83591[m bytes
+ .../message_receiving_inside_chat.mp3    |  Bin [31m0[m -> [32m33024[m bytes
+ .../message_seen while inside chat.mp3   |  Bin [31m0[m -> [32m33024[m bytes
+ .../message_sending_inside_chat.mp3      |  Bin [31m0[m -> [32m33024[m bytes
+ ...ily_readin_goal-done sound effect.mp3 |  Bin [31m0[m -> [32m154368[m bytes
+ ...ew-nudged-bell_notification_sound.mp3 |  Bin [31m0[m -> [32m96966[m bytes
+ sound effects/ringback tone.mp3          |  Bin [31m0[m -> [32m600960[m bytes
+ .../functions/fcm-dispatcher/index.ts    |  236 [32m++[m
+ supabase/functions/store-api/index.ts    |  342 [32m++[m
+ .../20260305_extension_store.sql         |  208 [32m++[m
+ .../20260306_user_books_sync.sql         |  167 [32m+[m
+ .../20260308_user_docs_sync.sql          |  106 [32m+[m
+ supabase_app_customization_migration.sql |   55 [32m+[m
+ supabase_browser_migration.sql           |   36 [32m+[m
+ supabase_redeem_codes_migration.sql      |  165 [32m+[m
+ 291 files changed, 32174 insertions(+), 2503 deletions(-)

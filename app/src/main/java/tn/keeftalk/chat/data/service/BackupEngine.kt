@@ -168,7 +168,7 @@ class BackupEngine(
                 backupId = UUID.randomUUID().toString(),
                 accountId = accountId,
                 timestamp = System.currentTimeMillis(),
-                appVersion = "0.3-Alpha",
+                appVersion = "0.9-Alpha",
                 selectedCategories = selectedCategories.toList(),
                 recordCounts = recordCounts,
                 schemaVersion = database.openHelper.readableDatabase.version,

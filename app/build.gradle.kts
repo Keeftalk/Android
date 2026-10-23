@@ -37,8 +37,8 @@ android {
         applicationId = "tn.keeftalk.chat"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.3-Alpha"
+        versionCode = 9
+        versionName = "0.9-Alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         signingConfig = signingConfigs.getByName("release")
