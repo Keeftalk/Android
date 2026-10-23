@@ -20,6 +20,7 @@ import tn.keeftalk.chat.domain.repository.MediaRepository
 import tn.keeftalk.chat.ui.screens.chatdetail.formatDateSeparatorInternal
 import tn.keeftalk.chat.ui.screens.chatdetail.isDifferentDay
 import tn.keeftalk.chat.util.VoiceRecorder
+import tn.keeftalk.chat.util.SoundEffectManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -197,6 +198,7 @@ class ChatDetailViewModel(
     fun getMessage(id: String): Flow<Message?> = repository.getMessage(id)
 
     fun sendMessage(content: String, replyToId: String? = null) {
+        SoundEffectManager.playMediaSound(getApplication(), SoundEffectManager.RES_MSG_SENDING)
         viewModelScope.launch { 
             val isMarkdownCode = content.contains("'''")
             val isLongCode = !isMarkdownCode && content.length > 500 && (
@@ -229,6 +231,7 @@ class ChatDetailViewModel(
     }
 
     fun retryMessage(message: Message) {
+        SoundEffectManager.playMediaSound(getApplication(), SoundEffectManager.RES_MSG_SENDING)
         _failedMessage.value = null
         viewModelScope.launch {
             repository.sendMessage(chatId, message.content, message.type, message.localFilePath, message.replyToId)
@@ -256,6 +259,7 @@ class ChatDetailViewModel(
     }
 
     fun sendMedia(type: MessageType, uri: String) {
+        SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_MSG_SENDING)
         viewModelScope.launch { repository.sendMessage(chatId, "", type, uri) }
     }
 
@@ -290,6 +294,7 @@ class ChatDetailViewModel(
             return
         }
         
+        SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_MSG_SENDING)
         viewModelScope.launch {
             items.forEach { item ->
                 // Note: In a real app, we might pass the quality from _mediaQualityMap to the upload pipeline
@@ -307,6 +312,7 @@ class ChatDetailViewModel(
             sendMessage(caption)
             return
         }
+        SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_MSG_SENDING)
         viewModelScope.launch {
             val type = if (item.isVideo) MessageType.VIDEO else MessageType.IMAGE
             repository.sendMessage(chatId, caption, type, item.uri.toString())
@@ -318,6 +324,7 @@ class ChatDetailViewModel(
     fun sendEditedMedia(items: List<EditorModel>) {
         if (items.isEmpty()) return
         
+        SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_MSG_SENDING)
         viewModelScope.launch {
             for (editorModel in items) {
                 val mediaItem = editorModel.mediaItem
@@ -403,6 +410,7 @@ class ChatDetailViewModel(
         val file = currentVoiceFile ?: return
         _recordingState.value = VoiceRecordingState.SENDING
         
+        SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_MSG_SENDING)
         viewModelScope.launch {
             repository.sendMessage(chatId, "", MessageType.VOICE, file.absolutePath)
             resetRecordingUI()
@@ -429,6 +437,7 @@ class ChatDetailViewModel(
 
         if (lastReadSentMessageId != message.id) {
             lastReadSentMessageId = message.id
+            SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_MSG_SEEN_CHAT)
             viewModelScope.launch {
                 repository.sendReadReceipt(chatId, message.id)
             }

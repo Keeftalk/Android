@@ -40,6 +40,7 @@ val FEATURE_SPECS = listOf(
     FeatureSpec("EMAIL", "My E-Mail", "mail", "#B388FF"),
     FeatureSpec("FEED", "My Feed", "rss", "#00CCCC"),
     FeatureSpec("BOOKS", "My Books", "book", "#5B6CF0"),
+    FeatureSpec("MY_DIN", "My Din", "mosque", "#00CCCC"),
     FeatureSpec("MARKET", "My Market", "shopping", "#FF6FB5"),
     FeatureSpec("HABITS", "My Habits", "check", "#8BE04E"),
     FeatureSpec("BROWSER", "My Browser", "globe", "#3D9BFF"),

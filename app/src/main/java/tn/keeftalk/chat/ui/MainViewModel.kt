@@ -381,14 +381,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
+    private val _logoutState = MutableStateFlow<LogoutState>(LogoutState.Idle)
+    val logoutState: StateFlow<LogoutState> = _logoutState
+
     fun logout() {
+        showLogoutConfirmation()
+    }
+
+    fun showLogoutConfirmation() {
+        _logoutState.value = LogoutState.Confirming
+    }
+
+    fun confirmLogout() {
         viewModelScope.launch {
-            authRepository.logout()
-            // Reset internal state
-            _isHydrated.value = false
-            _startupState.value = StartupState.Ready(false)
-            // The activity will handle final cleanup/restart if needed
+            _logoutState.value = LogoutState.Deleting
+            val result = authRepository.logout()
+            if (result.isSuccess) {
+                _logoutState.value = LogoutState.Idle
+                // Reset internal state
+                _isHydrated.value = false
+                _startupState.value = StartupState.Ready(false)
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Failed to wipe cached data and tokens completely."
+                _logoutState.value = LogoutState.Error(errorMsg)
+            }
         }
+    }
+
+    fun dismissLogout() {
+        _logoutState.value = LogoutState.Idle
+    }
+
+    fun dismissLogoutError() {
+        _logoutState.value = LogoutState.Idle
     }
 
     fun onStartupComplete() {

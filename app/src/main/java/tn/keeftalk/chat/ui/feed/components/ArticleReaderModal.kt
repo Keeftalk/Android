@@ -268,7 +268,9 @@ fun ArticleReaderModal(
                         Spacer(modifier = Modifier.height(18.dp))
 
                         // Render Complete Article Content & Description
-                        val contentHtml = article.content ?: article.description ?: ""
+                        val contentHtml = article.content?.takeIf { it.isNotBlank() } 
+                            ?: article.description?.takeIf { it.isNotBlank() } 
+                            ?: "<p>${article.title}. Read the complete story on the original publisher website by tapping below.</p>"
                         ReaderHtmlContent(
                             html = contentHtml,
                             description = if (article.content != null && article.content != article.description) article.description else null,

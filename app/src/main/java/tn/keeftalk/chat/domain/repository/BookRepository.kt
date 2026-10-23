@@ -34,8 +34,9 @@ interface BookRepository {
     suspend fun getAllSessions(): List<BookReadingSession>
     suspend fun recordReadingSession(session: BookReadingSession)
 
-    // Settings
+    // Settings & Cloud Sync
     fun getBookSettingsFlow(): Flow<BookSettings>
     suspend fun getBookSettings(): BookSettings
     suspend fun updateBookSettings(settings: BookSettings)
+    suspend fun syncBooksWithCloud()
 }

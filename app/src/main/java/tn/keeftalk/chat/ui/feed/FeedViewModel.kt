@@ -100,17 +100,14 @@ class FeedViewModel(
         _prayerDayIndex,
         _prayerCoordinates
     ) { prefs, dayIdx, coords ->
-        if (coords == null) {
-            emptyList()
-        } else {
-            calculateDailyPrayerTimes(
-                latitude = coords.first,
-                longitude = coords.second,
-                methodName = prefs.prayerCalculationMethod,
-                madhhabName = prefs.prayerAsrMadhhab,
-                dayOffset = dayIdx
-            )
-        }
+        val activeCoords = coords ?: Pair(36.8065, 10.1815) // Default offline fallback (Tunis)
+        calculateDailyPrayerTimes(
+            latitude = activeCoords.first,
+            longitude = activeCoords.second,
+            methodName = prefs.prayerCalculationMethod,
+            madhhabName = prefs.prayerAsrMadhhab,
+            dayOffset = dayIdx
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Verse of the Day State
@@ -266,7 +263,7 @@ class FeedViewModel(
 
     fun selectArticle(article: FeedArticle?) {
         _selectedArticle.value = article
-        if (article != null && !article.isExtracted) {
+        if (article != null && (!article.isExtracted || article.content.isNullOrBlank() || article.content == article.title)) {
             viewModelScope.launch {
                 try {
                     val full = feedRepository.getFullArticle(article.id)

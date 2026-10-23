@@ -18,6 +18,12 @@ interface SettingsRepository {
     suspend fun updateParentalControls(update: (tn.keeftalk.chat.domain.model.UserParentalControls) -> tn.keeftalk.chat.domain.model.UserParentalControls): Result<Unit>
     suspend fun updateBrowserSettings(update: (tn.keeftalk.chat.domain.model.UserBrowserSettings) -> tn.keeftalk.chat.domain.model.UserBrowserSettings): Result<Unit>
     suspend fun updateHabitSettings(update: (tn.keeftalk.chat.domain.model.UserHabitSettings) -> tn.keeftalk.chat.domain.model.UserHabitSettings): Result<Unit>
+    suspend fun updateFeedSettings(update: (tn.keeftalk.chat.domain.model.UserFeedSettings) -> tn.keeftalk.chat.domain.model.UserFeedSettings): Result<Unit>
+    suspend fun updateBookSettings(update: (tn.keeftalk.chat.domain.model.BookSettings) -> tn.keeftalk.chat.domain.model.BookSettings): Result<Unit>
+    suspend fun updateMarketSettings(update: (tn.keeftalk.chat.domain.model.UserMarketSettings) -> tn.keeftalk.chat.domain.model.UserMarketSettings): Result<Unit>
+    suspend fun updateSmsSettings(update: (tn.keeftalk.chat.domain.model.UserSmsSettings) -> tn.keeftalk.chat.domain.model.UserSmsSettings): Result<Unit>
+    suspend fun updateTodoSettings(update: (tn.keeftalk.chat.domain.model.UserTodoSettings) -> tn.keeftalk.chat.domain.model.UserTodoSettings): Result<Unit>
+    suspend fun updateMapSettings(update: (tn.keeftalk.chat.domain.model.UserMapSettings) -> tn.keeftalk.chat.domain.model.UserMapSettings): Result<Unit>
     
     // Tools & Management
     suspend fun getCacheSize(): Map<String, Long>

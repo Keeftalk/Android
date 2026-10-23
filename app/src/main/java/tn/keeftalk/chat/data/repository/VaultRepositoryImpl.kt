@@ -552,8 +552,12 @@ class VaultRepositoryImpl(
             vaultDao.getAllItems(),
             authRepository.currentUserProfile
         ) { trashBytes, allItems, profile ->
-            // --- SSOT: Cloud Storage truth is in the profile's storageUsed field ---
-            val cloudTotal = profile?.storageUsed ?: 0L
+            // --- SSOT: Cloud Storage truth is in the profile's storageUsed field, with fallback to actual vault items ---
+            val calculatedVaultBytes = allItems.sumOf { item -> 
+                (item.file.fileSize ?: 0L) + (item.file.thumbnailSize ?: 0L)
+            }
+            val profileStorageUsed = profile?.storageUsed ?: 0L
+            val cloudTotal = maxOf(profileStorageUsed, calculatedVaultBytes)
             val trashTotal = trashBytes ?: 0L
             val domainItems = allItems.map { it.toDomain() }
             val count = domainItems.size
@@ -582,7 +586,8 @@ class VaultRepositoryImpl(
                 localCacheBytesUsed = getLocalCacheSize(),
                 trashBytesUsed = trashTotal,
                 itemsCount = count,
-                categories = vaultCategories
+                categories = vaultCategories,
+                planType = profile?.planType ?: SubscriptionPlan.FREE
             )
         }
     }
@@ -657,8 +662,12 @@ class VaultRepositoryImpl(
                     }
                 }
                 
-                // Bulk insert items
-                vaultDao.insertItems(remoteItems)
+                // Only insert items whose files actually exist locally to avoid FOREIGN KEY constraint violations
+                val availableFileIds = fileDao.getAllFileIds().toSet()
+                val validItems = remoteItems.filter { it.fileId in availableFileIds }
+                if (validItems.isNotEmpty()) {
+                    vaultDao.insertItems(validItems)
+                }
             }
             
             Result.success(Unit)

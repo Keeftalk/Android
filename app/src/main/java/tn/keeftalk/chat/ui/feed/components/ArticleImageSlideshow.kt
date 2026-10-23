@@ -43,7 +43,7 @@ fun ArticleImageSlideshow(
     if (images.size > 1) {
         LaunchedEffect(images) {
             while (true) {
-                delay(5000)
+                delay(4000)
                 val nextPage = (pagerState.currentPage + 1) % images.size
                 pagerState.animateScrollToPage(nextPage)
             }

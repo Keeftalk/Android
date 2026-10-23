@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import tn.keeftalk.chat.di.AppModule
 import tn.keeftalk.chat.domain.model.EnvironmentalCalculators
 import tn.keeftalk.chat.ui.MainViewModel
 import tn.keeftalk.chat.ui.theme.keef.KeefAdaptiveFab
@@ -45,6 +47,29 @@ fun DisplaySettingsScreen(
     val scope = rememberCoroutineScope()
     var showDialogPreview by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val themeRegistry = remember(context) {
+        try {
+            AppModule.provideExtensionHost(context).registry.themeRegistry
+        } catch (_: Exception) {
+            null
+        }
+    }
+    val installedThemes = remember(themeRegistry) {
+        themeRegistry?.getInstalledThemes() ?: emptyList()
+    }
+    val globalAppThemes = remember(installedThemes) {
+        installedThemes.filter { pack ->
+            !pack.isReaderThemeOnly &&
+            pack.id != "dark" &&
+            pack.id != "twilight" &&
+            pack.id != "paper" &&
+            pack.id != "sepia" &&
+            pack.id != "sepiap"
+        }
+    }
+    val activeCustomTheme by (themeRegistry?.activeCustomTheme?.collectAsState() ?: remember { mutableStateOf(null) })
+
     Scaffold(
         topBar = {
             SettingsHeader(title = "Display", onBack = onBack)
@@ -62,24 +87,55 @@ fun DisplaySettingsScreen(
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             ThemeOption(
                                 title = "System Default",
-                                selected = prefs.themeMode == "SYSTEM",
-                                onClick = { scope.launch { viewModel.updateThemeMode("SYSTEM") } }
+                                selected = prefs.themeMode == "SYSTEM" && activeCustomTheme == null,
+                                onClick = {
+                                    themeRegistry?.setActiveTheme(null)
+                                    scope.launch { viewModel.updateThemeMode("SYSTEM") }
+                                }
                             )
                             ThemeOption(
                                 title = "Light",
-                                selected = prefs.themeMode == "LIGHT",
-                                onClick = { scope.launch { viewModel.updateThemeMode("LIGHT") } }
+                                selected = prefs.themeMode == "LIGHT" && activeCustomTheme == null,
+                                onClick = {
+                                    themeRegistry?.setActiveTheme(null)
+                                    scope.launch { viewModel.updateThemeMode("LIGHT") }
+                                }
                             )
                             ThemeOption(
                                 title = "Dark",
-                                selected = prefs.themeMode == "DARK",
-                                onClick = { scope.launch { viewModel.updateThemeMode("DARK") } }
+                                selected = prefs.themeMode == "DARK" && activeCustomTheme == null,
+                                onClick = {
+                                    themeRegistry?.setActiveTheme(null)
+                                    scope.launch { viewModel.updateThemeMode("DARK") }
+                                }
                             )
                             ThemeOption(
                                 title = "Keef Theme (Dynamic Sky UI)",
-                                selected = prefs.themeMode == "KEEF",
-                                onClick = { scope.launch { viewModel.updateThemeMode("KEEF") } }
+                                selected = prefs.themeMode == "KEEF" && activeCustomTheme == null,
+                                onClick = {
+                                    themeRegistry?.setActiveTheme(null)
+                                    scope.launch { viewModel.updateThemeMode("KEEF") }
+                                }
                             )
+                            if (globalAppThemes.isNotEmpty()) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                Text(
+                                    text = "Installed Custom Themes",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                )
+                                globalAppThemes.forEach { themePack ->
+                                    ThemeOption(
+                                        title = themePack.name,
+                                        selected = activeCustomTheme?.id == themePack.id,
+                                        onClick = {
+                                            themeRegistry?.setActiveTheme(themePack.id)
+                                            scope.launch { viewModel.updateThemeMode(themePack.id) }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

@@ -61,6 +61,7 @@ class FakeBookRepository : BookRepository {
     override fun getBookSettingsFlow() = flowOf(tn.keeftalk.chat.domain.model.BookSettings())
     override suspend fun getBookSettings() = tn.keeftalk.chat.domain.model.BookSettings()
     override suspend fun updateBookSettings(settings: tn.keeftalk.chat.domain.model.BookSettings) {}
+    override suspend fun syncBooksWithCloud() {}
     override fun getAllBooksFlow() = flowOf(emptyList<tn.keeftalk.chat.domain.model.Book>())
     override suspend fun getAllBooks() = emptyList<tn.keeftalk.chat.domain.model.Book>()
     override suspend fun getBookById(id: String) = null

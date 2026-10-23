@@ -16,6 +16,12 @@ data class UserSettings(
     val parentalControls: UserParentalControls = UserParentalControls(),
     val browserSettings: UserBrowserSettings = UserBrowserSettings(),
     val habitSettings: UserHabitSettings = UserHabitSettings(),
+    val feedSettings: UserFeedSettings = UserFeedSettings(),
+    val bookSettings: BookSettings = BookSettings(),
+    val marketSettings: UserMarketSettings = UserMarketSettings(),
+    val smsSettings: UserSmsSettings = UserSmsSettings(),
+    val todoSettings: UserTodoSettings = UserTodoSettings(),
+    val mapSettings: UserMapSettings = UserMapSettings(),
     val updatedAt: Long = System.currentTimeMillis()
 )
 

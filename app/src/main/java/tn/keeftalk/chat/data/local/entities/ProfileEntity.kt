@@ -31,6 +31,7 @@ data class ProfileEntity(
     @ColumnInfo(name = "family_id") val familyId: String?,
     @ColumnInfo(name = "last_name_change_at", defaultValue = "0") val lastNameChangeAt: Long = 0L,
     @ColumnInfo(name = "phone_verified", defaultValue = "0") val phoneVerified: Boolean = false,
+    @ColumnInfo(name = "total_xp", defaultValue = "0") val totalXp: Long = 0L,
     // Privacy settings flattened
     @ColumnInfo(name = "avatar_visibility") val avatarVisibility: String,
     @ColumnInfo(name = "cover_visibility") val coverVisibility: String,
@@ -64,6 +65,7 @@ fun ProfileEntity.toDomain() = Profile(
     familyId = familyId,
     lastNameChangeAt = lastNameChangeAt,
     phoneVerified = phoneVerified,
+    totalXp = totalXp,
     privacy = PrivacySettings(
         avatarVisibility = avatarVisibility,
         coverVisibility = coverVisibility,
@@ -102,6 +104,7 @@ fun Profile.toEntity() = ProfileEntity(
     familyId = familyId,
     lastNameChangeAt = lastNameChangeAt,
     phoneVerified = phoneVerified,
+    totalXp = totalXp,
     avatarVisibility = privacy.avatarVisibility,
     coverVisibility = privacy.coverVisibility,
     phoneVisibility = privacy.phoneVisibility,

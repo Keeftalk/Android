@@ -7,6 +7,7 @@ import tn.keeftalk.chat.domain.model.CallState
 import tn.keeftalk.chat.domain.repository.CallSession
 import tn.keeftalk.chat.domain.repository.ChatRepository
 import tn.keeftalk.chat.util.CallManager
+import tn.keeftalk.chat.util.SoundEffectManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.webrtc.Camera1Enumerator
@@ -62,6 +63,7 @@ class CallViewModel(
 
     fun onPermissionsGranted() {
         _permissionsGranted.value = true
+        setupWebRTC()
     }
 
     private fun observeConnectionState() {
@@ -96,10 +98,17 @@ class CallViewModel(
                 }
                 if (session?.state == CallState.ENDED) {
                     cleanup()
-                } else if (session?.state == CallState.OUTGOING_RINGING || session?.state == CallState.INCOMING_RINGING || session?.state == CallState.CONNECTING || session?.state == CallState.ACTIVE_CALL) {
-                    viewModelScope.launch {
-                        _permissionsGranted.first { it }
-                        setupWebRTC()
+                } else {
+                    if (session?.state == CallState.INCOMING_RINGING) {
+                        SoundEffectManager.playNotificationSound(getApplication(), SoundEffectManager.RES_INCOMING_RING, isRing = true)
+                    } else if (session?.state == CallState.OUTGOING_RINGING) {
+                        SoundEffectManager.playNotificationSound(getApplication(), SoundEffectManager.RES_RINGBACK_TONE, isRing = true)
+                    }
+                    if (session?.state == CallState.OUTGOING_RINGING || session?.state == CallState.INCOMING_RINGING || session?.state == CallState.CONNECTING || session?.state == CallState.ACTIVE_CALL) {
+                        viewModelScope.launch {
+                            _permissionsGranted.first { it }
+                            setupWebRTC()
+                        }
                     }
                 }
             }

@@ -11,6 +11,7 @@ import tn.keeftalk.chat.data.repository.HabitsRepositoryImpl
 import tn.keeftalk.chat.domain.engine.HabitEngine
 import tn.keeftalk.chat.domain.model.habit.*
 import tn.keeftalk.chat.domain.repository.HabitsRepository
+import tn.keeftalk.chat.util.SoundEffectManager
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -346,6 +347,9 @@ class HabitsViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleCheckIn(habitId: String, completed: Boolean) {
+        if (completed) {
+            SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_GOAL_DONE)
+        }
         viewModelScope.launch {
             val today = engine.today()
             repository.setCheckIn(habitId, today, completed)

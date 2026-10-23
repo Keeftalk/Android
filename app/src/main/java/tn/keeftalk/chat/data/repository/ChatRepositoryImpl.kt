@@ -203,6 +203,7 @@ class ChatRepositoryImpl(
                 Log.i("CHAT_PIPELINE", "REALTIME_SUBSCRIBE_START")
                 val userId = getCurrentUserId() ?: run {
                     Log.w("CHAT_PIPELINE", "REALTIME_SUBSCRIBE_FAILURE | reason=no_user")
+                    isObservingRealtime = false
                     return@launch
                 }
                 val supabase = getSupabase()
@@ -322,6 +323,7 @@ class ChatRepositoryImpl(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 Log.e("CHAT_PIPELINE", "REALTIME_SUBSCRIBE_FAILURE | error=${e.message}")
+                isObservingRealtime = false
             }
         }
     }
@@ -371,8 +373,18 @@ class ChatRepositoryImpl(
                         }
                     }
                     if (batch.isNotEmpty()) {
-                        processMessageBatch(batch)
-                        batch.clear()
+                        try {
+                            processMessageBatch(batch)
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            Log.e(TAG, "Error in message batcher batch: ${e.message}, falling back to individual processing")
+                            batch.forEach { item ->
+                                runCatching { processMessageBatch(listOf(item)) }
+                                    .onFailure { Log.e(TAG, "Poison message skipped/failed: ${it.message}") }
+                            }
+                        } finally {
+                            batch.clear()
+                        }
                     }
                 } catch (e: Exception) {
                     if (e !is CancellationException) {
@@ -1503,30 +1515,56 @@ class ChatRepositoryImpl(
     }
 
 
+    private suspend fun uploadGroupAvatarToPrivateBucket(chatId: String, avatarUrl: String): String? {
+        if (!avatarUrl.startsWith("content://") && !avatarUrl.startsWith("file://") && !avatarUrl.startsWith("/")) {
+            return avatarUrl
+        }
+        return try {
+            val uri = android.net.Uri.parse(avatarUrl)
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val ext = if (mimeType.contains("png", ignoreCase = true)) "png" else "jpg"
+            val bytes = if (avatarUrl.startsWith("/")) {
+                File(avatarUrl).readBytes()
+            } else {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+            }
+
+            val adminSupabase = getAdminSupabase()
+            val bucketName = tn.keeftalk.chat.util.StorageConfig.BUCKET_PRIVATE // "keeftalk-private"
+            try {
+                adminSupabase.storage.createBucket(bucketName) { public = false }
+            } catch (_: Exception) {}
+
+            val bucket = adminSupabase.storage[bucketName]
+            val objectKey = "groupchats/$chatId/avatars/avatar.$ext"
+
+            // Upsert = true creates if not exist and supports replace (overwrite)
+            bucket.upload(objectKey, bytes) { upsert = true }
+            Log.d(TAG, "Group avatar successfully stored in R2 bucket '$bucketName' at path '$objectKey'")
+            objectKey
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to upload group avatar to keeftalk-private", e)
+            null
+        }
+    }
+
+    override suspend fun updateGroupAvatar(chatId: String, avatarUrl: String) {
+        val finalAvatarUrl = uploadGroupAvatarToPrivateBucket(chatId, avatarUrl) ?: avatarUrl
+        val supabase = getSupabase()
+        supabase.postgrest["chats"].update(mapOf("avatar_url" to finalAvatarUrl)) {
+            filter { eq("id", chatId) }
+        }
+        fetchAndCacheChatInfo(chatId)
+    }
+
     override suspend fun createGroup(name: String, memberIds: List<String>, avatarUrl: String?): String {
         val currentUserId = getCurrentUserId() ?: throw Exception("Unauthorized")
         val chatId = UUID.randomUUID().toString()
         val supabase = getSupabase()
         
         var finalAvatarUrl = avatarUrl
-        
-        if (avatarUrl != null && (avatarUrl.startsWith("content://") || avatarUrl.startsWith("file://"))) {
-            try {
-                val uri = avatarUrl.toUri()
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                if (bytes != null) {
-                    val adminSupabase = getAdminSupabase()
-                    val bucketName = tn.keeftalk.chat.util.StorageConfig.BUCKET_PUBLIC
-                    try { adminSupabase.storage.createBucket(bucketName) { public = true } } catch (_: Exception) {}
-                    
-                    val bucket = adminSupabase.storage[bucketName]
-                    val remotePath = tn.keeftalk.chat.util.StorageConfig.buildUserKey(currentUserId, "avatars", "group_${chatId}_${System.currentTimeMillis()}.jpg")
-                    bucket.upload(remotePath, bytes) { upsert = true }
-                    finalAvatarUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(remotePath)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to upload group avatar", e)
-            }
+        if (!avatarUrl.isNullOrEmpty()) {
+            finalAvatarUrl = uploadGroupAvatarToPrivateBucket(chatId, avatarUrl) ?: avatarUrl
         }
 
         try {
@@ -1909,26 +1947,55 @@ class ChatRepositoryImpl(
         return callId
     }
 
-    override suspend fun acceptCall(callId: String) { updateCallState(callId, CallState.CONNECTING) }
+    override suspend fun acceptCall(callId: String) {
+        try {
+            updateCallState(callId, CallState.CONNECTING)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to accept call $callId", e)
+        }
+    }
     override suspend fun endCall(callId: String) {
-        val session = getSupabase().postgrest["call_sessions"].select { filter { eq("id", callId) } }.decodeSingleOrNull<JsonObject>()
-        if (session != null) {
-            val state = session["state"]?.jsonPrimitive?.content; val chatId = session["chat_id"]?.jsonPrimitive?.content; val callType = session["type"]?.jsonPrimitive?.content ?: "voice"
-            if (state == "calling" || state == "ringing") chatId?.let { sendMessage(it, "Missed ${if (callType.uppercase() == "VIDEO") "video call" else "voice call"}", MessageType.CALL_LOG) }
+        try {
+            val session = getSupabase().postgrest["call_sessions"].select { filter { eq("id", callId) } }.decodeSingleOrNull<JsonObject>()
+            if (session != null) {
+                val state = session["state"]?.jsonPrimitive?.content; val chatId = session["chat_id"]?.jsonPrimitive?.content; val callType = session["type"]?.jsonPrimitive?.content ?: "voice"
+                if (state == "calling" || state == "ringing") chatId?.let { 
+                    try {
+                        sendMessage(it, "Missed ${if (callType.uppercase() == "VIDEO") "video call" else "voice call"}", MessageType.CALL_LOG)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to send missed call message", e)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch session in endCall for $callId", e)
         }
         updateCallState(callId, CallState.ENDED)
     }
 
     override suspend fun updateCallState(callId: String, state: CallState) {
         val dbState = when (state) { CallState.IDLE -> "idle"; CallState.OUTGOING_RINGING -> "calling"; CallState.INCOMING_RINGING -> "calling"; CallState.CONNECTING -> "ringing"; CallState.ACTIVE_CALL -> "connected"; CallState.RECONNECTING -> "connected"; CallState.ENDED -> "ended" }
-        try { getSupabase().postgrest["call_sessions"].update({ set("state", dbState); if (state == CallState.ENDED) set("ended_at", formatToIso(System.currentTimeMillis())) }) { filter { eq("id", callId) } } } catch (e: Exception) {}
+        try { 
+            getSupabase().postgrest["call_sessions"].update({ 
+                set("state", dbState)
+                if (state == CallState.ENDED) set("ended_at", formatToIso(System.currentTimeMillis())) 
+            }) { 
+                filter { eq("id", callId) } 
+            } 
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update call state for callId $callId to $dbState ($state)", e)
+        }
     }
 
     override suspend fun sendCallSignaling(callId: String, type: String, payload: String) {
         val currentUserId = getCurrentUserId() ?: return
         val dbType = when(type.uppercase()) { "OFFER" -> "offer"; "ANSWER" -> "answer"; "ICE_CANDIDATE" -> "ice-candidate"; else -> type.lowercase() }
         val jsonPayload = try { Json.parseToJsonElement(payload) } catch (e: Exception) { JsonPrimitive(payload) }
-        try { getSupabase().postgrest["call_signaling"].insert(buildJsonObject { put("call_id", callId); put("sender_id", currentUserId); put("type", dbType); put("payload", jsonPayload) }) } catch (e: Exception) {}
+        try { 
+            getSupabase().postgrest["call_signaling"].insert(buildJsonObject { put("call_id", callId); put("sender_id", currentUserId); put("type", dbType); put("payload", jsonPayload) }) 
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send call signaling $type", e)
+        }
     }
 
     override fun getCallSignaling(callId: String): Flow<CallSignaling> = flow {
@@ -1941,7 +2008,7 @@ class ChatRepositoryImpl(
                 val payloadString = when (val p = data["payload"]) { is JsonObject, is JsonArray -> p.toString(); is JsonPrimitive -> p.content; else -> p?.toString() ?: "" }
                 trySend(CallSignaling(data["id"]?.jsonPrimitive?.content ?: "", callId, data["sender_id"]?.jsonPrimitive?.content ?: "", type, payloadString))
             }
-            launch { try { supabase.postgrest["call_signaling"].select { filter { eq("call_id", callId) } }.decodeList<JsonObject>().forEach { handleSignaling(it) } } catch (e: Exception) {} }
+            launch { try { supabase.postgrest["call_signaling"].select { filter { eq("call_id", callId) } }.decodeList<JsonObject>().forEach { handleSignaling(it) } } catch (e: Exception) { Log.e(TAG, "Failed to fetch signaling history", e) } }
             freshChannel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") { table = "call_signaling" }.filter { it.record["call_id"]?.jsonPrimitive?.content == callId }.onEach { handleSignaling(it.record) }.launchIn(this)
             launch { freshChannel.subscribe() }
             awaitClose { launch { try { freshChannel.unsubscribe(); supabase.realtime.removeChannel(freshChannel) } catch (_: Exception) {} } }
@@ -1954,7 +2021,18 @@ class ChatRepositoryImpl(
         val freshChannel = supabase.realtime.channel("session_$callId")
         val currentUserId = getCurrentUserId()
         val sessionFlow = callbackFlow {
-            suspend fun fetch() { try { supabase.postgrest["call_sessions"].select { filter { eq("id", callId) } }.decodeSingleOrNull<JsonObject>()?.let { val dbState = it["state"]!!.jsonPrimitive.content; val callerId = it["caller_id"]!!.jsonPrimitive.content; val state = if (dbState == "calling" && callerId != currentUserId) CallState.INCOMING_RINGING else dbState.toCallState(); trySend(CallSession(it["id"]!!.jsonPrimitive.content, it["chat_id"]!!.jsonPrimitive.content, it["caller_id"]!!.jsonPrimitive.content, it["receiver_id"]!!.jsonPrimitive.content, it["type"]!!.jsonPrimitive.content, state, 0L)) } } catch (e: Exception) {} }
+            suspend fun fetch() { 
+                try { 
+                    supabase.postgrest["call_sessions"].select { filter { eq("id", callId) } }.decodeSingleOrNull<JsonObject>()?.let { 
+                        val dbState = it["state"]!!.jsonPrimitive.content
+                        val callerId = it["caller_id"]!!.jsonPrimitive.content
+                        val state = if (dbState == "calling" && callerId != currentUserId) CallState.INCOMING_RINGING else dbState.toCallState()
+                        trySend(CallSession(it["id"]!!.jsonPrimitive.content, it["chat_id"]!!.jsonPrimitive.content, it["caller_id"]!!.jsonPrimitive.content, it["receiver_id"]!!.jsonPrimitive.content, it["type"]!!.jsonPrimitive.content, state, 0L)) 
+                    } 
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to fetch call session $callId", e)
+                } 
+            }
             launch { fetch() }; freshChannel.postgresChangeFlow<PostgresAction.Update>(schema = "public") { table = "call_sessions" }.filter { it.record["id"]?.jsonPrimitive?.content == callId }.onEach { fetch() }.launchIn(this)
             launch { freshChannel.subscribe() }
             awaitClose { launch { try { freshChannel.unsubscribe(); supabase.realtime.removeChannel(freshChannel) } catch (_: Exception) {} } }
@@ -1968,7 +2046,13 @@ class ChatRepositoryImpl(
         val channelId = "incoming_calls_${currentUserId}_${java.util.UUID.randomUUID().toString().take(8)}"
         val freshChannel = supabase.realtime.channel(channelId)
         val callFlow = callbackFlow {
-            suspend fun fetchActiveCalls() { try { supabase.postgrest["call_sessions"].select { filter { eq("receiver_id", currentUserId); or { eq("state", "calling"); eq("state", "ringing") } } }.decodeList<JsonObject>().forEach { data -> trySend(CallSession(data["id"]!!.jsonPrimitive.content, data["chat_id"]!!.jsonPrimitive.content, data["caller_id"]!!.jsonPrimitive.content, data["receiver_id"]!!.jsonPrimitive.content, data["type"]!!.jsonPrimitive.content, CallState.INCOMING_RINGING, 0L)) } } catch (e: Exception) {} }
+            suspend fun fetchActiveCalls() { 
+                try { 
+                    supabase.postgrest["call_sessions"].select { filter { eq("receiver_id", currentUserId); or { eq("state", "calling"); eq("state", "ringing") } } }.decodeList<JsonObject>().forEach { data -> trySend(CallSession(data["id"]!!.jsonPrimitive.content, data["chat_id"]!!.jsonPrimitive.content, data["caller_id"]!!.jsonPrimitive.content, data["receiver_id"]!!.jsonPrimitive.content, data["type"]!!.jsonPrimitive.content, CallState.INCOMING_RINGING, 0L)) } 
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to fetch active incoming calls", e)
+                } 
+            }
             launch { fetchActiveCalls() }
             freshChannel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") { table = "call_sessions" }.filter { it.record["receiver_id"]?.jsonPrimitive?.content == currentUserId && (it.record["state"]?.jsonPrimitive?.content == "calling" || it.record["state"]?.jsonPrimitive?.content == "ringing") }.onEach { action ->
                 val data = action.record; val callId = data["id"]!!.jsonPrimitive.content; val chatId = data["chat_id"]!!.jsonPrimitive.content; val type = data["type"]!!.jsonPrimitive.content
@@ -1995,20 +2079,30 @@ class ChatRepositoryImpl(
     }
 
     private fun String.toCallState(): CallState = when (this.lowercase()) { "calling" -> CallState.OUTGOING_RINGING; "ringing" -> CallState.CONNECTING; "connected" -> CallState.ACTIVE_CALL; "ended" -> CallState.ENDED; else -> CallState.IDLE }
-    private val notificationSettingsCache = mutableMapOf<String, ChatNotificationSettings>()
-    private val messageStatusCache = mutableMapOf<String, MessageStatus?>()
-    private fun getCachedMessageStatus(status: String?): MessageStatus? { if (status == null) return null; return messageStatusCache.getOrPut(status.uppercase()) { try { MessageStatus.valueOf(status.uppercase()) } catch (e: Exception) { null } } }
+    private val notificationSettingsCache = java.util.concurrent.ConcurrentHashMap<String, ChatNotificationSettings>()
+    private val messageStatusCache = java.util.concurrent.ConcurrentHashMap<String, MessageStatus>()
+    private fun getCachedMessageStatus(status: String?): MessageStatus? {
+        if (status == null) return null
+        val upper = status.uppercase()
+        return messageStatusCache[upper] ?: try {
+            val res = MessageStatus.valueOf(upper)
+            messageStatusCache[upper] = res
+            res
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private fun ChatEntity.toDomainInternal(): Chat {
         val settings = notificationSettingsJson?.let { json -> 
-            notificationSettingsCache.getOrPut(json) { 
-                try { 
-                    Json.decodeFromString<ChatNotificationSettings>(json) 
-                } catch (e: Exception) { 
-                    Log.e(TAG, "Failed to decode notification settings", e)
-                    ChatNotificationSettings() 
-                } 
-            } 
+            notificationSettingsCache[json] ?: try {
+                val decoded = Json.decodeFromString<ChatNotificationSettings>(json)
+                notificationSettingsCache[json] = decoded
+                decoded
+            } catch (e: Exception) { 
+                Log.e(TAG, "Failed to decode notification settings", e)
+                ChatNotificationSettings() 
+            }
         } ?: ChatNotificationSettings()
         
         val threadMetadata = tn.keeftalk.chat.util.ThreadMetadata.fromBlob(metadata)

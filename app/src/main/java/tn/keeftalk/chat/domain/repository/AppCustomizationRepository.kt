@@ -7,6 +7,7 @@ interface AppCustomizationRepository {
     val customization: Flow<AppCustomization>
     fun startCustomizationObservation()
     suspend fun updateCustomization(customization: AppCustomization): Result<Unit>
+    suspend fun syncCustomization(): Result<Unit>
     suspend fun resetToDefault(): Result<Unit>
 
     fun shutdown()

@@ -107,8 +107,24 @@ class SessionLifecycleTest {
         val authRepo = FakeLifecycleAuthRepository(initialLogged = true, initialVerified = true)
 
         assertTrue(authRepo.isLogged.first())
-        authRepo.logout()
+        val result = authRepo.logout()
 
+        assertTrue(result.isSuccess)
         assertFalse("User should no longer be logged in after explicit logout", authRepo.isLogged.first())
+    }
+
+    @Test
+    fun testLogout_idempotency() = runTest {
+        val authRepo = FakeLifecycleAuthRepository(initialLogged = true, initialVerified = true)
+
+        assertTrue(authRepo.isLogged.first())
+        val firstLogout = authRepo.logout()
+        assertTrue(firstLogout.isSuccess)
+        assertFalse(authRepo.isLogged.first())
+
+        // Second logout call should be idempotent and succeed
+        val secondLogout = authRepo.logout()
+        assertTrue("Repeated logout call must be idempotent and succeed", secondLogout.isSuccess)
+        assertFalse(authRepo.isLogged.first())
     }
 }

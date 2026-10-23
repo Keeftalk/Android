@@ -25,11 +25,18 @@ class HabitsRepositoryImpl(
 ) : HabitsRepository {
 
     private suspend fun getUserId(): String {
-        return runCatching {
+        val uid = runCatching {
             val ctx = context ?: return@runCatching "local_user"
             val supabase: SupabaseClient = AppModule.provideSupabaseClientAsync(ctx)
             supabase.auth.currentUserOrNull()?.id ?: "local_user"
         }.getOrDefault("local_user")
+
+        if (uid != "local_user") {
+            try {
+                nativeHabitDao.associateLocalHabits(uid)
+            } catch (_: Exception) {}
+        }
+        return uid
     }
 
     override fun observeHabits(): Flow<List<Habit>> {

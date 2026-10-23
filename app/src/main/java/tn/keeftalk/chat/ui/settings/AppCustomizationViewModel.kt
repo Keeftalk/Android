@@ -81,6 +81,9 @@ class AppCustomizationViewModel(
         updateCustomization(current.copy(bottomNavTabs = list))
     }
 
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
     fun toggleIsEnabled() {
         val current = customization.value
         updateCustomization(current.copy(isEnabled = !current.isEnabled))
@@ -98,8 +101,9 @@ class AppCustomizationViewModel(
 
     fun manualSync() {
         viewModelScope.launch {
-            // This would trigger a manual fetch in Repo
-            // For now, Repo automatically observes, but we could add a force fetch
+            _isSyncing.value = true
+            repository.syncCustomization()
+            _isSyncing.value = false
         }
     }
 

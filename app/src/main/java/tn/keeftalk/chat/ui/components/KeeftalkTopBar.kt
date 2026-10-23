@@ -177,11 +177,11 @@ fun KeeftalkFeatureTopBar(
                                 badge = { 
                                     Box(
                                         modifier = Modifier
-                                            .size(10.dp)
-                                            .background(tn.keeftalk.chat.ui.theme.FabGradient, androidx.compose.foundation.shape.CircleShape),
+                                            .size(12.dp)
+                                            .background(Color(0xFFEF4444), androidx.compose.foundation.shape.CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(unreadCount.toString(), fontSize = 6.sp, color = Color.White)
+                                        Text(unreadCount.toString(), fontSize = 7.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             ) {

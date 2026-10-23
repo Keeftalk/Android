@@ -16,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.sync.Mutex
@@ -47,8 +46,12 @@ class AppCustomizationRepositoryImpl(
 
     override fun startCustomizationObservation() {
         repositoryScope.launch {
-            delay(3.seconds)
             val supabase = getSupabase()
+            val currentUserId = supabase.auth.currentUserOrNull()?.id
+            if (currentUserId != null) {
+                fetchAndObserveCustomization(currentUserId)
+            }
+
             supabase.auth.sessionStatus
                 .map { supabase.auth.currentUserOrNull()?.id }
                 .distinctUntilChanged()
@@ -72,9 +75,10 @@ class AppCustomizationRepositoryImpl(
                 _customization.value = domain
                 prefs.updateAppCustomization(domain)
             } else {
-                val default = AppCustomization.default(userId)
-                supabase.postgrest["user_app_customization"].upsert(UserAppCustomizationDto.fromDomain(default))
-                _customization.value = default
+                val localWithUserId = _customization.value.copy(userId = userId)
+                supabase.postgrest["user_app_customization"].upsert(UserAppCustomizationDto.fromDomain(localWithUserId))
+                _customization.value = localWithUserId
+                prefs.updateAppCustomization(localWithUserId)
             }
         } catch (e: Exception) {
             Log.e("AppCustomizationRepo", "Failed to fetch customization", e)
@@ -112,15 +116,56 @@ class AppCustomizationRepositoryImpl(
 
     override suspend fun updateCustomization(customization: AppCustomization): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val userId = customization.userId
-            if (userId.isNotEmpty() && customization.syncEnabled) {
-                val dto = UserAppCustomizationDto.fromDomain(customization)
-                getSupabase().postgrest["user_app_customization"].upsert(dto)
+            val supabase = getSupabase()
+            val resolvedUserId = customization.userId.ifEmpty {
+                supabase.auth.currentUserOrNull()?.id ?: ""
             }
-            _customization.value = customization
-            prefs.updateAppCustomization(customization)
+            val targetCustomization = if (resolvedUserId.isNotEmpty() && customization.userId != resolvedUserId) {
+                customization.copy(userId = resolvedUserId)
+            } else {
+                customization
+            }
+
+            if (resolvedUserId.isNotEmpty() && targetCustomization.syncEnabled) {
+                val dto = UserAppCustomizationDto.fromDomain(targetCustomization)
+                supabase.postgrest["user_app_customization"].upsert(dto)
+            }
+
+            _customization.value = targetCustomization
+            prefs.updateAppCustomization(targetCustomization)
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("AppCustomizationRepo", "Failed to update customization remotely", e)
+            _customization.value = customization
+            prefs.updateAppCustomization(customization)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun syncCustomization(): Result<Unit> = withContext(Dispatchers.IO) {
+        val supabase = getSupabase()
+        val userId = supabase.auth.currentUserOrNull()?.id
+            ?: _customization.value.userId.takeIf { it.isNotEmpty() }
+            ?: return@withContext Result.failure(Exception("User not authenticated"))
+
+        try {
+            val remote = supabase.postgrest["user_app_customization"]
+                .select { filter { eq("user_id", userId) } }
+                .decodeSingleOrNull<UserAppCustomizationDto>()
+
+            if (remote != null) {
+                val domain = remote.toDomain()
+                _customization.value = domain
+                prefs.updateAppCustomization(domain)
+            } else {
+                val currentWithUserId = _customization.value.copy(userId = userId)
+                supabase.postgrest["user_app_customization"].upsert(UserAppCustomizationDto.fromDomain(currentWithUserId))
+                _customization.value = currentWithUserId
+                prefs.updateAppCustomization(currentWithUserId)
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("AppCustomizationRepo", "Failed manual sync", e)
             Result.failure(e)
         }
     }

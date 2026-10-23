@@ -9,6 +9,15 @@
 
 # Add any custom keep rules here.
 
+# SQLCipher ProGuard rules
+-keep class net.sqlcipher.** {
+    *;
+}
+-keep class net.sqlcipher.database.** {
+    *;
+}
+-dontwarn net.sqlcipher.**
+
 -dontwarn com.microsoft.device.display.DisplayMask
 -dontwarn edu.umd.cs.findbugs.annotations.NonNull
 -dontwarn edu.umd.cs.findbugs.annotations.Nullable

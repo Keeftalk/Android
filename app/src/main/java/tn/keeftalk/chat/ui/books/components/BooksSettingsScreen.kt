@@ -58,6 +58,31 @@ fun BooksSettingsScreen(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.BOOKS,
+                description = "Sync your books, reading progress, bookmarks, and reading data.",
+                onEnableClick = { },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Cloud Synchronization Toggle Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("CLOUD SYNCHRONIZATION", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SettingsSwitchRow(
+                        title = "Sync books across devices",
+                        caption = "Automatically back up and restore your reading progress, bookmarks, and settings",
+                        checked = currentSettings.syncAcrossDevices,
+                        onCheckedChange = { update(currentSettings.copy(syncAcrossDevices = it)) }
+                    )
+                }
+            }
             // Read Marker Settings Group
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

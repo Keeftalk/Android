@@ -2,6 +2,7 @@ package tn.keeftalk.chat.ui.books.reader
 
 import android.graphics.Bitmap
 import android.widget.Toast
+import tn.keeftalk.chat.extension.registry.DictionaryLookupResult
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -22,18 +23,28 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -221,6 +232,28 @@ private fun Modifier.zoomPanGestures(
     }
 }
 
+enum class ReaderTimerMode {
+    COUNTDOWN,
+    STOPWATCH
+}
+
+fun formatReaderTimerTime(totalSeconds: Int): String {
+    val hrs = totalSeconds / 3600
+    val mins = (totalSeconds % 3600) / 60
+    val secs = totalSeconds % 60
+    return if (hrs > 0) {
+        String.format(java.util.Locale.US, "%02d:%02d:%02d", hrs, mins, secs)
+    } else {
+        String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
+    }
+}
+
+fun isRtlText(text: String): Boolean {
+    if (text.isBlank()) return false
+    val rtlRegex = Regex("[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
+    return rtlRegex.containsMatchIn(text)
+}
+
 @OptIn(DelicateCoroutinesApi::class)
 @Composable
 fun BookReaderScreen(
@@ -286,6 +319,35 @@ fun BookReaderScreen(
     var autoCropMargins by remember { mutableStateOf(true) }
     var showReaderSettingsSheet by remember { mutableStateOf(false) }
 
+    // ---- Reading Timer / Pomodoro state ---------------------------------------------
+    var timerMode by remember { mutableStateOf(ReaderTimerMode.COUNTDOWN) }
+    var countdownPresetMinutes by remember { mutableIntStateOf(25) }
+    var timerSecondsRemaining by remember { mutableIntStateOf(25 * 60) }
+    var stopwatchSecondsElapsed by remember { mutableIntStateOf(0) }
+    var isTimerRunning by remember { mutableStateOf(false) }
+    var showTimerFinishedDialog by remember { mutableStateOf(false) }
+
+    // Timer tick loop
+    LaunchedEffect(isTimerRunning, timerMode) {
+        while (isTimerRunning) {
+            delay(1000L)
+            if (timerMode == ReaderTimerMode.COUNTDOWN) {
+                if (timerSecondsRemaining > 0) {
+                    timerSecondsRemaining--
+                    if (timerSecondsRemaining == 0) {
+                        isTimerRunning = false
+                        showTimerFinishedDialog = true
+                    }
+                } else {
+                    isTimerRunning = false
+                    showTimerFinishedDialog = true
+                }
+            } else {
+                stopwatchSecondsElapsed++
+            }
+        }
+    }
+
     // ---- Zoom & pan (applies only to the currently settled page) ---------------------------
     var zoomScale by remember { mutableFloatStateOf(1f) }
     var panOffsetX by remember { mutableFloatStateOf(0f) }
@@ -294,6 +356,10 @@ fun BookReaderScreen(
     // ---- Selection state ---------------------------------------------------------------------
     var pdfSelectionState by remember { mutableStateOf<PdfSelectionState?>(null) }
     var showNoteEditorSheet by remember { mutableStateOf(false) }
+    var showDictionarySheet by remember { mutableStateOf(false) }
+    var dictionaryResult by remember { mutableStateOf<DictionaryLookupResult?>(null) }
+    var dictionaryLookupWord by remember { mutableStateOf("") }
+    var hasInstalledDictionary by remember { mutableStateOf(false) }
 
     val dwellTracker = remember { PageDwellTracker() }
 
@@ -380,6 +446,23 @@ fun BookReaderScreen(
         }
     }
 
+    // ---- RTL Language Detection & Reading Direction -------------------------------
+    val detectedIsRtl = remember(book.title, book.author, epubParagraphs) {
+        isRtlText(book.title) ||
+        isRtlText(book.author) ||
+        epubParagraphs.take(5).any { isRtlText(it) }
+    }
+
+    val isRtlReading = when (bookSettings.readingDirection) {
+        "RTL" -> true
+        "LTR" -> false
+        else -> detectedIsRtl // "AUTO"
+    }
+
+    var showRtlPromptDialog by remember(detectedIsRtl, bookSettings.hasSeenRtlPrompt) {
+        mutableStateOf(detectedIsRtl && !bookSettings.hasSeenRtlPrompt)
+    }
+
     // ---- PDF renderer manager ----------------------------------------------------------------
     val pdfManager = remember(book.filePath) {
         if (isPdf && book.filePath.isNotEmpty()) PdfRendererManager(book.filePath) else null
@@ -457,10 +540,12 @@ fun BookReaderScreen(
         pageProgress.filter { it.isRead }.map { it.pageNumber }.toHashSet()
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(activeTheme.bg)
+    val layoutDirection = if (isRtlReading) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(activeTheme.bg)
             // Initial pass = we only watch, never consume, so no other gesture is affected
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -793,6 +878,17 @@ fun BookReaderScreen(
                     Toast.makeText(context, if (newQuote) "Saved as quote" else "Quote removed", Toast.LENGTH_SHORT).show()
                 },
                 onOpenNoteEditor = { showNoteEditorSheet = true },
+                onLookupDictionary = { text ->
+                    val host = try { tn.keeftalk.chat.di.AppModule.provideExtensionHost(context) } catch (_: Exception) { null }
+                    val dictRegistry = host?.registry?.dictionaryRegistry
+                    val installedDicts = dictRegistry?.installedDictionaries?.value ?: emptyList()
+                    val res = dictRegistry?.lookupWord(text)
+
+                    dictionaryLookupWord = text
+                    dictionaryResult = res
+                    hasInstalledDictionary = installedDicts.isNotEmpty()
+                    showDictionarySheet = true
+                },
                 onColorSelected = { hex ->
                     commitHighlight(sel, color = hex)
                     Toast.makeText(context, "Highlighted", Toast.LENGTH_SHORT).show()
@@ -830,6 +926,21 @@ fun BookReaderScreen(
                         showNoteEditorSheet = false
                         Toast.makeText(context, "Note saved", Toast.LENGTH_SHORT).show()
                     }
+                )
+            }
+        }
+
+        if (showDictionarySheet) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(200f)
+            ) {
+                DictionaryResultBottomSheet(
+                    word = dictionaryLookupWord.ifBlank { pdfSelectionState?.selectedText ?: "" },
+                    result = dictionaryResult,
+                    hasInstalledDictionary = hasInstalledDictionary,
+                    onDismiss = { showDictionarySheet = false }
                 )
             }
         }
@@ -872,12 +983,96 @@ fun BookReaderScreen(
                         tint = if (isBookmarked) Color(0xFFFF5D73) else activeTheme.text
                     )
                 }
+
+                // Reading Timer Badge
+                if (bookSettings.showTimerBadge) {
+                    val displayTimeStr = if (timerMode == ReaderTimerMode.COUNTDOWN) {
+                        formatReaderTimerTime(timerSecondsRemaining)
+                    } else {
+                        formatReaderTimerTime(stopwatchSecondsElapsed)
+                    }
+
+                    Surface(
+                        onClick = { showReaderSettingsSheet = true },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isTimerRunning) Color(0xFF6C63FF).copy(alpha = 0.2f) else activeTheme.text.copy(alpha = 0.08f),
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .alpha((bookSettings.timerBadgeOpacityPercent / 100f).coerceIn(0.1f, 1.0f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = "Timer",
+                                tint = if (isTimerRunning) Color(0xFF6C63FF) else activeTheme.text,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = displayTimeStr,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isTimerRunning) Color(0xFF6C63FF) else activeTheme.text
+                            )
+                        }
+                    }
+                }
+
                 IconButton(onClick = { showReaderSettingsSheet = true }) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
                         tint = activeTheme.text
                     )
+                }
+            }
+        }
+
+        // Persistent Floating Timer Badge when in Focus Mode (reading mode)
+        if (bookSettings.showTimerBadge && isFocusMode) {
+            val displayTimeStr = if (timerMode == ReaderTimerMode.COUNTDOWN) {
+                formatReaderTimerTime(timerSecondsRemaining)
+            } else {
+                formatReaderTimerTime(stopwatchSecondsElapsed)
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(top = 10.dp, end = 16.dp)
+                    .zIndex(100f)
+            ) {
+                Surface(
+                    onClick = { showReaderSettingsSheet = true },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isTimerRunning) Color(0xFF6C63FF) else activeTheme.text.copy(alpha = 0.12f),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .alpha((bookSettings.timerBadgeOpacityPercent / 100f).coerceIn(0.1f, 1.0f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = "Timer",
+                            tint = if (isTimerRunning) Color.White else activeTheme.text,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = displayTimeStr,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isTimerRunning) Color.White else activeTheme.text
+                        )
+                    }
                 }
             }
         }
@@ -949,32 +1144,40 @@ fun BookReaderScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             val arrowBottomPadding = with(density) { bottomBarHeightPx.toDp() } + 8.dp
+            val canLeft = if (isRtlReading) currentPage < totalPages else currentPage > 1
+            val targetLeft = if (isRtlReading) (pagerState.currentPage + 1).coerceAtMost(totalPages - 1) else (pagerState.currentPage - 1).coerceAtLeast(0)
+            val descLeft = if (isRtlReading) "Next Page" else "Previous Page"
+
+            val canRight = if (isRtlReading) currentPage > 1 else currentPage < totalPages
+            val targetRight = if (isRtlReading) (pagerState.currentPage - 1).coerceAtLeast(0) else (pagerState.currentPage + 1).coerceAtMost(totalPages - 1)
+            val descRight = if (isRtlReading) "Previous Page" else "Next Page"
+
             Box(modifier = Modifier.fillMaxSize()) {
-                if (currentPage > 1) {
+                if (canLeft) {
                     PageArrowButton(
                         icon = Icons.Default.ChevronLeft,
-                        description = "Previous Page",
+                        description = descLeft,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(start = 12.dp, bottom = arrowBottomPadding),
                         onClick = {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0))
+                                pagerState.animateScrollToPage(targetLeft)
                             }
                         }
                     )
                 }
 
-                if (currentPage < totalPages) {
+                if (canRight) {
                     PageArrowButton(
                         icon = Icons.Default.ChevronRight,
-                        description = "Next Page",
+                        description = descRight,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 12.dp, bottom = arrowBottomPadding),
                         onClick = {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(totalPages - 1))
+                                pagerState.animateScrollToPage(targetRight)
                             }
                         }
                     )
@@ -1019,10 +1222,159 @@ fun BookReaderScreen(
             }
         }
 
+        if (showRtlPromptDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showRtlPromptDialog = false
+                    onUpdateSettings(bookSettings.copy(hasSeenRtlPrompt = true))
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Translate,
+                        contentDescription = null,
+                        tint = Color(0xFF6C63FF),
+                        modifier = Modifier.size(32.dp)
+                    )
+                },
+                title = {
+                    Text("Arabic / RTL Language Detected 📖", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                },
+                text = {
+                    Text(
+                        "We detected that this book (\"${book.title}\") is written in Arabic or a Right-to-Left (RTL) language.\n\nWould you like to turn page reading direction to Right-to-Left (RTL) or continue in standard Left-to-Right (LTR)?",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showRtlPromptDialog = false
+                            onUpdateSettings(bookSettings.copy(readingDirection = "RTL", hasSeenRtlPrompt = true))
+                            Toast.makeText(context, "Switched reading direction to RTL", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C63FF))
+                    ) {
+                        Text("Turn Reading to RTL")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = {
+                            showRtlPromptDialog = false
+                            onUpdateSettings(bookSettings.copy(readingDirection = "LTR", hasSeenRtlPrompt = true))
+                        }
+                    ) {
+                        Text("Continue LTR")
+                    }
+                }
+            )
+        }
+
+        if (showTimerFinishedDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showTimerFinishedDialog = false
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF2ECC71),
+                        modifier = Modifier.size(36.dp)
+                    )
+                },
+                title = {
+                    Text("Reading Session Complete! 📚", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Great work! You completed your $countdownPresetMinutes-minute reading countdown.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Text(
+                            "Would you like to finish or add more reading time?",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val addTimeOptions = listOf(5, 10, 15, 30)
+                            addTimeOptions.forEach { extraMins ->
+                                OutlinedButton(
+                                    onClick = {
+                                        timerSecondsRemaining = extraMins * 60
+                                        countdownPresetMinutes = extraMins
+                                        isTimerRunning = true
+                                        showTimerFinishedDialog = false
+                                        Toast.makeText(context, "Added +$extraMins min to timer", Toast.LENGTH_SHORT).show()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text("+$extraMins min", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showTimerFinishedDialog = false
+                            timerSecondsRemaining = countdownPresetMinutes * 60
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C63FF))
+                    ) {
+                        Text("OK")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showTimerFinishedDialog = false
+                        }
+                    ) {
+                        Text("Dismiss")
+                    }
+                }
+            )
+        }
+
         if (showReaderSettingsSheet) {
             BookSettingsSheet(
                 settings = bookSettings,
                 currentThemeKey = currentThemeKey,
+                timerMode = timerMode,
+                countdownPresetMinutes = countdownPresetMinutes,
+                timerSecondsRemaining = timerSecondsRemaining,
+                stopwatchSecondsElapsed = stopwatchSecondsElapsed,
+                isTimerRunning = isTimerRunning,
+                onTimerModeChange = { mode -> timerMode = mode },
+                onCountdownPresetChange = { mins ->
+                    countdownPresetMinutes = mins
+                    timerSecondsRemaining = mins * 60
+                    isTimerRunning = false
+                },
+                onTimerToggle = { isTimerRunning = !isTimerRunning },
+                onTimerReset = {
+                    isTimerRunning = false
+                    if (timerMode == ReaderTimerMode.COUNTDOWN) {
+                        timerSecondsRemaining = countdownPresetMinutes * 60
+                    } else {
+                        stopwatchSecondsElapsed = 0
+                    }
+                },
                 onDismiss = { showReaderSettingsSheet = false },
                 onUpdateSettings = { newSettings -> onUpdateSettings(newSettings) },
                 onUpdateTheme = { themeKey ->
@@ -1032,6 +1384,7 @@ fun BookReaderScreen(
             )
         }
     }
+}
 }
 
 /** Round page-turn button. The whole control (circle + icon) is drawn at 20% opacity. */
@@ -1065,6 +1418,15 @@ private fun PageArrowButton(
 fun BookSettingsSheet(
     settings: BookSettings,
     currentThemeKey: String,
+    timerMode: ReaderTimerMode,
+    countdownPresetMinutes: Int,
+    timerSecondsRemaining: Int,
+    stopwatchSecondsElapsed: Int,
+    isTimerRunning: Boolean,
+    onTimerModeChange: (ReaderTimerMode) -> Unit,
+    onCountdownPresetChange: (Int) -> Unit,
+    onTimerToggle: () -> Unit,
+    onTimerReset: () -> Unit,
     onDismiss: () -> Unit,
     onUpdateSettings: (BookSettings) -> Unit,
     onUpdateTheme: (String) -> Unit
@@ -1081,6 +1443,180 @@ fun BookSettingsSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Reader Settings", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+
+            // ---- Reading Timer & Pomodoro Section ----
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = Color(0xFF6C63FF),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text("Reading Timer & Pomodoro", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    val timerDisplay = if (timerMode == ReaderTimerMode.COUNTDOWN) {
+                        formatReaderTimerTime(timerSecondsRemaining)
+                    } else {
+                        formatReaderTimerTime(stopwatchSecondsElapsed)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isTimerRunning) Color(0xFF6C63FF).copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = timerDisplay,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isTimerRunning) Color(0xFF6C63FF) else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                // Mode Selector (Countdown / Stopwatch)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = timerMode == ReaderTimerMode.COUNTDOWN,
+                        onClick = { onTimerModeChange(ReaderTimerMode.COUNTDOWN) },
+                        label = { Text("Countdown (Pomodoro)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = timerMode == ReaderTimerMode.STOPWATCH,
+                        onClick = { onTimerModeChange(ReaderTimerMode.STOPWATCH) },
+                        label = { Text("Stopwatch") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (timerMode == ReaderTimerMode.COUNTDOWN) {
+                    Text("Target Reading Time", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val presets = listOf(5, 15, 25, 30, 45, 60)
+                        presets.forEach { mins ->
+                            FilterChip(
+                                selected = countdownPresetMinutes == mins,
+                                onClick = { onCountdownPresetChange(mins) },
+                                label = { Text("${mins}m${if (mins == 25) " (Pomodoro)" else ""}") }
+                            )
+                        }
+                    }
+
+                    var customSliderVal by remember(countdownPresetMinutes) { mutableFloatStateOf(countdownPresetMinutes.toFloat()) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Custom duration", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${customSliderVal.roundToInt()} min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6C63FF))
+                    }
+                    Slider(
+                        value = customSliderVal,
+                        onValueChange = { customSliderVal = it },
+                        onValueChangeFinished = {
+                            val mins = customSliderVal.roundToInt().coerceIn(1, 180)
+                            onCountdownPresetChange(mins)
+                        },
+                        valueRange = 1f..180f,
+                        colors = SliderDefaults.colors(thumbColor = Color(0xFF6C63FF), activeTrackColor = Color(0xFF6C63FF)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onTimerToggle,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isTimerRunning) MaterialTheme.colorScheme.error else Color(0xFF6C63FF)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isTimerRunning) "Pause" else "Start Timer")
+                    }
+
+                    OutlinedButton(
+                        onClick = onTimerReset,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Reset")
+                    }
+                }
+
+                // Timer Badge Visibility & Opacity
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Show Timer Badge on Screen", fontSize = 13.sp)
+                    Switch(
+                        checked = settings.showTimerBadge,
+                        onCheckedChange = { onUpdateSettings(settings.copy(showTimerBadge = it)) }
+                    )
+                }
+
+                if (settings.showTimerBadge) {
+                    var localBadgeOpacity by remember(settings.timerBadgeOpacityPercent) { mutableFloatStateOf(settings.timerBadgeOpacityPercent.toFloat()) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Timer Badge Opacity", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Adjust badge transparency on reader screen", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("${localBadgeOpacity.toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6C63FF))
+                    }
+                    Slider(
+                        value = localBadgeOpacity,
+                        onValueChange = { localBadgeOpacity = it },
+                        onValueChangeFinished = {
+                            onUpdateSettings(settings.copy(timerBadgeOpacityPercent = localBadgeOpacity.toInt()))
+                        },
+                        valueRange = 10f..100f,
+                        colors = SliderDefaults.colors(thumbColor = Color(0xFF6C63FF), activeTrackColor = Color(0xFF6C63FF))
+                    )
+                }
+            }
+
+            HorizontalDivider()
 
             Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             // 6 chips overflow a phone screen -> make the row scrollable
@@ -1213,6 +1749,50 @@ fun BookSettingsSheet(
                     checked = settings.autoNextPageOnRead,
                     onCheckedChange = { onUpdateSettings(settings.copy(autoNextPageOnRead = it)) }
                 )
+            }
+
+            HorizontalDivider()
+
+            // ---- Reading Direction (RTL / Arabic Support) ----
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Translate,
+                            contentDescription = null,
+                            tint = Color(0xFF6C63FF),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text("Reading Direction (RTL / Arabic)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val dirOptions = listOf(
+                        "AUTO" to "Auto",
+                        "LTR" to "LTR (Left-to-Right)",
+                        "RTL" to "RTL (Right-to-Left)"
+                    )
+                    dirOptions.forEach { (dirKey, label) ->
+                        FilterChip(
+                            selected = settings.readingDirection == dirKey,
+                            onClick = { onUpdateSettings(settings.copy(readingDirection = dirKey)) },
+                            label = { Text(label, fontSize = 11.sp) }
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

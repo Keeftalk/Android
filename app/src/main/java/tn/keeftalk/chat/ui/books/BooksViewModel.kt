@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import tn.keeftalk.chat.domain.model.*
 import tn.keeftalk.chat.domain.repository.BookRepository
 import tn.keeftalk.chat.util.KeeftalkStore
+import tn.keeftalk.chat.util.SoundEffectManager
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
@@ -44,6 +45,8 @@ data class BooksUiState(
     val isSettingsOpen: Boolean = false,
     val lastDeletedBook: Book? = null,
     val toastMessage: String? = null,
+    val isImportingBook: Boolean = false,
+    val importingBookTitle: String? = null,
 
     // Goals state
     val focusedPeriod: String = "day", // "day", "month", "year"
@@ -176,6 +179,9 @@ class BooksViewModel(
         syncBooksReadProgress()
         backfillContentHashes()
         loadPendingSessionSummary()
+        viewModelScope.launch {
+            bookRepository.syncBooksWithCloud()
+        }
     }
 
     private fun backfillContentHashes() {
@@ -979,6 +985,7 @@ class BooksViewModel(
 
     // UI Actions
     fun importBookFromUri(context: android.content.Context, uri: android.net.Uri) {
+        _uiState.update { it.copy(isImportingBook = true, importingBookTitle = null) }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val contentResolver = context.contentResolver
@@ -1002,6 +1009,24 @@ class BooksViewModel(
                     targetFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
+                }
+
+                val contentHash = if (targetFile.exists()) tn.keeftalk.chat.util.ContentHashUtils.computeSha256(targetFile) else null
+                val allBooks = bookRepository.getAllBooks()
+                val existing = allBooks.firstOrNull {
+                    (!it.isDeleted) && ((!contentHash.isNullOrEmpty() && it.contentHash == contentHash) ||
+                            it.title.equals(title, ignoreCase = true))
+                }
+
+                if (existing != null) {
+                    val updated = existing.copy(
+                        filePath = targetFile.absolutePath,
+                        contentHash = contentHash ?: existing.contentHash,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    bookRepository.saveBook(updated)
+                    _uiState.update { it.copy(toastMessage = "Updated book: $title") }
+                    return@launch
                 }
 
                 var totalPages = 100
@@ -1031,13 +1056,16 @@ class BooksViewModel(
                     customCover = cover,
                     percentProgress = 0,
                     lastReadPage = 1,
-                    insightText = "Just added — start reading now"
+                    insightText = "Just added — start reading now",
+                    contentHash = contentHash
                 )
 
                 bookRepository.saveBook(newBook)
                 _uiState.update { it.copy(toastMessage = "Added book: $title") }
             } catch (e: Exception) {
                 _uiState.update { it.copy(toastMessage = "Failed to import book") }
+            } finally {
+                _uiState.update { it.copy(isImportingBook = false, importingBookTitle = null) }
             }
         }
     }
@@ -1047,18 +1075,52 @@ class BooksViewModel(
         vaultItem: VaultItem,
         vaultRepository: tn.keeftalk.chat.domain.repository.VaultRepository
     ) {
+        _uiState.update { it.copy(isImportingBook = true, importingBookTitle = vaultItem.title) }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val decryptedResult = vaultRepository.getDecryptedFile(vaultItem)
                 val file = decryptedResult.getOrNull() ?: vaultItem.file?.localPath?.let { java.io.File(it) }
                 if (file != null && file.exists()) {
-                    val isPdf = file.name.endsWith(".pdf", ignoreCase = true)
+                    val vaultFileName = vaultItem.file?.fileName ?: ""
+                    val vaultMimeType = vaultItem.file?.mimeType ?: ""
+
+                    val isPdf = file.name.endsWith(".pdf", ignoreCase = true) ||
+                            vaultFileName.endsWith(".pdf", ignoreCase = true) ||
+                            vaultMimeType.contains("pdf", ignoreCase = true) ||
+                            vaultItem.title.endsWith(".pdf", ignoreCase = true)
+
                     val format = if (isPdf) "PDF" else "EPUB"
-                    val title = vaultItem.title.ifBlank { file.nameWithoutExtension }
+                    val ext = if (isPdf) "pdf" else "epub"
+
+                    val rawTitle = vaultItem.title.ifBlank {
+                        if (vaultFileName.isNotBlank()) vaultFileName.substringBeforeLast(".")
+                        else file.nameWithoutExtension
+                    }
+                    val title = if (rawTitle.endsWith(".pdf", ignoreCase = true) || rawTitle.endsWith(".epub", ignoreCase = true)) {
+                        rawTitle.substringBeforeLast(".")
+                    } else rawTitle
 
                     val booksDir = java.io.File(context.filesDir, "books").apply { mkdirs() }
-                    val targetFile = java.io.File(booksDir, "book_${System.currentTimeMillis()}.${if (isPdf) "pdf" else "epub"}")
+                    val targetFile = java.io.File(booksDir, "book_${System.currentTimeMillis()}.$ext")
                     file.copyTo(targetFile, overwrite = true)
+
+                    val contentHash = if (targetFile.exists()) tn.keeftalk.chat.util.ContentHashUtils.computeSha256(targetFile) else null
+                    val allBooks = bookRepository.getAllBooks()
+                    val existing = allBooks.firstOrNull {
+                        (!it.isDeleted) && ((!contentHash.isNullOrEmpty() && it.contentHash == contentHash) ||
+                                it.title.equals(title, ignoreCase = true))
+                    }
+
+                    if (existing != null) {
+                        val updated = existing.copy(
+                            filePath = targetFile.absolutePath,
+                            contentHash = contentHash ?: existing.contentHash,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        bookRepository.saveBook(updated)
+                        _uiState.update { it.copy(toastMessage = "Updated from Vault: $title") }
+                        return@launch
+                    }
 
                     var totalPages = 100
                     if (isPdf && targetFile.exists()) {
@@ -1087,7 +1149,8 @@ class BooksViewModel(
                         customCover = cover,
                         percentProgress = 0,
                         lastReadPage = 1,
-                        insightText = "Imported from Vault — start reading now"
+                        insightText = "Imported from Vault — start reading now",
+                        contentHash = contentHash
                     )
 
                     bookRepository.saveBook(newBook)
@@ -1097,6 +1160,8 @@ class BooksViewModel(
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(toastMessage = "Failed to import from Vault") }
+            } finally {
+                _uiState.update { it.copy(isImportingBook = false, importingBookTitle = null) }
             }
         }
     }
@@ -1270,6 +1335,9 @@ class BooksViewModel(
                     finishedAt = null
                 )
             } else {
+                appContext?.let { ctx ->
+                    SoundEffectManager.playMediaSound(ctx, SoundEffectManager.RES_GOAL_DONE)
+                }
                 book.copy(
                     markedDone = true,
                     originalProgress = book.percentProgress,
@@ -1312,8 +1380,15 @@ class BooksViewModel(
     fun updatePagePosition(bookId: String, pageNumber: Int) {
         viewModelScope.launch {
             val book = bookRepository.getBookById(bookId) ?: return@launch
+            val percent = if (book.totalPages > 0) {
+                ((pageNumber.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else 0
+            val isNowDone = percent >= 100
             val updated = book.copy(
                 lastReadPage = pageNumber,
+                percentProgress = maxOf(book.percentProgress, percent),
+                markedDone = if (isNowDone) true else book.markedDone,
+                finishedAt = if (isNowDone && book.finishedAt == null) System.currentTimeMillis() else book.finishedAt,
                 updatedAt = System.currentTimeMillis()
             )
             bookRepository.saveBook(updated)
@@ -1373,9 +1448,15 @@ class BooksViewModel(
             val pageProgresses = bookRepository.getPageProgressForBook(progress.bookId)
             val readPagesCount = pageProgresses.count { it.isRead }
 
-            val percent = if (book.totalPages > 0) {
+            val posPercent = if (book.totalPages > 0) {
+                ((book.lastReadPage.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else 0
+
+            val pageReadPercent = if (book.totalPages > 0) {
                 ((readPagesCount.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
             } else 0
+
+            val percent = maxOf(book.percentProgress, posPercent, pageReadPercent)
 
             val isNowDone = percent >= 100 || (readPagesCount >= book.totalPages && book.totalPages > 0)
             val finishedAtVal = if (isNowDone && book.finishedAt == null) System.currentTimeMillis() else book.finishedAt
@@ -1399,6 +1480,9 @@ class BooksViewModel(
     fun updateBookSettings(settings: BookSettings) {
         viewModelScope.launch {
             bookRepository.updateBookSettings(settings)
+            if (settings.syncAcrossDevices) {
+                bookRepository.syncBooksWithCloud()
+            }
         }
     }
 

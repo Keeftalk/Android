@@ -34,6 +34,15 @@ fun HabitSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
+                tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                    featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.HABITS,
+                    description = "Sync your habits, schedules, check-ins, and progress.",
+                    onEnableClick = { },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
                 SettingsSection(title = "Behavior & Defaults") {
                     SettingsItem(
                         icon = icons.calendar,

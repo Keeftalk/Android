@@ -61,6 +61,7 @@ data class VaultStorageInfo(
     val trashBytesUsed: Long,
     val itemsCount: Int,
     val categories: Map<VaultItemType, Long>,
+    val planType: SubscriptionPlan = SubscriptionPlan.FREE,
     // For backward compatibility while migrating UI
     val totalUsed: Long = cloudBytesUsed,
     val cloudUsed: Long = cloudBytesUsed,

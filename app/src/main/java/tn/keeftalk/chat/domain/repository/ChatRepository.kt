@@ -33,6 +33,7 @@ interface ChatRepository {
     suspend fun createReminderNotification(chatId: String, senderName: String, count: Int)
     suspend fun sendMessage(chatId: String, content: String, type: tn.keeftalk.chat.domain.model.MessageType = tn.keeftalk.chat.domain.model.MessageType.TEXT, filePath: String? = null, replyToId: String? = null, onProgress: ((Float) -> Unit)? = null)
     suspend fun createGroup(name: String, memberIds: List<String>, avatarUrl: String? = null): String
+    suspend fun updateGroupAvatar(chatId: String, avatarUrl: String)
     suspend fun syncMessages(peerId: String, lastSyncTimestamp: Long): Long
     suspend fun syncChats(limit: Int, offset: Int)
     suspend fun syncFullChatHistory()

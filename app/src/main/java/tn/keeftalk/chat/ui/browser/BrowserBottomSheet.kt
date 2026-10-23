@@ -459,3 +459,147 @@ private fun KeyValueRow(label: String, value: String) {
         Text(value, fontSize = 13.sp, color = Color(0xFF16181d), modifier = Modifier.weight(1f))
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadsBottomSheet(
+    viewModel: BrowserViewModel,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val downloads by viewModel.downloads.collectAsState()
+    val context = LocalContext.current
+    val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 10.dp)
+                .heightIn(max = 500.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Downloads", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16181d))
+                    Text("${downloads.size} files", fontSize = 13.sp, color = Color(0xFF6b6e76))
+                }
+
+                if (downloads.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { viewModel.clearDownloads() },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFd12e2e))
+                    ) {
+                        Text("Clear", fontSize = 13.sp)
+                    }
+                }
+            }
+
+            if (downloads.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No downloads yet. Download files or pictures while browsing.", color = Color(0xFF6b6e76), fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(downloads) { item ->
+                        androidx.compose.material3.Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFFf6f7f9),
+                            tonalElevation = 1.dp
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item.fileName,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF16181d),
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (item.isComplete) "Complete" else "${(item.progress * 100).toInt()}%",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (item.isComplete) Color(0xFF168a4a) else Color(0xFF0a7cff)
+                                    )
+                                }
+
+                                androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = { item.progress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = Color(0xFF0a7cff),
+                                    trackColor = Color(0xFFe2e4ea)
+                                )
+                                androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = dateFormat.format(Date(item.timestamp)),
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF6b6e76)
+                                    )
+
+                                    if (item.isComplete && item.localPath != null) {
+                                        TextButton(
+                                            onClick = {
+                                                try {
+                                                    val file = java.io.File(item.localPath)
+                                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                        context,
+                                                        context.packageName + ".fileprovider",
+                                                        file
+                                                    )
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                                        setDataAndType(uri, context.contentResolver.getType(uri) ?: "*/*")
+                                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    viewModel.showToast("Cannot open file: ${e.message}")
+                                                }
+                                            }
+                                        ) {
+                                            Text("Open", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

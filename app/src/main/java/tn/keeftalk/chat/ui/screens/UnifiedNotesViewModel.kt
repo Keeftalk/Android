@@ -581,7 +581,6 @@ class UnifiedNotesViewModel(
     private fun autoSave(note: Note) {
         if (!canEdit.value) return
         val settings = noteSettings.value
-        if (!settings.autoSaveEnabled) return
 
         saveJob?.cancel()
         val interval = settings.autoSaveIntervalSeconds.coerceAtLeast(1) * 1000L

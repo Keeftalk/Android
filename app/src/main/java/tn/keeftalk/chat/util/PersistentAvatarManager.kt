@@ -68,9 +68,28 @@ object PersistentAvatarManager {
         if (!force && cachedUrl == url && getLocalAvatarFile(context, identifier) != null) return
         
         try {
-            val connection = java.net.URL(url).openConnection()
-            connection.connect()
-            val bytes = connection.getInputStream().readBytes()
+            val uri = android.net.Uri.parse(url)
+            val scheme = uri.scheme?.lowercase()
+            val bytes = when (scheme) {
+                "content", "file" -> {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw java.io.IOException("Could not open input stream for $url")
+                }
+                "http", "https" -> {
+                    val connection = java.net.URL(url).openConnection()
+                    connection.connect()
+                    connection.getInputStream().readBytes()
+                }
+                else -> {
+                    if (url.startsWith("/")) {
+                        File(url).readBytes()
+                    } else {
+                        val connection = java.net.URL(url).openConnection()
+                        connection.connect()
+                        connection.getInputStream().readBytes()
+                    }
+                }
+            }
             saveAvatar(context, identifier, bytes, url)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to proactively cache avatar for $identifier from $url", e)

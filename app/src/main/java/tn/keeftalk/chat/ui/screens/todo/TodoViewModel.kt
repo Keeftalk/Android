@@ -9,6 +9,7 @@ import tn.keeftalk.chat.di.AppModule
 import tn.keeftalk.chat.domain.model.todo.TodoList
 import tn.keeftalk.chat.domain.model.todo.TodoTask
 import tn.keeftalk.chat.domain.repository.TodoRepository
+import tn.keeftalk.chat.util.SoundEffectManager
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -76,6 +77,9 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val task = _tasks.value.find { it.id == taskId } ?: return@launch
             val newCompleted = !task.completed
+            if (newCompleted) {
+                SoundEffectManager.playMediaSound(getApplication<Application>(), SoundEffectManager.RES_GOAL_DONE)
+            }
             val updated = task.copy(
                 completed = newCompleted,
                 completedAt = if (newCompleted) System.currentTimeMillis() else 0L,

@@ -48,6 +48,7 @@ enum class FabActionType {
     TOGGLE_NIGHT_MODE, INCREASE_SCALE, DECREASE_SCALE, TOGGLE_DRAWER,
     CLOUD_IMPORT, NEW_HABIT, EDIT_HABITS, ADD_BOOK_FILE, IMPORT_BOOK_VAULT,
     ADD_FINANCES, FINANCES_TOOLS, SEARCH,
+    IMPORT_DOC_FILES, IMPORT_DOC_FOLDER,
     ADD_2FA_ENTRY, SCAN_QR_CAMERA_SECRETS, SCAN_QR_IMAGE_SECRETS, ADD_SECRET_CREDENTIAL, SECRETS_GENERATOR, IMPORT_CSV_SECRETS
 }
 
@@ -102,8 +103,8 @@ fun KeeftalkFab(
     )
 
     val rotation by animateFloatAsState(
-        targetValue = if (isExpanded) 90f else 0f,
-        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
         label = "fab_rotation"
     )
 
@@ -244,7 +245,11 @@ fun AdaptiveFab(
     val divider = FabMenuItem("", Icons.Default.Add, {}, isDivider = true)
 
     val primaryAction: FabMenuItem? = FabMenuItem("+", icons.add, { expanded = !expanded }, isPrimary = true)
-    val secondaryAction: FabMenuItem? = null
+    val secondaryAction: FabMenuItem? = if (currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS) {
+        FabMenuItem("Dialer", icons.dialpad, { onAction(FabActionType.DIALER) })
+    } else {
+        null
+    }
 
     val rawMenuItems: List<FabMenuItem> = when {
         currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS && chatTab == 0 -> {
@@ -335,6 +340,13 @@ fun AdaptiveFab(
                 divider
             ) + qrAndAiItems + divider + commonNavItems
         }
+        currentScreen == AppScreen.Docs -> {
+            listOf(
+                FabMenuItem("Import Files", Icons.Default.Description, { onAction(FabActionType.IMPORT_DOC_FILES); closeMenu() }),
+                FabMenuItem("Import Folder", Icons.Default.FolderOpen, { onAction(FabActionType.IMPORT_DOC_FOLDER); closeMenu() }),
+                divider
+            ) + qrAndAiItems + divider + commonNavItems
+        }
         currentScreen == AppScreen.Finances -> {
             listOf(
                 FabMenuItem("Add to My Finances", Icons.Default.Add, { onAction(FabActionType.ADD_FINANCES); closeMenu() }),
@@ -382,8 +394,8 @@ fun AdaptiveFab(
         // Menu content
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+            enter = fadeIn(animationSpec = tween(400)) + expandVertically(animationSpec = tween(500), expandFrom = Alignment.Bottom),
+            exit = fadeOut(animationSpec = tween(400)) + shrinkVertically(animationSpec = tween(500), shrinkTowards = Alignment.Bottom)
         ) {
             val fabMenuShape = RoundedCornerShape(24.dp)
             Surface(
@@ -562,23 +574,55 @@ fun AdaptiveFab(
 
             // Secondary FAB (e.g. The shared + FAB in Email/SMS/Calls)
             if (secondaryAction != null) {
-                KeeftalkFab(
-                    icon = secondaryAction.icon,
-                    onClick = secondaryAction.action,
-                    modifier = Modifier.size(secondarySize), // A bit smaller
-                    isExpanded = expanded,
-                    showPulse = false // Only pulse the main one if it's +
-                )
+                AnimatedVisibility(
+                    visible = !expanded,
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut()
+                ) {
+                    KeeftalkFab(
+                        icon = secondaryAction.icon,
+                        onClick = secondaryAction.action,
+                        modifier = Modifier.size(secondarySize), // A bit smaller
+                        isExpanded = false,
+                        showPulse = false // Only pulse the main one if it's +
+                    )
+                }
             }
 
             // Primary FAB (Always in the same spot as the '+' in main screen)
-            KeeftalkFab(
-                icon = primaryAction.icon,
-                onClick = primaryAction.action,
-                modifier = Modifier.size(primarySize),
-                isExpanded = if (secondaryAction == null) expanded else false,
-                showPulse = primaryAction.icon == icons.add && !expanded
-            )
+            val unreadCount = notifications.count { !it.isRead }
+            val showFabBadge = customization.isMinimalMode && unreadCount > 0
+
+            if (showFabBadge) {
+                BadgedBox(
+                    badge = {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .background(Color(0xFFEF4444), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(unreadCount.toString(), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                ) {
+                    KeeftalkFab(
+                        icon = primaryAction.icon,
+                        onClick = primaryAction.action,
+                        modifier = Modifier.size(primarySize),
+                        isExpanded = if (secondaryAction == null) expanded else false,
+                        showPulse = primaryAction.icon == icons.add && !expanded
+                    )
+                }
+            } else {
+                KeeftalkFab(
+                    icon = primaryAction.icon,
+                    onClick = primaryAction.action,
+                    modifier = Modifier.size(primarySize),
+                    isExpanded = if (secondaryAction == null) expanded else false,
+                    showPulse = primaryAction.icon == icons.add && !expanded
+                )
+            }
         }
     }
 }
@@ -589,14 +633,14 @@ fun MenuItem(
     index: Int,
     isCompact: Boolean = false
 ) {
-    val animDelay = index * 50
+    val animDelay = index * 100
     val transition = updateTransition(targetState = true, label = "MenuItem")
     val alpha by transition.animateFloat(
-        transitionSpec = { tween(durationMillis = 300, delayMillis = animDelay) },
+        transitionSpec = { tween(durationMillis = 600, delayMillis = animDelay) },
         label = "alpha"
     ) { if (it) 1f else 0f }
     val slide by transition.animateDp(
-        transitionSpec = { tween(durationMillis = 300, delayMillis = animDelay) },
+        transitionSpec = { tween(durationMillis = 600, delayMillis = animDelay) },
         label = "slide"
     ) { if (it) 0.dp else 20.dp }
 
@@ -692,10 +736,13 @@ private fun buildCommonNavigationItems(
         FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); closeMenu() }, isActive = currentScreen == AppScreen.Email, trailingAvatars = emailAvatars, module = tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
         FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); closeMenu() }, isActive = currentScreen == AppScreen.Feed, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FEED),
         FabMenuItem("My Books", Icons.AutoMirrored.Filled.MenuBook, { onNavigate(AppScreen.Books); closeMenu() }, isActive = currentScreen == AppScreen.Books, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS),
+        FabMenuItem("My Docs", Icons.Default.Description, { onNavigate(AppScreen.Docs); closeMenu() }, isActive = currentScreen == AppScreen.Docs, module = tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS),
         FabMenuItem("My Market", Icons.Default.Storefront, { onNavigate(AppScreen.Market); closeMenu() }, isActive = currentScreen == AppScreen.Market, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET),
         FabMenuItem("My Habits", Icons.Default.CheckCircle, { onNavigate(AppScreen.Habits); closeMenu() }, isActive = currentScreen == AppScreen.Habits, module = tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS),
         FabMenuItem("My Todo", tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo, { onNavigate(AppScreen.Todo); closeMenu() }, isActive = currentScreen == AppScreen.Todo, module = tn.keeftalk.chat.domain.model.KeeftalkModule.TODO),
         FabMenuItem("My Browser", Icons.Default.Language, { onNavigate(AppScreen.Browser()); closeMenu() }, isActive = currentScreen is AppScreen.Browser, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER),
+        FabMenuItem("My Maps", tn.keeftalk.chat.ui.theme.LucideIcons.MapPinned, { onNavigate(AppScreen.MyMaps); closeMenu() }, isActive = currentScreen is AppScreen.MyMaps, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MAPS),
+        FabMenuItem("My Din", Icons.Default.Mosque, { onNavigate(AppScreen.MyDin); closeMenu() }, isActive = currentScreen == AppScreen.MyDin, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MY_DIN),
         FabMenuItem("Settings", Icons.Default.Settings, { onNavigate(AppScreen.Settings); closeMenu() }, isActive = currentScreen == AppScreen.Settings)
     )
 }

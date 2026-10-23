@@ -125,17 +125,21 @@ fun SettingsToggleItem(
     subtitle: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    showDivider: Boolean = true
+    showDivider: Boolean = true,
+    enabled: Boolean = true
 ) {
     SettingsItem(
         icon = icon,
         title = title,
         subtitle = subtitle,
         showDivider = showDivider,
+        enabled = enabled,
+        onClick = { if (enabled) onCheckedChange(!checked) },
         trailing = {
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
                     checkedTrackColor = MaterialTheme.colorScheme.primaryContainer

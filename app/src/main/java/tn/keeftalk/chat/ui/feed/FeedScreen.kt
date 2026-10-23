@@ -46,7 +46,9 @@ import kotlinx.serialization.json.Json
 @Composable
 fun FeedScreen(
     onManageFeeds: () -> Unit = {},
-    onOpenUrlInBrowser: (String) -> Unit = {}
+    onOpenUrlInBrowser: (String) -> Unit = {},
+    onNavigateToExtensionScreen: (String) -> Unit = {},
+    onNavigateToMyDin: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: FeedViewModel = viewModel {
@@ -122,6 +124,15 @@ fun FeedScreen(
 
     val containerBg = if (userPrefs.themeMode == "KEEF") Color.Transparent else if (isDark) Color(0xFF080A10) else MaterialTheme.colorScheme.background
     val sheetBg = if (userPrefs.themeMode == "KEEF") Color.Transparent else if (isDark) Color(0xFF131722) else Color(0xFFEEF0F7)
+
+    val declarativeCardsFlow = remember(context) {
+        try {
+            AppModule.provideExtensionHost(context).registry.feedCardRegistry.installedFeedCards
+        } catch (_: Exception) {
+            null
+        }
+    }
+    val installedDeclarativeCards by (declarativeCardsFlow?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
 
     val listState = rememberLazyListState()
     val shouldLoadMore = remember {
@@ -228,6 +239,25 @@ fun FeedScreen(
                         }
                     }
 
+                    // Render Custom Declarative Extension Cards
+                    items(installedDeclarativeCards, key = { it.id }) { card ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                            tn.keeftalk.chat.extension.renderer.DeclarativeCardRenderer(
+                                card = card,
+                                onCardClick = { url ->
+                                    if (!url.isNullOrBlank()) {
+                                        if (url.startsWith("screen://")) {
+                                            onNavigateToExtensionScreen(url.removePrefix("screen://"))
+                                        } else {
+                                            onOpenUrlInBrowser(url)
+                                        }
+                                    }
+                                },
+                                onNavigate = { screenId -> onNavigateToExtensionScreen(screenId) }
+                            )
+                        }
+                    }
+
                     // Card Stack (Order & Visibility Driven)
                     item {
                         val cardOrder = userPrefs.feedCardOrder
@@ -258,7 +288,8 @@ fun FeedScreen(
                                             viewModel = viewModel,
                                             onOpenWeatherLocationSettings = { showLocationDialog = true },
                                             onOpenPrayerLocationSettings = { showPrayerLocationDialog = true },
-                                            onOpenVerseDetail = { showVerseDetail = true }
+                                            onOpenVerseDetail = { showVerseDetail = true },
+                                            onNavigateToMyDin = onNavigateToMyDin
                                         )
                                     }
                                 }
@@ -592,7 +623,8 @@ private fun RenderFeedCard(
     viewModel: FeedViewModel,
     onOpenWeatherLocationSettings: () -> Unit = {},
     onOpenPrayerLocationSettings: () -> Unit = {},
-    onOpenVerseDetail: () -> Unit = {}
+    onOpenVerseDetail: () -> Unit = {},
+    onNavigateToMyDin: () -> Unit = {}
 ) {
     when (cardId) {
         "weather" -> {
@@ -618,7 +650,7 @@ private fun RenderFeedCard(
                 selectedDayIndex = prayerDayIndex,
                 prayerTimes = prayerTimes,
                 onSelectDay = { viewModel.setPrayerDayIndex(it) },
-                onClick = { viewModel.showToast("Opening Prayer Schedule") },
+                onClick = { onNavigateToMyDin() },
                 onOpenLocationSettings = { onOpenPrayerLocationSettings() }
             )
         }

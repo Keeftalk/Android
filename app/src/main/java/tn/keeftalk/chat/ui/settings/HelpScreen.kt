@@ -42,6 +42,7 @@ import tn.keeftalk.chat.ui.components.BugReportBottomSheet
 @Composable
 fun HelpScreen(
     viewModel: BugReportViewModel,
+    onSecurityPrivacyCenterClick: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -136,7 +137,8 @@ fun HelpScreen(
                         PremiumTaskCards(
                             uriHandler = uriHandler, 
                             onReportBugClick = { showBugReport = true },
-                            onRateClick = { showRateDialog = true }
+                            onRateClick = { showRateDialog = true },
+                            onSecurityPrivacyCenterClick = onSecurityPrivacyCenterClick
                         )
                     }
 
@@ -449,7 +451,7 @@ fun TopicTile(topic: Topic, modifier: Modifier, onClick: () -> Unit) {
 }
 
 @Composable
-fun PremiumTaskCards(uriHandler: UriHandler, onReportBugClick: () -> Unit, onRateClick: () -> Unit) {
+fun PremiumTaskCards(uriHandler: UriHandler, onReportBugClick: () -> Unit, onRateClick: () -> Unit, onSecurityPrivacyCenterClick: () -> Unit) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -473,7 +475,7 @@ fun PremiumTaskCards(uriHandler: UriHandler, onReportBugClick: () -> Unit, onRat
             description = "Learn how we protect your data and manage your encryption keys.",
             icon = Icons.Default.Security,
             color = MaterialTheme.colorScheme.primary,
-            onClick = { uriHandler.openUri("https://keeftalk.com/security.html") }
+            onClick = onSecurityPrivacyCenterClick
         )
     }
 }

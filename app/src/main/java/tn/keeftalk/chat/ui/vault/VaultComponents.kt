@@ -300,8 +300,13 @@ fun VaultCategoryChip(
 @Composable
 fun VaultStorageCard(
     info: VaultStorageInfo?,
-    onAnalyzeClick: () -> Unit
+    activeUploads: Map<String, UploadProgress> = emptyMap(),
+    storageTips: List<VaultStorageTip> = emptyList(),
+    onAnalyzeClick: () -> Unit,
+    onCancelUpload: (String) -> Unit = {},
+    onReviewTip: (VaultStorageTip) -> Unit = {}
 ) {
+    val planName = info?.planType?.displayName ?: "Free"
     Surface(
         modifier = Modifier
             .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -327,7 +332,22 @@ fun VaultStorageCard(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Cloud Storage", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Cloud Storage", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "$planName Plan",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                         Text(
                             text = formatVaultSize(info?.cloudBytesUsed ?: 0),
                             color = MaterialTheme.colorScheme.onSurface,
@@ -346,6 +366,105 @@ fun VaultStorageCard(
                 }
             }
             
+            // Upload progress section integrated inside Cloud Storage card
+            if (activeUploads.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "UPLOADING FILES",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                activeUploads.forEach { (id, upload) ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = if (upload.isError) Icons.Default.ErrorOutline else Icons.Default.CloudUpload,
+                                    contentDescription = null,
+                                    tint = if (upload.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = upload.fileName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            
+                            IconButton(
+                                onClick = { onCancelUpload(id) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Cancel",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        if (upload.isError) {
+                            Text(
+                                text = upload.errorMessage ?: "Upload failed",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "${formatVaultSize(upload.uploadedBytes)} of ${formatVaultSize(upload.totalBytes)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "%.0f%%".format(upload.progress * 100),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { upload.progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+            
             Spacer(modifier = Modifier.height(24.dp))
             
             val limit = info?.cloudBytesLimit ?: SubscriptionPlan.FREE.storageLimit
@@ -359,7 +478,7 @@ fun VaultStorageCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(progress.coerceIn(0f, 1f)) // Accurate progress, no minimum 0.05f
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
                         .fillMaxHeight()
                         .background(Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)))
                 )
@@ -379,6 +498,78 @@ fun VaultStorageCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp
                 )
+            }
+
+            // Dynamic Suggestion / Tip
+            val topTip = storageTips.firstOrNull()
+            if (topTip != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            when (topTip.severity) {
+                                TipSeverity.CRITICAL -> MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
+                                TipSeverity.WARNING -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
+                                else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            },
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = when (topTip.severity) {
+                                TipSeverity.CRITICAL -> Icons.Default.Warning
+                                TipSeverity.WARNING -> Icons.Default.Info
+                                else -> Icons.Default.Lightbulb
+                            },
+                            contentDescription = null,
+                            tint = when (topTip.severity) {
+                                TipSeverity.CRITICAL -> MaterialTheme.colorScheme.error
+                                TipSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
+                                else -> MaterialTheme.colorScheme.primary
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = topTip.title,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = topTip.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    TextButton(
+                        onClick = { onReviewTip(topTip) }
+                    ) {
+                        Text(
+                            text = topTip.actionLabel,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
         }
     }

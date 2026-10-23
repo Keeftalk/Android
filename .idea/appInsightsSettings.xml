@@ -10,7 +10,7 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="tn.keeftalk.chat" />
-                  <option name="mobileSdkAppId" value="1:263449157700:android:54d1774bd9f9f5f20c1c11" />
+                  <option name="mobileSdkAppId" value="1:263449157700:android:26ddfe8a12a022bb0c1c11" />
                   <option name="projectId" value="keeftalk" />
                   <option name="projectNumber" value="263449157700" />
                 </ConnectionSetting>

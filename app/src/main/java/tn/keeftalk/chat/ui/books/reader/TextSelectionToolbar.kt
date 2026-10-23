@@ -5,16 +5,19 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import tn.keeftalk.chat.extension.registry.DictionaryLookupResult
 import tn.keeftalk.chat.ui.books.components.parseHexColor
 
 val HIGHLIGHT_COLORS = listOf("#FFD43B", "#2ECC71", "#FF5D73", "#00CCCC")
@@ -46,6 +50,7 @@ fun TextSelectionToolbar(
     onCopy: (String) -> Unit,
     onToggleQuote: () -> Unit,
     onOpenNoteEditor: () -> Unit,
+    onLookupDictionary: (String) -> Unit,
     onColorSelected: (String) -> Unit,
     onRemoveHighlight: (() -> Unit)?,
     modifier: Modifier = Modifier
@@ -57,7 +62,6 @@ fun TextSelectionToolbar(
         contentColor = Color.White,
         shadowElevation = 8.dp
     ) {
-        // Scrollable so the bar can never be clipped on narrow phones (Remove adds a 4th action)
         Row(
             modifier = Modifier
                 .horizontalScroll(rememberScrollState())
@@ -76,6 +80,10 @@ fun TextSelectionToolbar(
                 label = "Note",
                 isSelected = hasNote
             ) { onOpenNoteEditor() }
+            ToolbarActionItem(
+                icon = Icons.Default.MenuBook,
+                label = "Dictionary"
+            ) { onLookupDictionary(selectedText) }
 
             if (onRemoveHighlight != null) {
                 ToolbarActionItem(icon = Icons.Default.Delete, label = "Remove") { onRemoveHighlight() }
@@ -93,7 +101,6 @@ fun TextSelectionToolbar(
             HIGHLIGHT_COLORS.forEach { colorHex ->
                 val color = parseHexColor(colorHex, Color.Yellow)
                 val isSelected = existingHighlightColor.equals(colorHex, ignoreCase = true)
-                // 28dp touch target around an 18dp swatch (the old 18dp target was too small)
                 Box(
                     modifier = Modifier
                         .size(28.dp)
@@ -173,10 +180,9 @@ fun NoteEditorBottomSheet(
     val accent = parseHexColor(highlightColorHex, Color(0xFF6C63FF))
 
     LaunchedEffect(Unit) {
-        runCatching { focusRequester.requestFocus() } // opens the keyboard straight away
+        runCatching { focusRequester.requestFocus() }
     }
 
-    // Scrim: tap outside to dismiss (no ripple flash over the whole screen)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -194,8 +200,6 @@ fun NoteEditorBottomSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .imePadding()
-                // A disabled clickable does NOT consume taps, so taps on the card used to fall
-                // through to the scrim and close the sheet. Actually swallow them here.
                 .pointerInput(Unit) { detectTapGestures { } }
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -268,6 +272,158 @@ fun NoteEditorBottomSheet(
                     ) {
                         Text("Save note", color = Color.White)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DictionaryResultBottomSheet(
+    word: String,
+    result: DictionaryLookupResult?,
+    hasInstalledDictionary: Boolean = true,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onDismiss() },
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .pointerInput(Unit) { detectTapGestures { } }
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val cleanWord = word.trim().trim { !it.isLetterOrDigit() }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Book,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "DICTIONARY LOOKUP",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Text(
+                    text = if (cleanWord.isNotBlank()) cleanWord else word,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (result != null) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    ) {
+                        Text(
+                            text = "Source: ${result.dictionaryTitle}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    HorizontalDivider()
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = result.definition,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 22.sp
+                        )
+                    }
+                } else if (!hasInstalledDictionary) {
+                    // No Dictionary Extension Installed Message
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "No Offline Dictionary Installed",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "No offline dictionary extension is installed or active. Please install or enable a dictionary extension (.ktxp) from Extension Settings to look up word definitions offline.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                } else {
+                    // Word Not Found Message
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Word Not Found",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "No definition found for \"${if (cleanWord.isNotBlank()) cleanWord else word}\" in your installed dictionary. Try selecting the root form of the word or checking spelling.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Close", fontWeight = FontWeight.Bold)
                 }
             }
         }

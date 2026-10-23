@@ -105,7 +105,11 @@ data class BookSettings(
     val hasSeenLibraryTour: Boolean = false,
     val hasSeenQuotesCard: Boolean = false,
     val hasSeenGoalsCard: Boolean = false,
-    val hasSeenAchievementsCard: Boolean = false
+    val hasSeenAchievementsCard: Boolean = false,
+    val showTimerBadge: Boolean = true,
+    val timerBadgeOpacityPercent: Int = 100,
+    val readingDirection: String = "AUTO", // "AUTO", "LTR", "RTL"
+    val hasSeenRtlPrompt: Boolean = false
 ) {
     fun effectiveDpi(): Int {
         return when (pdfDpiOption) {

@@ -711,4 +711,23 @@ object LucideIcons {
             close()
         }.build()
     }
+
+    val MapPinned: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "LucideMapPinned",
+            defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f
+        ).path(
+            stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
+        ) {
+            moveTo(18f, 8f)
+            curveToRelative(0f, 4.5f, -6f, 11.5f, -6f, 11.5f)
+            curveToRelative(0f, 0f, -6f, -7f, -6f, -11.5f)
+            arcToRelative(6f, 6f, 0f, true, true, 12f, 0f)
+            close()
+            moveTo(12f, 10f)
+            arcToRelative(2f, 2f, 0f, true, false, 0f, 4f)
+            arcToRelative(2f, 2f, 0f, true, false, 0f, -4f)
+            close()
+        }.build()
+    }
 }

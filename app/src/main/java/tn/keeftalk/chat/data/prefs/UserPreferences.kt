@@ -148,7 +148,7 @@ data class UserPreferences(
     val keefContainerOpacityPercent: Int = 60, // 0 to 100%
 
     // Feed & Prayer Settings
-    val feedCardOrder: List<String> = listOf("weather", "verse", "prayer", "markets"),
+    val feedCardOrder: List<String> = listOf("weather", "verse", "markets"),
     val feedHiddenCards: List<String> = emptyList(),
     val feedLayoutMode: String = "STACKED", // "STACKED" or "SWIPE"
     val prayerCalculationMethod: String = "MWL",

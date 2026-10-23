@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -83,6 +84,8 @@ import tn.keeftalk.chat.ui.components.LocalNotificationActions
 import tn.keeftalk.chat.ui.components.NotificationActions
 import tn.keeftalk.chat.ui.settings.*
 import tn.keeftalk.chat.ui.theme.*
+import tn.keeftalk.chat.feature.maps.ui.*
+import tn.keeftalk.chat.domain.model.CanonicalLocation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -412,6 +415,15 @@ fun FullAppContent(
         mutableStateOf<String?>(null) 
     }
 
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        val notificationPermissionState = rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
+        LaunchedEffect(Unit) {
+            if (!notificationPermissionState.status.isGranted) {
+                notificationPermissionState.launchPermissionRequest()
+            }
+        }
+    }
+
     val timeTracker = remember { tn.keeftalk.chat.data.repository.TimeTrackingManager.getInstance(context) }
     LaunchedEffect(currentScreen) {
         val featureKey = when (currentScreen) {
@@ -425,6 +437,8 @@ fun FullAppContent(
             is AppScreen.Finances, is AppScreen.FinancesSettings -> "FINANCES"
             is AppScreen.Feed -> "FEED"
             is AppScreen.Books -> "BOOKS"
+            is AppScreen.MyDin -> "MY_DIN"
+            is AppScreen.Docs, is AppScreen.DocViewer -> "DOCS"
             is AppScreen.Market -> "MARKET"
             is AppScreen.Habits -> "HABITS"
             is AppScreen.Todo -> "TODO"
@@ -443,14 +457,31 @@ fun FullAppContent(
         }
         is StartupState.Ready -> {
             LaunchedEffect(intent) {
-                if (intent.action == android.content.Intent.ACTION_VIEW) {
-                    val data = intent.data
+                val isAccountManagerFlow = intent.getBooleanExtra("is_account_manager_flow", false) ||
+                    intent.getBooleanExtra("is_confirm_credentials_flow", false) ||
+                    intent.getBooleanExtra("is_get_auth_token_flow", false) ||
+                    intent.getBooleanExtra("is_update_credentials_flow", false)
+                if (isAccountManagerFlow) {
+                    onScreenChange(AppScreen.SecretsSettings)
+                    intent.removeExtra("is_account_manager_flow")
+                    intent.removeExtra("is_confirm_credentials_flow")
+                    intent.removeExtra("is_get_auth_token_flow")
+                    intent.removeExtra("is_update_credentials_flow")
+                }
+
+                if (intent.action == android.content.Intent.ACTION_VIEW || intent.action == android.content.Intent.ACTION_SEND) {
+                    val data = intent.data ?: intent.getParcelableExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)
+                    if (data != null && (data.toString().contains(".ktxp") || intent.type == "application/vnd.keeftalk.ktxp" || data.scheme == "content" || data.scheme == "file")) {
+                        if (data.toString().contains(".ktxp") || intent.type == "application/vnd.keeftalk.ktxp") {
+                            Log.i(TAG, "Received external .ktxp package import intent with URI: $data")
+                            onScreenChange(AppScreen.ExtensionReview(data.toString()))
+                            intent.action = null
+                        }
+                    }
                     if (data?.scheme == "keeftalk" && data.host == "reset-password") {
                         onScreenChange(AppScreen.CreateNewPassword)
                         intent.action = null
                     } else if (data?.scheme == "keeftalk" && data.host == "confirm-signup") {
-                        // Supabase handleDeeplinks will update the session,
-                        // and StartupState.Ready will eventually reflect the new isLogged status.
                         intent.action = null
                     }
                 }
@@ -1035,11 +1066,14 @@ fun MainScaffold(
                                           currentScreen is AppScreen.Finances ||
                                           currentScreen is AppScreen.Feed ||
                                           currentScreen is AppScreen.Books ||
+                                          currentScreen is AppScreen.MyDin ||
+                                          currentScreen is AppScreen.Docs ||
+                                          currentScreen is AppScreen.DocViewer ||
                                           currentScreen is AppScreen.Market ||
                                           currentScreen is AppScreen.Habits ||
                                           currentScreen is AppScreen.Todo
 
-                        val showGlobalTopBar = if (currentScreen is AppScreen.ChatList || (currentScreen is AppScreen.Books && (isReaderOpen || isBookDetailStatsOpen))) {
+                        val showGlobalTopBar = if (currentScreen is AppScreen.ChatList || (currentScreen is AppScreen.Books && (isReaderOpen || isBookDetailStatsOpen)) || currentScreen is AppScreen.MyDin || currentScreen is AppScreen.Docs || currentScreen is AppScreen.DocViewer) {
                             false // Handled locally or hidden in full screen reader / book detail stats
                         } else {
                             isMainModule
@@ -1064,6 +1098,8 @@ fun MainScaffold(
                                     is AppScreen.Finances -> "My Finances"
                                     is AppScreen.Feed -> "Feed"
                                     is AppScreen.Books -> "My Books"
+                                    is AppScreen.Docs -> "My Docs"
+                                    is AppScreen.DocViewer -> "Document Viewer"
                                     is AppScreen.Market -> "My Market"
                                     is AppScreen.Habits -> "My Habits"
                                     is AppScreen.Todo -> "My Todo"
@@ -1532,8 +1568,7 @@ fun MainScaffold(
                                                                                     val coords = geoUri.removePrefix("geo:").substringBefore("?").split(",")
                                                                                     val lat = coords[0].toDouble()
                                                                                     val lon = coords[1].toDouble()
-                                                                                    val isLive = geoUri.contains("live=true")
-                                                                                    onScreenChange(AppScreen.LocationDetail(lat, lon, "Location", isLive))
+                                                                                    onScreenChange(AppScreen.MyMapsDetail(latitude = lat, longitude = lon, title = "Location"))
                                                                                 } catch (e: Exception) {
                                                                                     onScreenChange(AppScreen.MediaViewer(messageId, content, pos))
                                                                                 }
@@ -1697,11 +1732,94 @@ fun MainScaffold(
                                     onBrowserSettingsClick = { onScreenChange(AppScreen.BrowserSettings) },
                                     onParentalControlsClick = { onScreenChange(AppScreen.ParentalControls) },
                                     onAppCustomizationClick = { onScreenChange(AppScreen.AppCustomization) },
+                                    onExtensionsClick = { onScreenChange(AppScreen.Extensions) },
                                     onDisplaySettingsClick = { onScreenChange(AppScreen.DisplaySettings) },
                                     onAboutClick = { onScreenChange(AppScreen.About) },
                                     onHelpClick = { onScreenChange(AppScreen.Help) },
-                                    onTestScreensPreviewClick = { onScreenChange(AppScreen.TestScreensPreview) }
+                                    onSecretsSettingsClick = { onScreenChange(AppScreen.SecretsSettings) },
+                                    onTestScreensPreviewClick = { onScreenChange(AppScreen.TestScreensPreview) },
+                                    onFeedSettingsClick = { onScreenChange(AppScreen.FeedSettings) },
+                                    onBooksSettingsClick = { onScreenChange(AppScreen.BooksSettings) },
+                                    onMarketSettingsClick = { onScreenChange(AppScreen.MarketSettings) },
+                                    onSmsSettingsClick = { onScreenChange(AppScreen.SmsSettings) },
+                                    onTodoSettingsClick = { onScreenChange(AppScreen.TodoSettings) },
+                                    onMapSettingsClick = { onScreenChange(AppScreen.MapSettings) }
                                 )
+                            }
+                            is AppScreen.Extensions -> {
+                                tn.keeftalk.chat.extension.ui.ExtensionSettingsScreen(
+                                    onBack = { onScreenChange(AppScreen.Settings) },
+                                    onOpenReview = { uri -> onScreenChange(AppScreen.ExtensionReview(uri.toString())) }
+                                )
+                            }
+                            is AppScreen.ExtensionScreen -> {
+                                val host = tn.keeftalk.chat.di.AppModule.provideExtensionHost(context)
+                                val screen = host.registry.declarativeScreenRegistry.getScreen(currentScreen.screenId)
+                                if (screen != null) {
+                                    tn.keeftalk.chat.extension.renderer.DeclarativeScreenRenderer(
+                                        screen = screen,
+                                        onBack = { onScreenChange(AppScreen.Feed) },
+                                        onNavigate = { targetId -> onScreenChange(AppScreen.ExtensionScreen(targetId)) }
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("Extension screen not found: ${currentScreen.screenId}")
+                                    }
+                                }
+                            }
+                            is AppScreen.ExtensionReview -> {
+                                val extViewModel: tn.keeftalk.chat.extension.ui.ExtensionViewModel = viewModel {
+                                    tn.keeftalk.chat.extension.ui.ExtensionViewModel(context.applicationContext as android.app.Application)
+                                }
+                                val reviewState by extViewModel.reviewState.collectAsState()
+
+                                LaunchedEffect(currentScreen.packageUriString) {
+                                    if (reviewState is tn.keeftalk.chat.extension.ui.ReviewState.Idle) {
+                                        extViewModel.stageAndReviewPackage(android.net.Uri.parse(currentScreen.packageUriString))
+                                    }
+                                }
+
+                                when (val state = reviewState) {
+                                    is tn.keeftalk.chat.extension.ui.ReviewState.Analyzing -> {
+                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                CircularProgressIndicator()
+                                                Text("Analyzing .ktxp extension package...", style = MaterialTheme.typography.bodyMedium)
+                                            }
+                                        }
+                                    }
+                                    is tn.keeftalk.chat.extension.ui.ReviewState.Ready -> {
+                                        tn.keeftalk.chat.extension.ui.ExtensionReviewScreen(
+                                            manifest = state.manifest,
+                                            report = state.report,
+                                            onConfirmInstall = {
+                                                extViewModel.confirmInstallation {
+                                                    onScreenChange(AppScreen.Extensions)
+                                                }
+                                            },
+                                            onCancel = {
+                                                extViewModel.cancelReview()
+                                                onScreenChange(AppScreen.Extensions)
+                                            }
+                                        )
+                                    }
+                                    is tn.keeftalk.chat.extension.ui.ReviewState.Error -> {
+                                        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(64.dp))
+                                                Text("Package Review Failed", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                                Text(state.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Button(onClick = {
+                                                    extViewModel.cancelReview()
+                                                    onScreenChange(AppScreen.Extensions)
+                                                }) {
+                                                    Text("Back to Extensions")
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else -> {}
+                                }
                             }
                             is AppScreen.TestScreensPreview -> {
                                 tn.keeftalk.chat.ui.settings.TestScreensPreviewScreen(
@@ -1835,7 +1953,8 @@ fun MainScaffold(
                                 SecretsSettingsScreen(
                                     settings = secretsViewModel.uiState.collectAsState().value.settings,
                                     onSettingsChanged = { secretsViewModel.updateSettings(it) },
-                                    onBack = { onScreenChange(AppScreen.Secrets) }
+                                    onBack = { onScreenChange(AppScreen.Settings) },
+                                    onOpenVault = { onScreenChange(AppScreen.Secrets) }
                                 )
                             }
                             is AppScreen.AutomaticBackupSettings -> {
@@ -1880,6 +1999,84 @@ fun MainScaffold(
                                     )
                                 }
                                 HabitSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.FeedSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                FeedSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.BooksSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                BooksSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.MarketSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                MarketSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.SmsSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                SmsSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.TodoSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                TodoSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
+                            }
+                            is AppScreen.MapSettings -> {
+                                val settingsViewModel: SettingsViewModel = viewModel {
+                                    SettingsViewModel(
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        mainViewModel.authRepository,
+                                        mainViewModel.chatRepository,
+                                        AppModule.providePrivacyRepository(context),
+                                        AppModule.provideSecurityRepository(context),
+                                        AppModule.provideSettingsRepository(context)
+                                    )
+                                }
+                                MapSettingsScreen(viewModel = settingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
                             }
                             is AppScreen.ParentalControls -> {
                                 val settingsViewModel: SettingsViewModel = viewModel {
@@ -2324,7 +2521,23 @@ fun MainScaffold(
                                 }
                                 HelpScreen(
                                     viewModel = bugReportViewModel,
+                                    onSecurityPrivacyCenterClick = { onScreenChange(AppScreen.SecurityPrivacyCenter) },
                                     onBack = { onScreenChange(AppScreen.Settings) }
+                                )
+                            }
+                            is AppScreen.SecurityPrivacyCenter -> {
+                                tn.keeftalk.chat.ui.settings.SecurityPrivacyCenterScreen(
+                                    onNavigateToBackupRestore = { onScreenChange(AppScreen.BackupRestore) },
+                                    onNavigateToTwoFactor = { onScreenChange(AppScreen.VaultSettings) },
+                                    onBack = { onScreenChange(AppScreen.Help) }
+                                )
+                            }
+                            is AppScreen.BackupRestore -> {
+                                val database = AppModule.provideDatabase(context)
+                                val backupEngine = tn.keeftalk.chat.data.service.BackupEngine(context, database)
+                                tn.keeftalk.chat.ui.settings.BackupRestoreScreen(
+                                    backupEngine = backupEngine,
+                                    onBack = { onScreenChange(AppScreen.SecurityPrivacyCenter) }
                                 )
                             }
                             is AppScreen.SmsList -> { /* Already handled via chatTab */ }
@@ -2433,47 +2646,60 @@ fun MainScaffold(
                                     }
                                 )
                             }
-                            is AppScreen.LocationPicker -> {
-                                tn.keeftalk.chat.ui.screens.LocationPickerScreen(
-                                    onBack = { 
-            onScreenChange(AppScreen.ChatList)
-            onShowAttachmentsChange(currentScreen.chatId)
-        },
-                                    onLocationShared = { latitude, longitude, isLive, duration ->
-                                        scope.launch {
-                                            if (isLive) {
-                                                mainViewModel.chatRepository.sendMessage(
-                                                    currentScreen.chatId,
-                                                    "Live location started ($duration)",
-                                                    tn.keeftalk.chat.domain.model.MessageType.LOCATION,
-                                                    "geo:$latitude,$longitude?live=true&duration=$duration"
-                                                )
-                                            } else {
-                                                mainViewModel.chatRepository.sendMessage(
-                                                    currentScreen.chatId,
-                                                    "Shared a location",
-                                                    tn.keeftalk.chat.domain.model.MessageType.LOCATION,
-                                                    "geo:$latitude,$longitude"
-                                                )
-                                            }
-                                            navigator.navigateBack()
+                            is AppScreen.MyMaps -> {
+                                MyMapsScreen(
+                                    viewModel = viewModel<MyMapsViewModel>(),
+                                    onBack = {
+                                        if (navigator.canNavigateBack()) {
+                                            scope.launch { navigator.navigateBack() }
+                                        } else {
+                                            onNavigateBack()
                                         }
                                     }
                                 )
                             }
-                            is AppScreen.LocationDetail -> {
-                                tn.keeftalk.chat.ui.screens.LocationDetailScreen(
-                                    latitude = currentScreen.latitude,
-                                    longitude = currentScreen.longitude,
-                                    title = currentScreen.title,
-                                    isLive = currentScreen.isLive,
-                                    onBack = { scope.launch { navigator.navigateBack() } }
+                            is AppScreen.MyMapsDetail -> {
+                                MyMapsScreen(
+                                    viewModel = viewModel<MyMapsViewModel>(),
+                                    initialLatitude = currentScreen.latitude,
+                                    initialLongitude = currentScreen.longitude,
+                                    initialTitle = currentScreen.title,
+                                    isPickerMode = currentScreen.isPicker,
+                                    chatId = currentScreen.chatId,
+                                    onBack = {
+                                        if (currentScreen.isPicker && currentScreen.chatId != null) {
+                                            onScreenChange(AppScreen.ChatList)
+                                        } else if (navigator.canNavigateBack()) {
+                                            scope.launch { navigator.navigateBack() }
+                                        } else {
+                                            onNavigateBack()
+                                        }
+                                    },
+                                    onLocationPicked = { selectedLoc: CanonicalLocation ->
+                                        currentScreen.chatId?.let { targetChatId ->
+                                            scope.launch {
+                                                mainViewModel.chatRepository.sendMessage(
+                                                    targetChatId,
+                                                    selectedLoc.name ?: "Shared a location",
+                                                    tn.keeftalk.chat.domain.model.MessageType.LOCATION,
+                                                    "geo:${selectedLoc.latitude},${selectedLoc.longitude}"
+                                                )
+                                                if (navigator.canNavigateBack()) {
+                                                    navigator.navigateBack()
+                                                } else {
+                                                    onScreenChange(AppScreen.ChatList)
+                                                }
+                                            }
+                                        }
+                                    }
                                 )
                             }
                             is AppScreen.Feed -> {
                                 tn.keeftalk.chat.ui.feed.FeedScreen(
                                     onManageFeeds = { onScreenChange(AppScreen.ManageFeeds) },
-                                    onOpenUrlInBrowser = { url -> onScreenChange(AppScreen.Browser(url)) }
+                                    onOpenUrlInBrowser = { url -> onScreenChange(AppScreen.Browser(url)) },
+                                    onNavigateToExtensionScreen = { screenId -> onScreenChange(AppScreen.ExtensionScreen(screenId)) },
+                                    onNavigateToMyDin = { onScreenChange(AppScreen.MyDin) }
                                 )
                             }
                             is AppScreen.ManageFeeds -> {
@@ -2496,6 +2722,38 @@ fun MainScaffold(
                                     fabActionFlow = fabActionFlow,
                                     onReaderStateChanged = { isReaderOpen = it },
                                     onDetailStatsStateChanged = { isBookDetailStatsOpen = it }
+                                )
+                            }
+                            is AppScreen.MyDin -> {
+                                tn.keeftalk.chat.feature.mydin.ui.MyDinScreen(
+                                    onBack = { onScreenChange(AppScreen.ChatList) }
+                                )
+                            }
+                            is AppScreen.Docs -> {
+                                val docsViewModel: tn.keeftalk.chat.ui.docs.DocsViewModel = viewModel {
+                                    tn.keeftalk.chat.ui.docs.DocsViewModel(
+                                        context.applicationContext as android.app.Application,
+                                        AppModule.provideDocRepository(context)
+                                    )
+                                }
+                                tn.keeftalk.chat.ui.docs.DocsScreen(
+                                    viewModel = docsViewModel,
+                                    onOpenDoc = { docId -> onScreenChange(AppScreen.DocViewer(docId)) },
+                                    onSettings = { onScreenChange(AppScreen.Settings) },
+                                    fabActionFlow = fabActionFlow
+                                )
+                            }
+                            is AppScreen.DocViewer -> {
+                                val docViewerViewModel: tn.keeftalk.chat.ui.docs.viewer.DocViewerViewModel = viewModel(key = (currentScreen as AppScreen.DocViewer).docId) {
+                                    tn.keeftalk.chat.ui.docs.viewer.DocViewerViewModel(
+                                        (currentScreen as AppScreen.DocViewer).docId,
+                                        AppModule.provideDocRepository(context)
+                                    )
+                                }
+                                tn.keeftalk.chat.ui.docs.viewer.DocViewerScreen(
+                                    viewModel = docViewerViewModel,
+                                    onBack = { onNavigateBack() },
+                                    onOpenInBrowser = { url -> onScreenChange(AppScreen.Browser(url)) }
                                 )
                             }
                             is AppScreen.Market -> {
@@ -2612,6 +2870,9 @@ fun MainScaffold(
                     AppScreen.DisplaySettings -> true
                     AppScreen.Feed -> true
                     AppScreen.Books -> !isReaderOpen && !isBookDetailStatsOpen
+                    AppScreen.MyDin -> true
+                    AppScreen.Docs -> true
+                    is AppScreen.DocViewer -> false
                     AppScreen.Market -> true
                     AppScreen.Habits -> true
                     AppScreen.Todo -> true
@@ -2626,8 +2887,8 @@ fun MainScaffold(
                     AppScreen.Wallet -> true
                     AppScreen.Finances -> true
                     AppScreen.Email -> true
-                    is AppScreen.LocationPicker -> false
-                    is AppScreen.LocationDetail -> false
+                    is AppScreen.MyMaps -> false
+                    is AppScreen.MyMapsDetail -> false
                     is AppScreen.SharePicker -> false
                     is AppScreen.ShareNotePicker -> false
                     is AppScreen.ShareEmailPicker -> false
@@ -2777,6 +3038,12 @@ sealed class AppScreen : Parcelable {
     @Parcelize
     data object Books : AppScreen()
     @Parcelize
+    data object MyDin : AppScreen()
+    @Parcelize
+    data object Docs : AppScreen()
+    @Parcelize
+    data class DocViewer(val docId: String) : AppScreen()
+    @Parcelize
     data object Market : AppScreen()
     @Parcelize
     data object Habits : AppScreen()
@@ -2815,13 +3082,35 @@ sealed class AppScreen : Parcelable {
     @Parcelize
     data object AutomaticBackupSettings : AppScreen()
     @Parcelize
+    data object SecurityPrivacyCenter : AppScreen()
+    @Parcelize
+    data object BackupRestore : AppScreen()
+    @Parcelize
     data object CalendarSettings : AppScreen()
     @Parcelize
     data object HabitSettings : AppScreen()
     @Parcelize
+    data object FeedSettings : AppScreen()
+    @Parcelize
+    data object BooksSettings : AppScreen()
+    @Parcelize
+    data object MarketSettings : AppScreen()
+    @Parcelize
+    data object SmsSettings : AppScreen()
+    @Parcelize
+    data object TodoSettings : AppScreen()
+    @Parcelize
+    data object MapSettings : AppScreen()
+    @Parcelize
     data object ParentalControls : AppScreen()
     @Parcelize
     data object AppCustomization : AppScreen()
+    @Parcelize
+    data object Extensions : AppScreen()
+    @Parcelize
+    data class ExtensionReview(val packageUriString: String) : AppScreen()
+    @Parcelize
+    data class ExtensionScreen(val screenId: String) : AppScreen()
     @Parcelize
     data object ChatAppearanceSettings : AppScreen()
     @Parcelize
@@ -2873,8 +3162,6 @@ sealed class AppScreen : Parcelable {
     @Parcelize
     data object AddContact : AppScreen()
     @Parcelize
-    data class LocationPicker(val chatId: String) : AppScreen()
-    @Parcelize
     data class SharePicker(val chatId: String) : AppScreen()
     @Parcelize
     data class ShareNotePicker(val chatId: String) : AppScreen()
@@ -2884,8 +3171,6 @@ sealed class AppScreen : Parcelable {
     data class ShareVaultPicker(val chatId: String) : AppScreen()
     @Parcelize
     data class ShareAgendaPicker(val chatId: String) : AppScreen()
-    @Parcelize
-    data class LocationDetail(val latitude: Double, val longitude: Double, val title: String? = null, val isLive: Boolean = false) : AppScreen()
     @Parcelize
     data class ConnectionPath(val userId: String) : AppScreen()
     @Parcelize
@@ -2898,6 +3183,16 @@ sealed class AppScreen : Parcelable {
     data object TestScreensPreview : AppScreen()
     @Parcelize
     data object SubscriptionPlans : AppScreen()
+    @Parcelize
+    data object MyMaps : AppScreen()
+    @Parcelize
+    data class MyMapsDetail(
+        val latitude: Double? = null,
+        val longitude: Double? = null,
+        val title: String? = null,
+        val isPicker: Boolean = false,
+        val chatId: String? = null
+    ) : AppScreen()
 }
 
 @SuppressLint("MissingPermission")
@@ -2928,7 +3223,7 @@ private fun handleAttachmentAction(
             pickContactLauncher.launch(null)
         }
         AttachmentType.LOCATION -> {
-            onScreenChange(AppScreen.LocationPicker(chatId))
+            onScreenChange(AppScreen.MyMapsDetail(isPicker = true, chatId = chatId))
         }
         else -> {}
     }

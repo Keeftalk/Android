@@ -22,20 +22,22 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tn.keeftalk.chat.domain.model.todo.TodoTask
+import tn.keeftalk.chat.ui.theme.FabGradient
+import tn.keeftalk.chat.ui.theme.FabPurple
 import tn.keeftalk.chat.ui.theme.LucideIcons
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-val C1 = Color(0xFF00CCCC)
-val C2 = Color(0xFF7D5CFF)
-val Hi = Color(0xFFFF4D7A)
-val CardBg = Color(0xFF111628)
-val SoftBg = Color(0xFF18203a)
-val ScrBg = Color(0xFF0a0e1e)
-val TextColor = Color(0xFFeef1ff)
-val MutedColor = Color(0xFF8d97bb)
-val LineColor = Color(0xFF1e2742)
+val C1 @Composable get() = MaterialTheme.colorScheme.primary
+val C2 @Composable get() = MaterialTheme.colorScheme.secondary
+val Hi @Composable get() = MaterialTheme.colorScheme.error
+val CardBg @Composable get() = MaterialTheme.colorScheme.surface
+val SoftBg @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+val ScrBg @Composable get() = MaterialTheme.colorScheme.background
+val TextColor @Composable get() = MaterialTheme.colorScheme.onBackground
+val MutedColor @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+val LineColor @Composable get() = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +82,7 @@ fun TodoScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(ScrBg)
+            .navigationBarsPadding()
             .imePadding()
     ) {
         Column(
@@ -95,8 +98,8 @@ fun TodoScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(
-                        if (isAllDone) Brush.linearGradient(listOf(C2, C1, Color(0xFF2ED9A0)))
-                        else Brush.linearGradient(listOf(C1, C2))
+                        if (isAllDone) Brush.linearGradient(listOf(FabPurple, tn.keeftalk.chat.ui.theme.FabCyan, Color(0xFF2ED9A0)))
+                        else FabGradient
                     )
                     .padding(heroPadding)
             ) {
@@ -116,7 +119,7 @@ fun TodoScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             Button(
                                 onClick = { viewModel.setView("up") },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = C2),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = FabPurple),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {

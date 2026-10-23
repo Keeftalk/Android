@@ -41,4 +41,7 @@ interface NativeHabitDao {
 
     @Query("DELETE FROM habit_checkins WHERE habitId = :habitId AND epochDay = :epochDay")
     suspend fun deleteCheckIn(habitId: String, epochDay: Long)
+
+    @Query("UPDATE habits SET userId = :newUserId WHERE userId = 'local_user'")
+    suspend fun associateLocalHabits(newUserId: String)
 }

@@ -1119,6 +1119,13 @@ fun FinancesSettingsScreen(
     ) {
         BackHeader("Settings", onBack = onBack)
 
+        tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+            featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.FINANCES,
+            description = "Sync your financial data securely across your devices.",
+            onEnableClick = { },
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        )
+
         FinanceCard {
             Text("Display Currency", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Spacer(modifier = Modifier.height(6.dp))

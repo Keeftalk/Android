@@ -169,10 +169,36 @@ class SettingsViewModel(
 
 
 
+    private val _logoutState = kotlinx.coroutines.flow.MutableStateFlow<tn.keeftalk.chat.ui.LogoutState>(tn.keeftalk.chat.ui.LogoutState.Idle)
+    val logoutState: StateFlow<tn.keeftalk.chat.ui.LogoutState> = _logoutState
+
     fun logout() {
+        showLogoutConfirmation()
+    }
+
+    fun showLogoutConfirmation() {
+        _logoutState.value = tn.keeftalk.chat.ui.LogoutState.Confirming
+    }
+
+    fun confirmLogout() {
         viewModelScope.launch {
-            authRepository.logout()
+            _logoutState.value = tn.keeftalk.chat.ui.LogoutState.Deleting
+            val result = authRepository.logout()
+            if (result.isSuccess) {
+                _logoutState.value = tn.keeftalk.chat.ui.LogoutState.Idle
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Failed to wipe cached data and tokens completely."
+                _logoutState.value = tn.keeftalk.chat.ui.LogoutState.Error(errorMsg)
+            }
         }
+    }
+
+    fun dismissLogout() {
+        _logoutState.value = tn.keeftalk.chat.ui.LogoutState.Idle
+    }
+
+    fun dismissLogoutError() {
+        _logoutState.value = tn.keeftalk.chat.ui.LogoutState.Idle
     }
 
     fun deleteAccount() {
@@ -252,6 +278,30 @@ class SettingsViewModel(
     fun updateHabitSettings(update: (tn.keeftalk.chat.domain.model.UserHabitSettings) -> tn.keeftalk.chat.domain.model.UserHabitSettings) {
         viewModelScope.launch { settingsRepository.updateHabitSettings(update) }
     }
+
+    fun updateFeedSettings(update: (tn.keeftalk.chat.domain.model.UserFeedSettings) -> tn.keeftalk.chat.domain.model.UserFeedSettings) {
+        viewModelScope.launch { settingsRepository.updateFeedSettings(update) }
+    }
+
+    fun updateBookSettings(update: (tn.keeftalk.chat.domain.model.BookSettings) -> tn.keeftalk.chat.domain.model.BookSettings) {
+        viewModelScope.launch { settingsRepository.updateBookSettings(update) }
+    }
+
+    fun updateMarketSettings(update: (tn.keeftalk.chat.domain.model.UserMarketSettings) -> tn.keeftalk.chat.domain.model.UserMarketSettings) {
+        viewModelScope.launch { settingsRepository.updateMarketSettings(update) }
+    }
+
+    fun updateSmsSettings(update: (tn.keeftalk.chat.domain.model.UserSmsSettings) -> tn.keeftalk.chat.domain.model.UserSmsSettings) {
+        viewModelScope.launch { settingsRepository.updateSmsSettings(update) }
+    }
+
+    fun updateTodoSettings(update: (tn.keeftalk.chat.domain.model.UserTodoSettings) -> tn.keeftalk.chat.domain.model.UserTodoSettings) {
+        viewModelScope.launch { settingsRepository.updateTodoSettings(update) }
+    }
+
+    fun updateMapSettings(update: (tn.keeftalk.chat.domain.model.UserMapSettings) -> tn.keeftalk.chat.domain.model.UserMapSettings) {
+        viewModelScope.launch { settingsRepository.updateMapSettings(update) }
+    }
     
     override fun onCleared() {
         super.onCleared()
@@ -284,6 +334,30 @@ class SettingsViewModel(
 
     fun clearSecuritySuccessMessage() {
         _securityUiState.update { it.copy(successMessage = null) }
+    }
+
+    fun enableSyncForUnlockedFeatures() {
+        viewModelScope.launch {
+            updateNoteSettings { it.copy(syncNotesAcrossDevices = true) }
+            updateBookSettings { it.copy(syncAcrossDevices = true) }
+            updateCalendarSettings { it.copy(syncDeviceCalendar = true) }
+            updateTodoSettings { it.copy(syncTodosAcrossDevices = true) }
+            updateHabitSettings { it.copy(syncHabitsAcrossDevices = true) }
+            updateVaultSettings { it.copy(automaticBackupEnabled = true) }
+            updateSmsSettings { it.copy(smsBridgeEnabled = true) }
+            updateModuleIntegration("financesSyncEnabled", true)
+        }
+    }
+
+    fun redeemCode(context: Context, code: String, onResult: (tn.keeftalk.chat.domain.engine.RedeemResult) -> Unit) {
+        viewModelScope.launch {
+            val entitlementManager = tn.keeftalk.chat.di.AppModule.provideEntitlementManager(context)
+            val result = entitlementManager.redeemCode(code, authRepository)
+            if (result is tn.keeftalk.chat.domain.engine.RedeemResult.Success) {
+                enableSyncForUnlockedFeatures()
+            }
+            onResult(result)
+        }
     }
 }
 

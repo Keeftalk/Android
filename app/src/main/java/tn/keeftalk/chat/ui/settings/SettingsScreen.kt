@@ -37,6 +37,7 @@ fun SettingsScreen(
     onCallSettingsClick: () -> Unit = {},
     onNoteSettingsClick: () -> Unit = {},
     onVaultSettingsClick: () -> Unit = {},
+    onSecretsSettingsClick: () -> Unit = {},
     onCalendarSettingsClick: () -> Unit = {},
     onHabitSettingsClick: () -> Unit = {},
     onFinancesSettingsClick: () -> Unit = {},
@@ -44,14 +45,20 @@ fun SettingsScreen(
     onBrowserSettingsClick: () -> Unit = {},
     onParentalControlsClick: () -> Unit = {},
     onAppCustomizationClick: () -> Unit = {},
+    onExtensionsClick: () -> Unit = {},
     onDisplaySettingsClick: () -> Unit = {},
+    onFeedSettingsClick: () -> Unit = {},
+    onBooksSettingsClick: () -> Unit = {},
+    onMarketSettingsClick: () -> Unit = {},
+    onSmsSettingsClick: () -> Unit = {},
+    onTodoSettingsClick: () -> Unit = {},
+    onMapSettingsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     onHelpClick: () -> Unit = {},
     onTestScreensPreviewClick: () -> Unit = {},
     title: String = "Settings"
 ) {
     val profile by viewModel.currentUserProfile.collectAsState()
-    var showLogoutDialog by remember { mutableStateOf(false) }
     var showLegalDocumentType by remember { mutableStateOf<String?>(null) }
     val icons = LocalAppIcons.current
 
@@ -105,6 +112,12 @@ fun SettingsScreen(
                         onClick = onAppCustomizationClick
                     )
                     SettingsItem(
+                        icon = Icons.Default.Extension,
+                        title = "Extensions & Add-ons",
+                        subtitle = "Themes, emoji packs, feed cards, file viewers, .ktxp packages",
+                        onClick = onExtensionsClick
+                    )
+                    SettingsItem(
                         icon = icons.chat,
                         title = "My Chats",
                         subtitle = "Chat display, archive, visibility",
@@ -127,6 +140,12 @@ fun SettingsScreen(
                         title = "My Vault",
                         subtitle = "Encrypted storage, password, backup",
                         onClick = onVaultSettingsClick
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.VpnKey,
+                        title = "My Secrets",
+                        subtitle = "Passwords, vault, generator, autofill",
+                        onClick = onSecretsSettingsClick
                     )
                     SettingsItem(
                         icon = icons.calendar,
@@ -172,6 +191,42 @@ fun SettingsScreen(
                         onClick = onParentalControlsClick
                     )
                     SettingsItem(
+                        icon = icons.calendar,
+                        title = "My Feed",
+                        subtitle = "RSS aggregator, widgets, layout",
+                        onClick = onFeedSettingsClick
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.Book,
+                        title = "My Books",
+                        subtitle = "E-books, reader, read marker, DPI",
+                        onClick = onBooksSettingsClick
+                    )
+                    SettingsItem(
+                        icon = icons.finances,
+                        title = "My Market",
+                        subtitle = "Tickers, currency, charts, alerts",
+                        onClick = onMarketSettingsClick
+                    )
+                    SettingsItem(
+                        icon = icons.chat,
+                        title = "My SMS/MMS",
+                        subtitle = "Messaging bridge, reports, encryption",
+                        onClick = onSmsSettingsClick
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.CheckCircle,
+                        title = "My Todo",
+                        subtitle = "Tasks, priorities, reminders",
+                        onClick = onTodoSettingsClick
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.Map,
+                        title = "My Maps",
+                        subtitle = "Map types, GPS accuracy, offline cache",
+                        onClick = onMapSettingsClick
+                    )
+                    SettingsItem(
                         icon = icons.palette,
                         title = "Display",
                         subtitle = "Theme, fonts, accessibility",
@@ -200,7 +255,7 @@ fun SettingsScreen(
                         title = "Logout",
                         subtitle = "Sign out of your account",
                         contentColor = MaterialTheme.colorScheme.error,
-                        onClick = { showLogoutDialog = true },
+                        onClick = { viewModel.showLogoutConfirmation() },
                         showDivider = false
                     )
                 }
@@ -227,26 +282,71 @@ fun SettingsScreen(
         )
     }
 
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Logout") },
-            text = { Text("Are you sure you want to logout from Keeftalk?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.logout()
-                    showLogoutDialog = false
-                    onBack()
-                }) {
-                    Text("Logout", color = MaterialTheme.colorScheme.error)
+    val logoutState by viewModel.logoutState.collectAsState()
+
+    when (val state = logoutState) {
+        is tn.keeftalk.chat.ui.LogoutState.Confirming -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissLogout() },
+                title = { Text("Logout") },
+                text = { Text("Are you sure you want to logout? All local data, chats, and cache will be permanently deleted and the app will be reset to a fresh install state.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.confirmLogout()
+                    }) {
+                        Text("Logout", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissLogout() }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Cancel")
+            )
+        }
+        is tn.keeftalk.chat.ui.LogoutState.Deleting -> {
+            androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Deleting all app data, cache, and resetting app...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
             }
-        )
+        }
+        is tn.keeftalk.chat.ui.LogoutState.Error -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissLogoutError() },
+                title = { Text("Logout Failed") },
+                text = { Text(state.message) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.confirmLogout() }) {
+                        Text("Retry")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissLogoutError() }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+        else -> {}
     }
 }
 
@@ -358,6 +458,7 @@ fun SettingsToggleItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

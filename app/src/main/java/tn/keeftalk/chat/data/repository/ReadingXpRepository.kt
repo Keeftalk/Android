@@ -2,6 +2,7 @@ package tn.keeftalk.chat.data.repository
 
 import android.content.Context
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonPrimitive
@@ -274,13 +275,49 @@ class ReadingXpRepository(
     suspend fun syncAndFetchGlobalRank(context: Context, totalXp: Long): GlobalRankDto? {
         return try {
             val supabase = AppModule.provideSupabaseClientAsync(context)
-            val user = supabase.auth.currentUserOrNull()
-            val username = user?.userMetadata?.get("username")?.let {
+            val user = supabase.auth.currentUserOrNull() ?: return null
+            val userId = user.id
+            val username = user.userMetadata?.get("username")?.let {
                 if (it is JsonPrimitive) it.content else null
-            } ?: user?.email?.substringBefore("@") ?: "Reader"
+            } ?: user.email?.substringBefore("@") ?: "Reader"
+
+            // 1. Fetch server profile total_xp to prevent overwriting higher server XP with 0 on fresh install
+            val serverProfile = try {
+                supabase.postgrest["profiles"]
+                    .select { filter { eq("id", userId) } }
+                    .decodeSingleOrNull<tn.keeftalk.chat.domain.model.Profile>()
+            } catch (_: Exception) { null }
+
+            val serverXp = serverProfile?.totalXp ?: 0L
+            val effectiveXp: Long
+
+            if (serverXp > totalXp) {
+                // Restore server XP into local legacyReadingXp
+                val meta = xpDao.getXpMeta()
+                val currentLegacy = meta?.legacyReadingXp ?: 0L
+                val diff = serverXp - totalXp
+                val newLegacy = currentLegacy + diff
+
+                val updatedMeta = meta?.copy(legacyReadingXp = newLegacy)
+                    ?: XpMetaEntity(id = 1, legacyReadingXp = newLegacy, accountTz = java.time.ZoneId.systemDefault().id)
+                xpDao.insertOrUpdateXpMeta(updatedMeta)
+                effectiveXp = serverXp
+            } else {
+                effectiveXp = totalXp
+                // Push local total_xp to Supabase profiles table (offline-first sync)
+                if (totalXp > 0) {
+                    try {
+                        supabase.postgrest["profiles"].update(mapOf("total_xp" to totalXp)) {
+                            filter { eq("id", userId) }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("ReadingXpRepository", "Failed to update profile total_xp: ${e.message}")
+                    }
+                }
+            }
 
             val api: XpSyncApi = SupabaseXpSyncApi()
-            val res = api.syncUserXpAndGetRank(supabase, totalXp, username)
+            val res = api.syncUserXpAndGetRank(supabase, effectiveXp, username)
             if (res.isSuccess) {
                 val rankDto = res.getOrThrow()
                 val currentMeta = xpDao.getXpMeta()

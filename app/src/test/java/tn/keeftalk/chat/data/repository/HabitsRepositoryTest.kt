@@ -35,6 +35,7 @@ class HabitsRepositoryTest {
         override suspend fun deleteCheckIn(habitId: String, epochDay: Long) {
             checkIns.removeIf { it.habitId == habitId && it.epochDay == epochDay }
         }
+        override suspend fun associateLocalHabits(newUserId: String) {}
     }
 
     private val dao = FakeDao()

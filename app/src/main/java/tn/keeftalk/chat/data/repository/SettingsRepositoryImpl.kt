@@ -162,6 +162,24 @@ class SettingsRepositoryImpl(
     override suspend fun updateHabitSettings(update: (UserHabitSettings) -> UserHabitSettings) =
         updateSection { it.copy(habitSettings = update(it.habitSettings)) }
 
+    override suspend fun updateFeedSettings(update: (UserFeedSettings) -> UserFeedSettings) =
+        updateSection { it.copy(feedSettings = update(it.feedSettings)) }
+
+    override suspend fun updateBookSettings(update: (BookSettings) -> BookSettings) =
+        updateSection { it.copy(bookSettings = update(it.bookSettings)) }
+
+    override suspend fun updateMarketSettings(update: (UserMarketSettings) -> UserMarketSettings) =
+        updateSection { it.copy(marketSettings = update(it.marketSettings)) }
+
+    override suspend fun updateSmsSettings(update: (UserSmsSettings) -> UserSmsSettings) =
+        updateSection { it.copy(smsSettings = update(it.smsSettings)) }
+
+    override suspend fun updateTodoSettings(update: (UserTodoSettings) -> UserTodoSettings) =
+        updateSection { it.copy(todoSettings = update(it.todoSettings)) }
+
+    override suspend fun updateMapSettings(update: (UserMapSettings) -> UserMapSettings) =
+        updateSection { it.copy(mapSettings = update(it.mapSettings)) }
+
     override suspend fun getCacheSize(): Map<String, Long> = withContext(Dispatchers.IO) {
         val cacheDir = context.cacheDir
         fun getFolderSize(file: java.io.File): Long {

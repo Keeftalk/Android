@@ -64,6 +64,7 @@ fun BrowserMenuPopup(
         listOf(
             MenuItemData("find", "Find in page", Icons.Default.Search),
             MenuItemData("reader", if (viewModel.isReaderMode.collectAsState().value) "Exit reader mode" else "Reader mode", Icons.AutoMirrored.Filled.Article),
+            MenuItemData("downloads", "Downloads", Icons.Default.Star),
             MenuItemData("share", "Share link", Icons.Default.Share),
             MenuItemData("site", "Site information", Icons.Default.Info),
             MenuItemData("save", "Save to quick links", Icons.Default.Star),
@@ -75,6 +76,7 @@ fun BrowserMenuPopup(
     } else {
         listOf(
             MenuItemData("new", "New tab", Icons.Default.Add),
+            MenuItemData("downloads", "Downloads", Icons.Default.Star),
             MenuItemData("hist", "History", Icons.Default.History),
             MenuItemData("set", "Settings", Icons.Default.Settings),
             MenuItemData("all", "Close all tabs", Icons.Default.Delete)
@@ -122,6 +124,7 @@ fun BrowserMenuPopup(
                                                 }
                                             }
                                         }
+                                        "downloads" -> viewModel.isDownloadsSheetOpen.value = true
                                         "site" -> onOpenSiteInfo()
                                         "save" -> viewModel.saveCurrentPageToQuickLinks()
                                         "read" -> viewModel.addCurrentPageToReadingList()

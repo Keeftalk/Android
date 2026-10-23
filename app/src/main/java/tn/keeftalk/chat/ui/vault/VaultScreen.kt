@@ -520,6 +520,73 @@ fun VaultScreen(
                     )
                 }
 
+                val logoutState by viewModel.logoutState.collectAsState()
+
+                when (val state = logoutState) {
+                    is tn.keeftalk.chat.ui.LogoutState.Confirming -> {
+                        AlertDialog(
+                            onDismissRequest = { viewModel.dismissLogout() },
+                            title = { Text("Logout") },
+                            text = { Text("Are you sure you want to logout? All local data, chats, and cache will be permanently deleted and the app will be reset to a fresh install state.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    viewModel.confirmLogout()
+                                }) {
+                                    Text("Logout", color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.dismissLogout() }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
+                    is tn.keeftalk.chat.ui.LogoutState.Deleting -> {
+                        androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(48.dp),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Deleting all app data, cache, and resetting app...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    is tn.keeftalk.chat.ui.LogoutState.Error -> {
+                        AlertDialog(
+                            onDismissRequest = { viewModel.dismissLogoutError() },
+                            title = { Text("Logout Failed") },
+                            text = { Text(state.message) },
+                            confirmButton = {
+                                TextButton(onClick = { viewModel.confirmLogout() }) {
+                                    Text("Retry")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.dismissLogoutError() }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
+                    else -> {}
+                }
+
                 val keyErrorUpload = uiState.activeUploads.values.find { it.isError && it.errorMessage?.contains("Encryption context missing") == true }
                 if (keyErrorUpload != null) {
                     AlertDialog(
@@ -529,7 +596,6 @@ fun VaultScreen(
                         confirmButton = {
                             TextButton(onClick = { 
                                 viewModel.logout()
-                                onBack() // Go to login
                             }) {
                                 Text("Log Out Now")
                             }
@@ -939,17 +1005,14 @@ fun VaultTabPage(
                 verticalItemSpacing = 10.dp
             ) {
                 item(span = StaggeredGridItemSpan.FullLine) {
-                    Column {
-                        uiState.activeUploads.forEach { (id, upload) ->
-                            UploadingCard(
-                                upload = upload,
-                                onCancel = { viewModel.clearUploadError(id) }
-                            )
-                        }
-                    }
-                }
-                item(span = StaggeredGridItemSpan.FullLine) {
-                    VaultStorageCard(info = uiState.storageInfo, onAnalyzeClick = onAnalyzeStorage)
+                    VaultStorageCard(
+                        info = uiState.storageInfo,
+                        activeUploads = uiState.activeUploads,
+                        storageTips = uiState.storageTips,
+                        onAnalyzeClick = onAnalyzeStorage,
+                        onCancelUpload = { id -> viewModel.clearUploadError(id) },
+                        onReviewTip = { tip -> viewModel.onReviewTip(tip) }
+                    )
                 }
                 item(span = StaggeredGridItemSpan.FullLine) {
                     Column(modifier = Modifier.padding(vertical = 16.dp)) {

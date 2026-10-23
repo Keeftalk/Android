@@ -23,6 +23,9 @@ class SecretsRepositoryTest {
 
     @Before
     fun setUp() {
+        tn.keeftalk.chat.security.crypto.KeyManager.setAEK(
+            javax.crypto.spec.SecretKeySpec(ByteArray(32), "AES")
+        )
         fakeDao = FakeSecretsDao()
         repository = SecretsRepositoryImpl(fakeDao)
     }

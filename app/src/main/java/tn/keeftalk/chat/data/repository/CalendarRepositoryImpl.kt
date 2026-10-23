@@ -46,6 +46,11 @@ class CalendarRepositoryImpl(
         calendarDao.getItemById(id)?.toDomainInternal()
 
     override suspend fun saveItem(item: CalendarItem) {
+        if (item.title == "[Encrypted]") {
+            Log.w("CalendarRepositoryImpl", "saveItem blocked: Attempted to save an item whose title was NOT decrypted successfully.")
+            return
+        }
+
         // --- E2E ENCRYPTION ---
         val sensitiveData = buildJsonObject {
             put("title", item.title)

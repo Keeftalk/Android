@@ -49,8 +49,18 @@ object NotificationChannelManager {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Ringtone and heads-up alerts for incoming calls"
+                val customRingtonePath = try {
+                    tn.keeftalk.chat.di.AppModule.provideExtensionHost(context).registry.soundPackRegistry.resolveSoundPath("incoming_call")
+                } catch (_: Exception) {
+                    null
+                }
+                val ringtoneUri = if (!customRingtonePath.isNullOrBlank() && java.io.File(customRingtonePath).exists()) {
+                    android.net.Uri.fromFile(java.io.File(customRingtonePath))
+                } else {
+                    android.provider.Settings.System.DEFAULT_RINGTONE_URI
+                }
                 setSound(
-                    android.provider.Settings.System.DEFAULT_RINGTONE_URI,
+                    ringtoneUri,
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)

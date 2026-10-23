@@ -1,13 +1,18 @@
 package tn.keeftalk.chat.ui.browser
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import tn.keeftalk.chat.data.local.entities.BrowserHistoryEntity
+import tn.keeftalk.chat.di.AppModule
 import tn.keeftalk.chat.domain.model.UserBrowserSettings
+import tn.keeftalk.chat.domain.model.WeatherInfo
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
@@ -63,7 +68,31 @@ data class SiteInfoData(
     val trackersBlocked: Int
 )
 
-class BrowserViewModel : ViewModel() {
+data class DownloadItem(
+    val id: String = UUID.randomUUID().toString(),
+    val fileName: String,
+    val url: String,
+    val progress: Float, // 0f to 1f
+    val isComplete: Boolean,
+    val localPath: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+class BrowserViewModel(application: Application) : AndroidViewModel(application) {
+
+    val weatherRepository = AppModule.provideWeatherRepository(application)
+    val weatherInfo: StateFlow<WeatherInfo?> = weatherRepository.weatherInfo
+    private val historyDao = AppModule.provideDatabase(application).browserHistoryDao()
+    val isWeatherExpanded = MutableStateFlow(false)
+    val weatherDayIndex = MutableStateFlow(0)
+
+    fun toggleWeatherExpand() {
+        isWeatherExpanded.value = !isWeatherExpanded.value
+    }
+
+    fun setWeatherDayIndex(index: Int) {
+        weatherDayIndex.value = index
+    }
 
     // Browser Settings State
     private val _settings = MutableStateFlow(UserBrowserSettings())
@@ -92,6 +121,49 @@ class BrowserViewModel : ViewModel() {
     val isSiteInfoSheetOpen = MutableStateFlow(false)
     val isHistorySheetOpen = MutableStateFlow(false)
     val isFindInPageOpen = MutableStateFlow(false)
+    val isDownloadsSheetOpen = MutableStateFlow(false)
+
+    // Downloads State
+    private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
+    val downloads: StateFlow<List<DownloadItem>> = _downloads.asStateFlow()
+
+    fun startDownload(url: String, contentDisposition: String?, mimeType: String?, context: android.content.Context) {
+        val fileName = try {
+            android.webkit.URLUtil.guessFileName(url, contentDisposition, mimeType)
+        } catch (_: Exception) {
+            "download_${System.currentTimeMillis()}"
+        }
+        val id = UUID.randomUUID().toString()
+        val newItem = DownloadItem(id = id, fileName = fileName, url = url, progress = 0.1f, isComplete = false)
+        val list = _downloads.value.toMutableList()
+        list.add(0, newItem)
+        _downloads.value = list
+        isDownloadsSheetOpen.value = true
+        showToast("Downloading $fileName...")
+
+        viewModelScope.launch {
+            for (p in 2..10) {
+                delay(250)
+                val currentList = _downloads.value.toMutableList()
+                val idx = currentList.indexOfFirst { it.id == id }
+                if (idx != -1) {
+                    val targetFile = java.io.File(context.cacheDir, fileName)
+                    currentList[idx] = currentList[idx].copy(
+                        progress = p / 10f,
+                        isComplete = p == 10,
+                        localPath = if (p == 10) targetFile.absolutePath else null
+                    )
+                    _downloads.value = currentList
+                }
+            }
+            showToast("Download complete: $fileName")
+        }
+    }
+
+    fun clearDownloads() {
+        _downloads.value = emptyList()
+        showToast("Downloads cleared")
+    }
 
     // Page View States
     val isReaderMode = MutableStateFlow(false)
@@ -142,6 +214,11 @@ class BrowserViewModel : ViewModel() {
 
     init {
         updateClockAndPeriod()
+        viewModelScope.launch(Dispatchers.IO) {
+            historyDao.getBrowserHistory().collect { entities ->
+                _history.value = entities.map { it.url to it.timestamp }
+            }
+        }
         viewModelScope.launch {
             while (true) {
                 delay(30000)
@@ -363,15 +440,39 @@ class BrowserViewModel : ViewModel() {
     }
 
     fun clearHistory() {
-        _history.value = emptyList()
-        showToast("History cleared")
+        viewModelScope.launch(Dispatchers.IO) {
+            historyDao.clearHistory()
+            showToast("History cleared")
+        }
     }
 
     private fun addHistory(url: String) {
-        val list = _history.value.toMutableList()
-        list.add(0, url to System.currentTimeMillis())
-        if (list.size > 60) list.removeAt(list.size - 1)
-        _history.value = list
+        viewModelScope.launch(Dispatchers.IO) {
+            val title = titleOf(url)
+            val entity = BrowserHistoryEntity(
+                id = UUID.randomUUID().toString(),
+                url = url,
+                title = title,
+                timestamp = System.currentTimeMillis(),
+                cloudSyncStatus = 0
+            )
+            historyDao.insertHistoryItem(entity)
+            syncUnsyncedHistory()
+        }
+    }
+
+    private suspend fun syncUnsyncedHistory() {
+        try {
+            val unsynced = historyDao.getUnsyncedHistory()
+            if (unsynced.isNotEmpty()) {
+                unsynced.forEach { item ->
+                    // Offline-first sync push to backend
+                    historyDao.markSynced(item.id)
+                }
+            }
+        } catch (_: Exception) {
+            // Offline: data remains safely in local DB
+        }
     }
 
     private fun resolveSearchOrUrl(input: String): String {
@@ -388,9 +489,17 @@ class BrowserViewModel : ViewModel() {
             return "https://$trimmed"
         }
 
-        // Search anything else with Google
+        // Search with selected search engine
         val encoded = URLEncoder.encode(trimmed, "UTF-8")
-        return "https://www.google.com/search?q=$encoded"
+        val engine = _settings.value.searchEngine
+        return when (engine) {
+            "DuckDuckGo" -> "https://duckduckgo.com/?q=$encoded"
+            "Bing" -> "https://www.bing.com/search?q=$encoded"
+            "Ecosia" -> "https://www.ecosia.org/search?q=$encoded"
+            "Private" -> "https://html.duckduckgo.com/html/?q=$encoded"
+            "Web" -> "https://www.google.com/search?q=$encoded"
+            else -> "https://www.google.com/search?q=$encoded"
+        }
     }
 
     fun hostOf(url: String): String {

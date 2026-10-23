@@ -58,13 +58,14 @@ fun EmojiPicker(
         isDataSourceReady = true
     }
 
-    LaunchedEffect(searchQuery) {
-        if (searchQuery.isNotEmpty()) {
-            searchResults = EmojiDataSource.search(searchQuery)
-        } else {
-            searchResults = emptyList()
+    val customPacksFlow = remember(context) {
+        try {
+            tn.keeftalk.chat.di.AppModule.provideExtensionHost(context).registry.emojiPackRegistry.installedEmojiPacks
+        } catch (_: Exception) {
+            null
         }
     }
+    val customPacks by (customPacksFlow?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
 
     Surface(
         modifier = modifier

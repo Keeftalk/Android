@@ -50,6 +50,15 @@ fun CallSettingsScreen(
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
             item {
+                tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                    featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.CALLS,
+                    description = "Sync your call history and call data across your devices.",
+                    onEnableClick = { },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            item {
                 SettingsSection(title = "Calling") {
                     SettingsItem(
                         icon = tn.keeftalk.chat.ui.theme.LocalAppIcons.current.phone,

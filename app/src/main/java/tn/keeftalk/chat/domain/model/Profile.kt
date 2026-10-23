@@ -73,6 +73,8 @@ data class Profile(
     val lastNameChangeAt: Long = 0L,
     @SerialName("phone_verified")
     val phoneVerified: Boolean = false,
+    @SerialName("total_xp")
+    val totalXp: Long = 0L,
     val privacy: PrivacySettings = PrivacySettings(),
     @SerialName("notification_settings")
     val notifications: tn.keeftalk.chat.data.prefs.NotificationPreferences = tn.keeftalk.chat.data.prefs.NotificationPreferences()

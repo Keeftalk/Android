@@ -79,6 +79,15 @@ fun BrowserSettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            item {
+                tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                    featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.BROWSER,
+                    description = "Sync your bookmarks, history, and browser data.",
+                    onEnableClick = { },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             // Section 1: Weather and time
             item {
                 SectionHeader("WEATHER AND TIME")
@@ -240,7 +249,7 @@ fun BrowserSettingsScreen(
     }
 
     if (showSearchEngineDialog) {
-        val engines = listOf("Keeftalk", "Private", "Web", "Google", "DuckDuckGo", "Bing", "Ecosia")
+        val engines = listOf("Google", "DuckDuckGo", "Bing", "Ecosia", "Private", "Web")
         AlertDialog(
             onDismissRequest = { showSearchEngineDialog = false },
             title = { Text("Select Search Engine") },

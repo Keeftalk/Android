@@ -115,6 +115,9 @@ object AppModule {
     private var bookRepository: tn.keeftalk.chat.domain.repository.BookRepository? = null
 
     @Volatile
+    private var docRepository: tn.keeftalk.chat.domain.repository.DocRepository? = null
+
+    @Volatile
     private var habitsRepository: tn.keeftalk.chat.domain.repository.HabitsRepository? = null
 
     @Volatile
@@ -205,6 +208,12 @@ object AppModule {
 
     @Volatile
     private var billingManager: tn.keeftalk.chat.data.billing.BillingManager? = null
+
+    @Volatile
+    private var entitlementManager: tn.keeftalk.chat.domain.engine.EntitlementManager? = null
+
+    @Volatile
+    private var extensionHost: tn.keeftalk.chat.extension.lifecycle.ExtensionHost? = null
 
     @Volatile
     private var bugReportRepository: tn.keeftalk.chat.domain.repository.BugReportRepository? = null
@@ -407,6 +416,74 @@ object AppModule {
                     Log.e("AppModule", "Failed to load SQLCipher libs", e)
                 }
 
+                fun performDatabasePreFlightBackup() {
+                    try {
+                        val dbFile = context.getDatabasePath(dbName)
+                        if (!dbFile.exists()) return
+
+                        val backupDir = File(context.filesDir, "db_backups")
+                        if (!backupDir.exists()) backupDir.mkdirs()
+
+                        val backupDbFile = File(backupDir, "$dbName.bak")
+                        val backupWalFile = File(backupDir, "$dbName-wal.bak")
+                        val backupShmFile = File(backupDir, "$dbName-shm.bak")
+
+                        val walFile = File(dbFile.path + "-wal")
+                        val shmFile = File(dbFile.path + "-shm")
+
+                        // Copy main DB file and WAL/SHM files first before any database open attempt
+                        dbFile.copyTo(backupDbFile, overwrite = true)
+
+                        if (walFile.exists()) {
+                            walFile.copyTo(backupWalFile, overwrite = true)
+                        }
+                        if (shmFile.exists()) {
+                            shmFile.copyTo(backupShmFile, overwrite = true)
+                        }
+
+                        // Try to perform WAL checkpoint if file can be opened using SQLCipher
+                        try {
+                            val passphrase = DatabaseKeyManager.getDatabasePassphrase(context)
+                            val sqDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                                dbFile.path,
+                                passphrase,
+                                null,
+                                net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE
+                            )
+                            val cursor = sqDb.rawQuery("PRAGMA wal_checkpoint(FULL)", null)
+                            cursor.use { if (it.moveToFirst()) { Log.i("AppModule", "WAL Checkpoint result: ${it.getInt(0)}") } }
+                            sqDb.close()
+                        } catch (e: Exception) {
+                            Log.w("AppModule", "WAL checkpoint prior to backup skipped: ${e.message}")
+                        }
+
+                        // Verify backup can actually be opened and queried using SQLCipher
+                        try {
+                            val passphrase = DatabaseKeyManager.getDatabasePassphrase(context)
+                            val verifiedSqDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                                backupDbFile.path,
+                                passphrase,
+                                null,
+                                net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY
+                            )
+                            val verifyCursor = verifiedSqDb.rawQuery("SELECT count(*) FROM sqlite_master", null)
+                            verifyCursor.use {
+                                if (it.moveToFirst()) {
+                                    Log.i("AppModule", "Database pre-flight backup verified successfully (${it.getInt(0)} tables found).")
+                                }
+                            }
+                            verifiedSqDb.close()
+                        } catch (e: Exception) {
+                            Log.w("AppModule", "Backup verification skipped or failed: ${e.message}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("AppModule", "Pre-flight database backup failed, preserving original files", e)
+                    }
+                }
+
+                // Execute WAL-checkpointed pre-flight backup before Room open
+                performDatabasePreFlightBackup()
+
                 fun buildDatabase(): KeeftalkDatabase {
                     val passphrase = DatabaseKeyManager.getDatabasePassphrase(context)
                     val factory = SupportFactory(passphrase.toByteArray(Charsets.UTF_8))
@@ -420,6 +497,7 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_63_64, 
                             KeeftalkDatabase.MIGRATION_64_65,
                             KeeftalkDatabase.MIGRATION_65_66,
+                            KeeftalkDatabase.MIGRATION_66_67,
                             KeeftalkDatabase.MIGRATION_67_68,
                             KeeftalkDatabase.MIGRATION_68_69,
                             KeeftalkDatabase.MIGRATION_69_70,
@@ -427,6 +505,7 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_71_72,
                             KeeftalkDatabase.MIGRATION_72_73,
                             KeeftalkDatabase.MIGRATION_73_74,
+                            KeeftalkDatabase.MIGRATION_74_82,
                             KeeftalkDatabase.MIGRATION_82_83,
                             KeeftalkDatabase.MIGRATION_83_84,
                             KeeftalkDatabase.MIGRATION_84_85,
@@ -441,8 +520,11 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_93_94,
                             KeeftalkDatabase.MIGRATION_94_95,
                             KeeftalkDatabase.MIGRATION_95_96,
+                            KeeftalkDatabase.MIGRATION_96_100,
                             KeeftalkDatabase.MIGRATION_100_101,
+                            KeeftalkDatabase.MIGRATION_101_102,
                             KeeftalkDatabase.MIGRATION_102_103,
+                            KeeftalkDatabase.MIGRATION_103_104,
                             KeeftalkDatabase.MIGRATION_104_105,
                             KeeftalkDatabase.MIGRATION_105_106,
                             KeeftalkDatabase.MIGRATION_106_107,
@@ -451,7 +533,14 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_109_110,
                             KeeftalkDatabase.MIGRATION_110_111,
                             KeeftalkDatabase.MIGRATION_111_112,
-                            KeeftalkDatabase.MIGRATION_112_113
+                            KeeftalkDatabase.MIGRATION_112_113,
+                            KeeftalkDatabase.MIGRATION_113_114,
+                            KeeftalkDatabase.MIGRATION_114_115,
+                            KeeftalkDatabase.MIGRATION_115_116,
+                            KeeftalkDatabase.MIGRATION_116_117,
+                            KeeftalkDatabase.MIGRATION_117_118,
+                            KeeftalkDatabase.MIGRATION_118_119,
+                            KeeftalkDatabase.MIGRATION_119_120
                         )
                         .openHelperFactory(factory)
                         .addCallback(object : RoomDatabase.Callback() {
@@ -459,7 +548,6 @@ object AppModule {
                                 debugSupportDb = db
                             }
                         })
-                        .fallbackToDestructiveMigration(true)
                         .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                         .setQueryCallback({ sqlQuery, _ ->
                             if (BuildConfig.DEBUG) {
@@ -469,26 +557,15 @@ object AppModule {
                         .build()
                 }
 
-                var newDb = buildDatabase()
+                val newDb = buildDatabase()
                 
-                // CRITICAL: Verify if database is openable
+                // CRITICAL: Verify if database is openable WITHOUT destructive fallback
                 try {
                     newDb.openHelper.readableDatabase
                     Log.i("AppModule", "Database opened successfully.")
                 } catch (e: Exception) {
-                    val msg = e.message ?: ""
-                    val isCorrupt = msg.contains("file is not a database") || msg.contains("corrupt")
-                    val isMigrationError = e is IllegalStateException && msg.contains("Migration didn't properly handle")
-                    
-                    if (isCorrupt || isMigrationError) {
-                        Log.e("AppModule", "Database error detected (Corrupt=$isCorrupt, MigrationError=$isMigrationError). Attempting recovery by clearing database.", e)
-                        newDb.close()
-                        context.deleteDatabase(dbName)
-                        // Re-build a fresh one
-                        newDb = buildDatabase()
-                    } else {
-                        Log.e("AppModule", "Unexpected error during database open.", e)
-                    }
+                    Log.e("AppModule", "Database error detected during open. ORIGINAL DATABASE AND VERIFIED BACKUP REMAIN PRESERVED ON DISK.", e)
+                    // NEVER SILENTLY DELETE THE USER DATABASE OR CALL deleteDatabase()
                 }
 
                 database = newDb
@@ -638,28 +715,24 @@ object AppModule {
         
         // 1. Shut down all active components to stop background operations
         synchronized(this) {
-            try {
-                tn.keeftalk.chat.util.KeeftalkStore.shutdown()
-                tn.keeftalk.chat.util.AppDependencies.reset()
-                decryptionManager?.shutdown()
-                repository?.shutdown()
-                authRepository?.shutdown()
-                chatSettingsRepository?.shutdown()
-                appCustomizationRepository?.shutdown()
-                privacyRepository?.shutdown()
-                relationshipRepository?.shutdown()
-                securityRepository?.shutdown()
-                calendarRepository?.shutdown()
-                noteRepository?.shutdown()
-                vaultRepository?.shutdown()
-                emailRepository?.shutdown()
-                feedRepository?.shutdown()
-                callLogManager?.shutdown()
-                backgroundSyncManager?.shutdown()
-                telephonySyncManager?.stopSync()
-            } catch (e: Exception) {
-                Log.e("AppModule", "Error during component shutdown", e)
-            }
+            tn.keeftalk.chat.util.KeeftalkStore.shutdown()
+            tn.keeftalk.chat.util.AppDependencies.reset()
+            decryptionManager?.shutdown()
+            repository?.shutdown()
+            authRepository?.shutdown()
+            chatSettingsRepository?.shutdown()
+            appCustomizationRepository?.shutdown()
+            privacyRepository?.shutdown()
+            relationshipRepository?.shutdown()
+            securityRepository?.shutdown()
+            calendarRepository?.shutdown()
+            noteRepository?.shutdown()
+            vaultRepository?.shutdown()
+            emailRepository?.shutdown()
+            feedRepository?.shutdown()
+            callLogManager?.shutdown()
+            backgroundSyncManager?.shutdown()
+            telephonySyncManager?.stopSync()
         }
 
         // 2. Clear all databases
@@ -669,48 +742,72 @@ object AppModule {
         }
         context.databaseList().forEach { dbName ->
             Log.d("AppModule", "Deleting database: $dbName")
-            context.deleteDatabase(dbName)
+            if (dbName.endsWith("-journal") || dbName.endsWith("-wal") || dbName.endsWith("-shm")) {
+                try {
+                    val dbFile = context.getDatabasePath(dbName)
+                    if (dbFile.exists()) dbFile.delete()
+                } catch (_: Exception) {}
+            } else {
+                context.deleteDatabase(dbName)
+                try {
+                    val dbFile = context.getDatabasePath(dbName)
+                    if (dbFile.exists()) dbFile.delete()
+                    val journalFile = File(dbFile.parentFile, "${dbFile.name}-journal")
+                    if (journalFile.exists()) journalFile.delete()
+                    val walFile = File(dbFile.parentFile, "${dbFile.name}-wal")
+                    if (walFile.exists()) walFile.delete()
+                    val shmFile = File(dbFile.parentFile, "${dbFile.name}-shm")
+                    if (shmFile.exists()) shmFile.delete()
+                } catch (e: Exception) {
+                    Log.w("AppModule", "Warning deleting database files for $dbName: ${e.message}")
+                }
+            }
         }
 
         // 3. Clear all shared preferences
-        try {
-            val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
-            if (sharedPrefsDir.exists() && sharedPrefsDir.isDirectory) {
-                sharedPrefsDir.listFiles()?.forEach { file ->
-                    val name = file.name.removeSuffix(".xml")
-                    Log.d("AppModule", "Clearing shared preferences: $name")
-                    context.getSharedPreferences(name, Context.MODE_PRIVATE).edit(commit = true) { clear() }
-                    file.delete()
+        val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
+        if (sharedPrefsDir.exists() && sharedPrefsDir.isDirectory) {
+            sharedPrefsDir.listFiles()?.forEach { file ->
+                val name = file.name.removeSuffix(".xml")
+                Log.d("AppModule", "Clearing shared preferences: $name")
+                context.getSharedPreferences(name, Context.MODE_PRIVATE).edit(commit = true) { clear() }
+                if (!file.delete()) {
+                    Log.w("AppModule", "Could not delete shared preference file: ${file.name}")
                 }
             }
-        } catch (e: Exception) {
-            Log.e("AppModule", "Error clearing shared preferences", e)
         }
 
         // 4. Clear Datastore and Files
-        try {
-            // Delete entire files directory content
-            context.filesDir.listFiles()?.forEach { 
-                Log.d("AppModule", "Deleting file/dir: ${it.name}")
-                it.deleteRecursively() 
+        context.filesDir.listFiles()?.forEach { 
+            Log.d("AppModule", "Deleting file/dir: ${it.name}")
+            if (!it.deleteRecursively()) {
+                throw Exception("Failed to delete file/directory: ${it.name}")
             }
-            
-            // Delete datastore if it's in a sibling directory (standard location)
-            val dataStoreDir = File(context.filesDir.parentFile, "datastore")
-            if (dataStoreDir.exists()) dataStoreDir.deleteRecursively()
-            
-            // Delete external files if they exist
-            context.getExternalFilesDir(null)?.listFiles()?.forEach { it.deleteRecursively() }
-        } catch (e: Exception) {
-            Log.e("AppModule", "Error clearing files", e)
+        }
+        
+        val dataStoreDir = File(context.filesDir.parentFile, "datastore")
+        if (dataStoreDir.exists()) {
+            if (!dataStoreDir.deleteRecursively()) {
+                throw Exception("Failed to delete datastore directory")
+            }
+        }
+        
+        context.getExternalFilesDir(null)?.listFiles()?.forEach { 
+            if (!it.deleteRecursively()) {
+                Log.w("AppModule", "Could not delete external file: ${it.name}")
+            }
         }
 
         // 5. Clear Cache
-        try {
-            context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
-            context.externalCacheDir?.listFiles()?.forEach { it.deleteRecursively() }
-        } catch (e: Exception) {
-            Log.e("AppModule", "Error clearing cache", e)
+        context.cacheDir.listFiles()?.forEach { 
+            if (!it.deleteRecursively()) {
+                Log.w("AppModule", "Could not delete cache file: ${it.name}")
+            }
+        }
+        context.externalCacheDir?.listFiles()?.forEach { 
+            if (!it.deleteRecursively()) {
+                Log.w("AppModule", "Could not delete external cache file: ${it.name}")
+            }
         }
 
         // 6. Reset all singleton references
@@ -948,6 +1045,20 @@ object AppModule {
                 db.bookDao(),
                 context.applicationContext
             ).also { bookRepository = it }
+        }
+    }
+
+    fun provideDocDao(context: Context): tn.keeftalk.chat.data.local.dao.DocDao {
+        return provideDatabase(context).docDao()
+    }
+
+    fun provideDocRepository(context: Context): tn.keeftalk.chat.domain.repository.DocRepository {
+        return docRepository ?: synchronized(this) {
+            val db = provideDatabase(context)
+            docRepository ?: tn.keeftalk.chat.data.repository.DocRepositoryImpl(
+                db.docDao(),
+                context.applicationContext
+            ).also { docRepository = it }
         }
     }
 
@@ -1266,6 +1377,20 @@ object AppModule {
     fun provideBillingManager(context: Context): tn.keeftalk.chat.data.billing.BillingManager {
         return billingManager ?: synchronized(this) {
             billingManager ?: tn.keeftalk.chat.data.billing.BillingManager(context.applicationContext).also { billingManager = it }
+        }
+    }
+
+    fun provideEntitlementManager(context: Context): tn.keeftalk.chat.domain.engine.EntitlementManager {
+        return entitlementManager ?: synchronized(this) {
+            entitlementManager ?: tn.keeftalk.chat.domain.engine.EntitlementManager(context.applicationContext).also { entitlementManager = it }
+        }
+    }
+
+    fun provideExtensionHost(context: Context): tn.keeftalk.chat.extension.lifecycle.ExtensionHost {
+        return extensionHost ?: synchronized(this) {
+            extensionHost ?: tn.keeftalk.chat.extension.lifecycle.ExtensionHost(
+                context.applicationContext
+            ).also { extensionHost = it }
         }
     }
 

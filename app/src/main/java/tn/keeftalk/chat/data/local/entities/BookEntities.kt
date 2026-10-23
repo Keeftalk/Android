@@ -36,6 +36,7 @@ data class BookEntity(
     @SerialName("marked_done") @ColumnInfo(name = "marked_done") val markedDone: Boolean = false,
     @SerialName("original_progress") @ColumnInfo(name = "original_progress") val originalProgress: Int = 0,
     @SerialName("original_insight") @ColumnInfo(name = "original_insight") val originalInsight: String = "",
+    @SerialName("finished_at") @ColumnInfo(name = "finished_at") val finishedAt: Long? = null,
     @SerialName("content_hash") @ColumnInfo(name = "content_hash") val contentHash: String? = null,
     @SerialName("created_at") @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @SerialName("updated_at") @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()

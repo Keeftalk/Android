@@ -30,7 +30,7 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 coil.memory.MemoryCache.Builder(this)
-                    .maxSizePercent(0.35)
+                    .maxSizePercent(0.15)
                     .strongReferencesEnabled(true)
                     .build()
             }
@@ -63,6 +63,7 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
         // Critical only
         tn.keeftalk.chat.util.KeeftalkStore.init(this)
         tn.keeftalk.chat.security.crypto.KeyManager.init(this)
+        org.maplibre.android.MapLibre.getInstance(this)
         
         // Ensure channels exist synchronously for FCM wake-up
         createNotificationChannels()
@@ -104,6 +105,14 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
                 val repo = tn.keeftalk.chat.di.AppModule.provideChatRepository(this@KeeftalkApplication)
                 repo.startBackgroundTasks()
 
+                // Load Installed Extensions into Registries
+                try {
+                    tn.keeftalk.chat.di.AppModule.provideExtensionHost(this@KeeftalkApplication).loadAllInstalledExtensions()
+                    Log.i("KeeftalkApplication", "ExtensionHost loaded installed extensions on startup.")
+                } catch (e: Exception) {
+                    Log.e("KeeftalkApplication", "Failed to load extensions on startup", e)
+                }
+
                 // Initialize JobManager
                 val instantiator = tn.keeftalk.chat.util.job.KeeftalkJobInstantiator(this@KeeftalkApplication)
                 val jobController = tn.keeftalk.chat.util.job.JobController.init(this@KeeftalkApplication, instantiator)
@@ -113,6 +122,9 @@ class KeeftalkApplication : Application(), ImageLoaderFactory {
                 val userId = tn.keeftalk.chat.di.AppModule.provideUserPreferencesRepository(this@KeeftalkApplication).getUserIdFast()
                 if (userId != null) {
                     PerformanceProfiler.startStage("Crypto Session Restore")
+                    try {
+                        tn.keeftalk.chat.account.KeeftalkAccountSyncHelper.ensureAccountExists(this@KeeftalkApplication, userId)
+                    } catch (_: Exception) {}
                     // Start session monitoring and restore AEK if needed
                     tn.keeftalk.chat.di.AppModule.provideAuthRepository(this@KeeftalkApplication)
                     // Pre-warm conversation keys

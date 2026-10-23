@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.*
 import java.io.File
 import kotlin.time.Duration.Companion.minutes
+import tn.keeftalk.chat.ui.LogoutState
 
 data class VaultUiState(
     val items: List<VaultItem> = emptyList(),
@@ -494,11 +495,41 @@ class VaultViewModel(
         repository.cancelUpload(uploadId)
     }
 
+    private val _logoutState = MutableStateFlow<LogoutState>(LogoutState.Idle)
+    val logoutState: StateFlow<LogoutState> = _logoutState
+
     fun logout() {
+        showLogoutConfirmation()
+    }
+
+    fun showLogoutConfirmation() {
+        _logoutState.value = LogoutState.Confirming
+    }
+
+    fun confirmLogout() {
         viewModelScope.launch {
-            repository.shutdown()
-            tn.keeftalk.chat.util.AppDependencies.authRepository.logout()
+            _logoutState.value = LogoutState.Deleting
+            try {
+                repository.shutdown()
+                val result = tn.keeftalk.chat.util.AppDependencies.authRepository.logout()
+                if (result.isSuccess) {
+                    _logoutState.value = LogoutState.Idle
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Failed to wipe cached data and tokens completely."
+                    _logoutState.value = LogoutState.Error(errorMsg)
+                }
+            } catch (e: Exception) {
+                _logoutState.value = LogoutState.Error(e.message ?: "Failed to wipe cached data and tokens completely.")
+            }
         }
+    }
+
+    fun dismissLogout() {
+        _logoutState.value = LogoutState.Idle
+    }
+
+    fun dismissLogoutError() {
+        _logoutState.value = LogoutState.Idle
     }
 
     fun importFromDrive(uris: List<android.net.Uri>) {

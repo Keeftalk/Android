@@ -5,12 +5,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UserVaultSettings(
     // Security
-    val autoLockVault: Boolean = true,
+    val autoLockVault: Boolean = false,
     val autoLockTimeoutMinutes: Int = 1,
-    val requireBiometricAuth: Boolean = true,
+    val requireBiometricAuth: Boolean = false,
     val requireAppAuth: Boolean = false,
     val hideVaultPreviews: Boolean = true,
-    val screenshotProtection: Boolean = true,
+    val screenshotProtection: Boolean = false,
     
     // Files
     val autoImportBehavior: String = "ASK", // ASK, AUTO_MOVE, AUTO_COPY, DISABLED

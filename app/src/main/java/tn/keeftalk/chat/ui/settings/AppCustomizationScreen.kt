@@ -29,6 +29,7 @@ fun AppCustomizationScreen(
     onBack: () -> Unit
 ) {
     val customization by viewModel.customization.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
     val icons = LocalAppIcons.current
     var showMenu by remember { mutableStateOf(false) }
 
@@ -60,9 +61,15 @@ fun AppCustomizationScreen(
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Sync Now") },
-                                leadingIcon = { Icon(Icons.Default.Sync, null) },
-                                enabled = customization.syncEnabled,
+                                text = { Text(if (isSyncing) "Syncing..." else "Sync Now") },
+                                leadingIcon = { 
+                                    if (isSyncing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Sync, null)
+                                    }
+                                },
+                                enabled = customization.syncEnabled && !isSyncing,
                                 onClick = { 
                                     viewModel.manualSync()
                                     showMenu = false
@@ -339,10 +346,13 @@ private fun getModuleName(module: KeeftalkModule) = when(module) {
     KeeftalkModule.FINANCES -> "My Finances"
     KeeftalkModule.FEED -> "My Feed"
     KeeftalkModule.BOOKS -> "My Books"
+    KeeftalkModule.DOCS -> "My Docs"
     KeeftalkModule.MARKET -> "My Market"
     KeeftalkModule.HABITS -> "My Habits"
     KeeftalkModule.BROWSER -> "My Browser"
     KeeftalkModule.TODO -> "My Todo"
+    KeeftalkModule.MAPS -> "My Maps"
+    KeeftalkModule.MY_DIN -> "My Din"
 }
 
 private fun getFabActionName(action: FabAction) = when(action) {
@@ -366,10 +376,13 @@ private fun getModuleIcon(module: KeeftalkModule, icons: tn.keeftalk.chat.ui.the
     KeeftalkModule.FINANCES -> icons.finances
     KeeftalkModule.FEED -> icons.feed
     KeeftalkModule.BOOKS -> Icons.AutoMirrored.Filled.MenuBook
+    KeeftalkModule.DOCS -> Icons.Default.Description
     KeeftalkModule.MARKET -> Icons.Default.Storefront
     KeeftalkModule.HABITS -> Icons.Default.CheckCircle
     KeeftalkModule.BROWSER -> Icons.Default.Language
     KeeftalkModule.TODO -> tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo
+    KeeftalkModule.MAPS -> tn.keeftalk.chat.ui.theme.LucideIcons.MapPinned
+    KeeftalkModule.MY_DIN -> Icons.Default.Mosque
 }
 
 private fun getFabActionIcon(action: FabAction, icons: tn.keeftalk.chat.ui.theme.AppIcons) = when(action) {

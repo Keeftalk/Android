@@ -78,9 +78,6 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.ui.layout.onGloballyPositioned
 import java.util.Locale
 import tn.keeftalk.chat.domain.model.DecryptionState
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.*
 
 @Composable
 fun DecryptionLoadingBubble(contentColor: Color) {
@@ -1740,77 +1737,78 @@ fun LocationMessageBubble(
     contentColor: Color,
     onLocationClick: (Double, Double) -> Unit
 ) {
-    val geoUri = message.fileUrl ?: ""
+    val geoUri = message.fileUrl ?: message.content ?: ""
     val (lat, lon) = remember(geoUri) {
         try {
-            val coords = geoUri.removePrefix("geo:").substringBefore("?").split(",")
+            val cleanUri = geoUri.removePrefix("geo:")
+            val coords = cleanUri.substringBefore("?").split(",")
             coords[0].toDouble() to coords[1].toDouble()
         } catch (_: Exception) {
             0.0 to 0.0
         }
     }
 
-    val location = LatLng(lat, lon)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(location, 15f)
-    }
+    val isLive = geoUri.contains("live=true")
 
     Column(
         modifier = Modifier
             .widthIn(max = 280.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onLocationClick(lat, lon) }
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(12.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .height(120.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
         ) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState,
-                uiSettings = MapUiSettings(
-                    zoomControlsEnabled = false,
-                    scrollGesturesEnabled = false,
-                    zoomGesturesEnabled = false,
-                    tiltGesturesEnabled = false,
-                    rotationGesturesEnabled = false
-                )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Marker(
-                    state = rememberUpdatedMarkerState(position = location)
+                Icon(
+                    imageVector = LucideIcons.MapPinned,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Tap to open My Maps",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Medium
                 )
             }
-            // Overlay to capture clicks and prevent map interaction inside the bubble
-            Box(modifier = Modifier.fillMaxSize().background(Color.Transparent))
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val isLive = geoUri.contains("live=true")
             Icon(
                 if (isLive) Icons.Default.MyLocation else Icons.Default.Place,
                 null,
                 tint = if (isLive) Color(0xFF25D366) else contentColor,
                 modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (isLive) "Live Location" else "Location",
+                text = if (isLive) "Live Location" else "Shared Location",
                 style = MaterialTheme.typography.labelMedium,
                 color = if (isLive) Color(0xFF25D366) else contentColor,
                 fontWeight = FontWeight.Bold
             )
         }
-        if (message.content.isNotBlank()) {
-            Text(
-                text = message.content,
-                style = MaterialTheme.typography.bodySmall,
-                color = contentColor.copy(alpha = 0.8f),
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "Lat: %.4f, Lon: %.4f".format(lat, lon),
+            style = MaterialTheme.typography.bodySmall,
+            color = contentColor.copy(alpha = 0.7f)
+        )
     }
 }
 

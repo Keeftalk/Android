@@ -42,6 +42,12 @@ object UserPrivacySettingsFlexibleSerializer : FlexibleDtoSerializer<UserPrivacy
 object UserParentalControlsFlexibleSerializer : FlexibleDtoSerializer<UserParentalControlsDto>(UserParentalControlsDto.serializer())
 object UserBrowserSettingsFlexibleSerializer : FlexibleDtoSerializer<UserBrowserSettingsDto>(UserBrowserSettingsDto.serializer())
 object UserHabitSettingsFlexibleSerializer : FlexibleDtoSerializer<UserHabitSettingsDto>(UserHabitSettingsDto.serializer())
+object UserFeedSettingsFlexibleSerializer : FlexibleDtoSerializer<UserFeedSettingsDto>(UserFeedSettingsDto.serializer())
+object BookSettingsFlexibleSerializer : FlexibleDtoSerializer<BookSettingsDto>(BookSettingsDto.serializer())
+object UserMarketSettingsFlexibleSerializer : FlexibleDtoSerializer<UserMarketSettingsDto>(UserMarketSettingsDto.serializer())
+object UserSmsSettingsFlexibleSerializer : FlexibleDtoSerializer<UserSmsSettingsDto>(UserSmsSettingsDto.serializer())
+object UserTodoSettingsFlexibleSerializer : FlexibleDtoSerializer<UserTodoSettingsDto>(UserTodoSettingsDto.serializer())
+object UserMapSettingsFlexibleSerializer : FlexibleDtoSerializer<UserMapSettingsDto>(UserMapSettingsDto.serializer())
 
 @Serializable
 data class UserSettingsDto(
@@ -57,6 +63,12 @@ data class UserSettingsDto(
     @Serializable(with = UserParentalControlsFlexibleSerializer::class) @SerialName("parental_controls") val parentalControls: UserParentalControlsDto? = null,
     @Serializable(with = UserBrowserSettingsFlexibleSerializer::class) @SerialName("browser_settings") val browserSettings: UserBrowserSettingsDto? = null,
     @Serializable(with = UserHabitSettingsFlexibleSerializer::class) @SerialName("habit_settings") val habitSettings: UserHabitSettingsDto? = null,
+    @Serializable(with = UserFeedSettingsFlexibleSerializer::class) @SerialName("feed_settings") val feedSettings: UserFeedSettingsDto? = null,
+    @Serializable(with = BookSettingsFlexibleSerializer::class) @SerialName("book_settings") val bookSettings: BookSettingsDto? = null,
+    @Serializable(with = UserMarketSettingsFlexibleSerializer::class) @SerialName("market_settings") val marketSettings: UserMarketSettingsDto? = null,
+    @Serializable(with = UserSmsSettingsFlexibleSerializer::class) @SerialName("sms_settings") val smsSettings: UserSmsSettingsDto? = null,
+    @Serializable(with = UserTodoSettingsFlexibleSerializer::class) @SerialName("todo_settings") val todoSettings: UserTodoSettingsDto? = null,
+    @Serializable(with = UserMapSettingsFlexibleSerializer::class) @SerialName("map_settings") val mapSettings: UserMapSettingsDto? = null,
     @SerialName("updated_at") val updatedAt: String? = null
 )
  {
@@ -72,8 +84,13 @@ data class UserSettingsDto(
         privacySettings = privacySettings?.toDomain() ?: UserPrivacySettings(userId = userId),
         parentalControls = parentalControls?.toDomain() ?: UserParentalControls(),
         browserSettings = browserSettings?.toDomain() ?: UserBrowserSettings(),
-        habitSettings = habitSettings?.toDomain() ?: UserHabitSettings()
-        // updatedAt handling if needed
+        habitSettings = habitSettings?.toDomain() ?: UserHabitSettings(),
+        feedSettings = feedSettings?.toDomain() ?: UserFeedSettings(),
+        bookSettings = bookSettings?.toDomain() ?: BookSettings(),
+        marketSettings = marketSettings?.toDomain() ?: UserMarketSettings(),
+        smsSettings = smsSettings?.toDomain() ?: UserSmsSettings(),
+        todoSettings = todoSettings?.toDomain() ?: UserTodoSettings(),
+        mapSettings = mapSettings?.toDomain() ?: UserMapSettings()
     )
 
     companion object {
@@ -89,7 +106,13 @@ data class UserSettingsDto(
             privacySettings = UserPrivacySettingsDto.fromDomain(settings.privacySettings),
             parentalControls = UserParentalControlsDto.fromDomain(settings.parentalControls),
             browserSettings = UserBrowserSettingsDto.fromDomain(settings.browserSettings),
-            habitSettings = UserHabitSettingsDto.fromDomain(settings.habitSettings)
+            habitSettings = UserHabitSettingsDto.fromDomain(settings.habitSettings),
+            feedSettings = UserFeedSettingsDto.fromDomain(settings.feedSettings),
+            bookSettings = BookSettingsDto.fromDomain(settings.bookSettings),
+            marketSettings = UserMarketSettingsDto.fromDomain(settings.marketSettings),
+            smsSettings = UserSmsSettingsDto.fromDomain(settings.smsSettings),
+            todoSettings = UserTodoSettingsDto.fromDomain(settings.todoSettings),
+            mapSettings = UserMapSettingsDto.fromDomain(settings.mapSettings)
         )
     }
 }
@@ -195,12 +218,12 @@ data class FolderBackupConfigDto(
 
 @Serializable
 data class UserVaultSettingsDto(
-    val autoLockVault: Boolean = true,
+    val autoLockVault: Boolean = false,
     val autoLockTimeoutMinutes: Int = 1,
-    val requireBiometricAuth: Boolean = true,
+    val requireBiometricAuth: Boolean = false,
     val requireAppAuth: Boolean = false,
     val hideVaultPreviews: Boolean = true,
-    val screenshotProtection: Boolean = true,
+    val screenshotProtection: Boolean = false,
     val autoImportBehavior: String = "ASK",
     val generateThumbnails: Boolean = true,
     val mediaQuality: String = "ORIGINAL",
@@ -566,5 +589,130 @@ data class UserBrowserSettingsDto(
             downloadPath = d.downloadPath,
             cacheEnabled = d.cacheEnabled
         )
+    }
+}
+
+@Serializable
+data class UserFeedSettingsDto(
+    val autoRefreshEnabled: Boolean = true,
+    val defaultLayoutMode: String = "MOSAIC",
+    val showWeatherCard: Boolean = true,
+    val showPrayerCard: Boolean = true,
+    val showVerseCard: Boolean = true,
+    val syncFeedsAcrossDevices: Boolean = true
+) {
+    fun toDomain() = UserFeedSettings(autoRefreshEnabled, defaultLayoutMode, showWeatherCard, showPrayerCard, showVerseCard, syncFeedsAcrossDevices)
+    companion object {
+        fun fromDomain(d: UserFeedSettings) = UserFeedSettingsDto(d.autoRefreshEnabled, d.defaultLayoutMode, d.showWeatherCard, d.showPrayerCard, d.showVerseCard, d.syncFeedsAcrossDevices)
+    }
+}
+
+@Serializable
+data class BookSettingsDto(
+    val showReadMarker: Boolean = true,
+    val buttonSizePx: Int = 38,
+    val greenOpacityPercent: Int = 50,
+    val readMarkerColorHex: String = "#2ECC71",
+    val theme: String = "original",
+    val pageMarginsEnabled: Boolean = true,
+    val keepScreenOn: Boolean = true,
+    val autoNextPageOnRead: Boolean = true,
+    val volumeKeysTurnPage: Boolean = false,
+    val syncAcrossDevices: Boolean = true,
+    val encryptFiles: Boolean = true,
+    val autoAddPageReference: Boolean = true,
+    val trackReadingTime: Boolean = true,
+    val dailyGoalMinutes: Int = 30,
+    val yearlyGoalBooks: Int = 24,
+    val pdfDpiOption: String = "lowest",
+    val pdfCustomDpi: Int = 200,
+    val hasSeenLibraryTour: Boolean = false,
+    val hasSeenQuotesCard: Boolean = false,
+    val hasSeenGoalsCard: Boolean = false,
+    val hasSeenAchievementsCard: Boolean = false,
+    val showTimerBadge: Boolean = true,
+    val timerBadgeOpacityPercent: Int = 100,
+    val readingDirection: String = "AUTO",
+    val hasSeenRtlPrompt: Boolean = false
+) {
+    fun toDomain() = BookSettings(
+        showReadMarker = showReadMarker, buttonSizePx = buttonSizePx, greenOpacityPercent = greenOpacityPercent,
+        readMarkerColorHex = readMarkerColorHex, theme = theme, pageMarginsEnabled = pageMarginsEnabled,
+        keepScreenOn = keepScreenOn, autoNextPageOnRead = autoNextPageOnRead, volumeKeysTurnPage = volumeKeysTurnPage,
+        syncAcrossDevices = syncAcrossDevices, encryptFiles = encryptFiles, autoAddPageReference = autoAddPageReference,
+        trackReadingTime = trackReadingTime, dailyGoalMinutes = dailyGoalMinutes, yearlyGoalBooks = yearlyGoalBooks,
+        pdfDpiOption = pdfDpiOption, pdfCustomDpi = pdfCustomDpi, hasSeenLibraryTour = hasSeenLibraryTour,
+        hasSeenQuotesCard = hasSeenQuotesCard, hasSeenGoalsCard = hasSeenGoalsCard, hasSeenAchievementsCard = hasSeenAchievementsCard,
+        showTimerBadge = showTimerBadge, timerBadgeOpacityPercent = timerBadgeOpacityPercent,
+        readingDirection = readingDirection, hasSeenRtlPrompt = hasSeenRtlPrompt
+    )
+    companion object {
+        fun fromDomain(d: BookSettings) = BookSettingsDto(
+            showReadMarker = d.showReadMarker, buttonSizePx = d.buttonSizePx, greenOpacityPercent = d.greenOpacityPercent,
+            readMarkerColorHex = d.readMarkerColorHex, theme = d.theme, pageMarginsEnabled = d.pageMarginsEnabled,
+            keepScreenOn = d.keepScreenOn, autoNextPageOnRead = d.autoNextPageOnRead, volumeKeysTurnPage = d.volumeKeysTurnPage,
+            syncAcrossDevices = d.syncAcrossDevices, encryptFiles = d.encryptFiles, autoAddPageReference = d.autoAddPageReference,
+            trackReadingTime = d.trackReadingTime, dailyGoalMinutes = d.dailyGoalMinutes, yearlyGoalBooks = d.yearlyGoalBooks,
+            pdfDpiOption = d.pdfDpiOption, pdfCustomDpi = d.pdfCustomDpi, hasSeenLibraryTour = d.hasSeenLibraryTour,
+            hasSeenQuotesCard = d.hasSeenQuotesCard, hasSeenGoalsCard = d.hasSeenGoalsCard, hasSeenAchievementsCard = d.hasSeenAchievementsCard,
+            showTimerBadge = d.showTimerBadge, timerBadgeOpacityPercent = d.timerBadgeOpacityPercent,
+            readingDirection = d.readingDirection, hasSeenRtlPrompt = d.hasSeenRtlPrompt
+        )
+    }
+}
+
+@Serializable
+data class UserMarketSettingsDto(
+    val defaultCurrency: String = "USD",
+    val autoRefreshIntervalSeconds: Int = 30,
+    val priceAlertsEnabled: Boolean = true,
+    val showTrendCharts: Boolean = true,
+    val syncWatchlistsAcrossDevices: Boolean = true
+) {
+    fun toDomain() = UserMarketSettings(defaultCurrency, autoRefreshIntervalSeconds, priceAlertsEnabled, showTrendCharts, syncWatchlistsAcrossDevices)
+    companion object {
+        fun fromDomain(d: UserMarketSettings) = UserMarketSettingsDto(d.defaultCurrency, d.autoRefreshIntervalSeconds, d.priceAlertsEnabled, d.showTrendCharts, d.syncWatchlistsAcrossDevices)
+    }
+}
+
+@Serializable
+data class UserSmsSettingsDto(
+    val smsBridgeEnabled: Boolean = false,
+    val deliveryReportsEnabled: Boolean = true,
+    val mmsAutoDownload: Boolean = true,
+    val retentionDays: Int = 90,
+    val encryptSmsThreads: Boolean = true
+) {
+    fun toDomain() = UserSmsSettings(smsBridgeEnabled, deliveryReportsEnabled, mmsAutoDownload, retentionDays, encryptSmsThreads)
+    companion object {
+        fun fromDomain(d: UserSmsSettings) = UserSmsSettingsDto(d.smsBridgeEnabled, d.deliveryReportsEnabled, d.mmsAutoDownload, d.retentionDays, d.encryptSmsThreads)
+    }
+}
+
+@Serializable
+data class UserTodoSettingsDto(
+    val defaultPriority: String = "MEDIUM",
+    val showCompletedTasks: Boolean = true,
+    val dueRemindersEnabled: Boolean = true,
+    val weekStartDay: String = "MONDAY",
+    val syncTodosAcrossDevices: Boolean = true
+) {
+    fun toDomain() = UserTodoSettings(defaultPriority, showCompletedTasks, dueRemindersEnabled, weekStartDay, syncTodosAcrossDevices)
+    companion object {
+        fun fromDomain(d: UserTodoSettings) = UserTodoSettingsDto(d.defaultPriority, d.showCompletedTasks, d.dueRemindersEnabled, d.weekStartDay, d.syncTodosAcrossDevices)
+    }
+}
+
+@Serializable
+data class UserMapSettingsDto(
+    val defaultMapType: String = "NORMAL",
+    val highAccuracyGps: Boolean = true,
+    val offlineCacheEnabled: Boolean = true,
+    val distanceUnit: String = "KM",
+    val syncLocationsAcrossDevices: Boolean = true
+) {
+    fun toDomain() = UserMapSettings(defaultMapType, highAccuracyGps, offlineCacheEnabled, distanceUnit, syncLocationsAcrossDevices)
+    companion object {
+        fun fromDomain(d: UserMapSettings) = UserMapSettingsDto(d.defaultMapType, d.highAccuracyGps, d.offlineCacheEnabled, d.distanceUnit, d.syncLocationsAcrossDevices)
     }
 }

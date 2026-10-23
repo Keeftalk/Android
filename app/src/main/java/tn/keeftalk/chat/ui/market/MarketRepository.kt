@@ -37,7 +37,9 @@ class MarketRepository {
                 data.sellers.keys.removeAll { it.matches(Regex("s\\d+")) }
                 return data
             } catch (e: Exception) {
-                android.util.Log.e("MarketRepository", "Error parsing saved market state, reseeding", e)
+                android.util.Log.e("MarketRepository", "Error parsing saved market state, preserving original raw JSON without reseeding", e)
+                // DO NOT reseed or overwrite raw payload on parse failure
+                return MarketStateData(me = UserProfile(alias = "me", real = "User", mode = "alias"))
             }
         }
         val seeded = createSeedState()
@@ -138,6 +140,28 @@ class MarketRepository {
                 val updatedListings = state.listings.map { item ->
                     if (item.id == id) {
                         item.copy(exp = item.exp + 30 * MarketConstants.DAY_MS, ext = 1)
+                    } else item
+                }.toMutableList()
+                state.listings.clear()
+                state.listings.addAll(updatedListings)
+                extended = true
+            }
+        }
+        return extended
+    }
+
+    fun extendListingOnQualifyingBuyerMessage(listingId: String, buyerId: String, sellerId: String, isSellerPremium: Boolean): Boolean {
+        if (buyerId.isBlank() || sellerId.isBlank() || buyerId == sellerId || !isSellerPremium) {
+            return false
+        }
+        var extended = false
+        updateState { state ->
+            val listing = state.listings.firstOrNull { it.id == listingId }
+            if (listing != null && !listing.sold) {
+                val sevenDaysMs = 7 * MarketConstants.DAY_MS
+                val updatedListings = state.listings.map { item ->
+                    if (item.id == listingId) {
+                        item.copy(exp = item.exp + sevenDaysMs)
                     } else item
                 }.toMutableList()
                 state.listings.clear()

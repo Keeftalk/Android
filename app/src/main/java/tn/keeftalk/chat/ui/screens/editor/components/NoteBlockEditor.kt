@@ -30,172 +30,17 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import coil.compose.AsyncImage
 import tn.keeftalk.chat.domain.model.*
 import tn.keeftalk.chat.ui.screens.editor.NotesDesign
 import tn.keeftalk.chat.ui.screens.editor.LocalNotesPalette
-import tn.keeftalk.chat.ui.screens.editor.toSpanStyle
-import tn.keeftalk.chat.ui.screens.editor.toRichTextParts
-
-@Composable
-fun TextBlockEditor(
-    block: NoteBlock.Text,
-    onContentChange: (List<RichTextPart>) -> Unit,
-    modifier: Modifier = Modifier,
-    onFocusChanged: (Boolean, TextRange) -> Unit = { _, _ -> },
-    onMentionQueryChange: (String) -> Unit = {},
-    readOnly: Boolean = false
-) {
-    val palette = LocalNotesPalette.current
-    
-    val annotatedString = remember(block.richText) {
-        buildAnnotatedString {
-            if (block.richText.isEmpty()) {
-                append("")
-            } else {
-                block.richText.forEach { part ->
-                    withStyle(style = part.toSpanStyle()) {
-                        append(part.text)
-                    }
-                }
-            }
-        }
-    }
-
-    var textFieldValue by remember(block.id) {
-        mutableStateOf(TextFieldValue(annotatedString))
-    }
-
-    var lastSentRichText by remember(block.id) {
-        mutableStateOf(block.richText)
-    }
-
-    // Sync external changes (Undo/Redo)
-    LaunchedEffect(block.richText) {
-        if (block.richText != lastSentRichText) {
-            textFieldValue = textFieldValue.copy(
-                annotatedString = annotatedString,
-                selection = TextRange(annotatedString.length)
-            )
-            lastSentRichText = block.richText
-        }
-    }
-
-    // Selection reporting
-    LaunchedEffect(textFieldValue.selection) {
-        onFocusChanged(true, textFieldValue.selection)
-    }
-
-    // Mention Detection
-    LaunchedEffect(textFieldValue.selection) {
-        val text = textFieldValue.text
-        val cursor = textFieldValue.selection.end
-        if (cursor > 0 && text.isNotEmpty()) {
-            val lastAt = text.lastIndexOf('@', cursor - 1)
-            if (lastAt != -1) {
-                val query = text.substring(lastAt + 1, cursor)
-                if (!query.contains(" ")) {
-                    onMentionQueryChange(query)
-                    return@LaunchedEffect
-                }
-            }
-        }
-        onMentionQueryChange("")
-    }
-
-    val style = when (block.style) {
-        "H1" -> MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = palette.text)
-        "H2" -> MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = palette.text)
-        "QUOTE" -> MaterialTheme.typography.bodyLarge.copy(
-            fontStyle = FontStyle.Italic,
-            color = palette.textSecondary
-        )
-        else -> MaterialTheme.typography.bodyLarge.copy(color = palette.text, lineHeight = 26.sp)
-    }.copy(
-        textAlign = when (block.alignment) {
-            "CENTER" -> TextAlign.Center
-            "RIGHT" -> TextAlign.Right
-            else -> TextAlign.Left
-        }
-    )
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        val brandColor = NotesDesign.BrandColor
-        if (block.style == "QUOTE") {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .drawBehind {
-                        drawLine(
-                            color = brandColor,
-                            start = Offset(0f, 0f),
-                            end = Offset(0f, size.height),
-                            strokeWidth = 4.dp.toPx()
-                        )
-                    }
-                    .padding(start = 16.dp)
-            ) {
-                BasicRichTextField(
-                    value = textFieldValue,
-                    onValueChange = {
-                        textFieldValue = it
-                        val newParts = it.annotatedString.toRichTextParts()
-                        if (newParts != lastSentRichText) {
-                            lastSentRichText = newParts
-                            onContentChange(newParts)
-                        }
-                    },
-                    style = style,
-                    readOnly = readOnly,
-                    placeholder = "Quote..."
-                )
-            }
-        } else {
-            BasicRichTextField(
-                value = textFieldValue,
-                onValueChange = {
-                    textFieldValue = it
-                    onContentChange(it.annotatedString.toRichTextParts())
-                },
-                style = style,
-                readOnly = readOnly,
-                placeholder = if (block.style == "NORMAL") "Start typing..." else ""
-            )
-        }
-    }
-}
-
-@Composable
-fun BasicRichTextField(
-    value: TextFieldValue,
-    onValueChange: (TextFieldValue) -> Unit,
-    style: TextStyle,
-    readOnly: Boolean,
-    placeholder: String
-) {
-    val palette = LocalNotesPalette.current
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        textStyle = style,
-        cursorBrush = SolidColor(NotesDesign.BrandColor),
-        readOnly = readOnly,
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-        decorationBox = { innerTextField ->
-            Box(modifier = Modifier.fillMaxWidth()) {
-                if (value.text.isEmpty() && !readOnly) {
-                    Text(
-                        text = placeholder,
-                        style = style.copy(color = palette.textMuted)
-                    )
-                }
-                innerTextField()
-            }
-        }
-    )
-}
 
 @Composable
 fun ImageBlockEditor(
@@ -236,7 +81,7 @@ fun ImageBlockEditor(
                 }
             }
         }
-        
+
         BasicTextField(
             value = block.caption ?: "",
             onValueChange = onCaptionChange,
@@ -299,7 +144,7 @@ fun TableBlockEditor(
                 }
             }
         }
-        
+
         if (!readOnly) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
@@ -440,72 +285,129 @@ fun ChecklistBlockEditor(
     onChecklistChange: (List<ChecklistItem>) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
-    readOnly: Boolean = false
+    readOnly: Boolean = false,
+    requestFocus: Boolean = false,
+    onFocusRequestHandled: () -> Unit = {}
 ) {
     val palette = LocalNotesPalette.current
+    var pendingFocusId by remember(block.id) { mutableStateOf<String?>(null) }
+
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         block.items.forEachIndexed { index, item ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = {
-                        val newList = block.items.toMutableList()
-                        newList[index] = item.copy(isChecked = !item.isChecked)
-                        onChecklistChange(newList)
-                    },
-                    enabled = !readOnly,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        if (item.isChecked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                        null,
-                        tint = if (item.isChecked) NotesDesign.BrandColor else palette.textMuted
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                BasicTextField(
-                    value = item.text,
-                    onValueChange = { newValue ->
-                        val newList = block.items.toMutableList()
-                        newList[index] = item.copy(text = newValue)
-                        onChecklistChange(newList)
-                    },
-                    modifier = Modifier.weight(1f),
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = if (item.isChecked) palette.textSecondary else palette.text,
-                        textDecoration = if (item.isChecked) TextDecoration.LineThrough else null
-                    ),
-                    readOnly = readOnly,
-                    decorationBox = { innerTextField ->
-                        if (item.text.isEmpty() && !readOnly) {
-                            Text("List item...", style = MaterialTheme.typography.bodyLarge.copy(color = palette.textMuted))
-                        }
-                        innerTextField()
-                    }
-                )
+            // Stable key per item: removing/inserting an item no longer shifts focus/state onto its neighbour.
+            androidx.compose.runtime.key(item.id) {
+                val itemFocus = remember { FocusRequester() }
 
-                if (!readOnly) {
-                    IconButton(onClick = {
-                        val newList = block.items.toMutableList()
-                        newList.removeAt(index)
-                        onChecklistChange(newList)
-                    }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp), tint = palette.textMuted)
+                LaunchedEffect(pendingFocusId) {
+                    if (pendingFocusId == item.id) {
+                        withFrameNanos { }
+                        try { itemFocus.requestFocus() } catch (_: IllegalStateException) { }
+                        pendingFocusId = null
+                    }
+                }
+                LaunchedEffect(requestFocus) {
+                    if (requestFocus && index == 0 && !readOnly) {
+                        withFrameNanos { }
+                        try { itemFocus.requestFocus() } catch (_: IllegalStateException) { }
+                        onFocusRequestHandled()
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val newList = block.items.toMutableList()
+                            newList[index] = item.copy(isChecked = !item.isChecked)
+                            onChecklistChange(newList)
+                        },
+                        enabled = !readOnly,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            if (item.isChecked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
+                            null,
+                            tint = if (item.isChecked) NotesDesign.BrandColor else palette.textMuted
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    BasicTextField(
+                        value = item.text,
+                        onValueChange = { newValue ->
+                            val nl = newValue.indexOf('\n')
+                            if (nl < 0) {
+                                val newList = block.items.toMutableList()
+                                newList[index] = item.copy(text = newValue)
+                                onChecklistChange(newList)
+                            } else {
+                                // Enter pressed: split here, new item below, focus it.
+                                val newItem = ChecklistItem(text = newValue.substring(nl + 1).replace("\n", " "))
+                                val newList = block.items.toMutableList()
+                                newList[index] = item.copy(text = newValue.substring(0, nl))
+                                newList.add(index + 1, newItem)
+                                onChecklistChange(newList)
+                                pendingFocusId = newItem.id
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(itemFocus)
+                            .onPreviewKeyEvent { event ->
+                                if (!readOnly &&
+                                    event.type == KeyEventType.KeyDown &&
+                                    event.key == Key.Backspace &&
+                                    item.text.isEmpty() &&
+                                    block.items.size > 1
+                                ) {
+                                    val newList = block.items.toMutableList()
+                                    newList.removeAt(index)
+                                    onChecklistChange(newList)
+                                    pendingFocusId = block.items.getOrNull(index - 1)?.id
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = if (item.isChecked) palette.textSecondary else palette.text,
+                            textDecoration = if (item.isChecked) TextDecoration.LineThrough else null
+                        ),
+                        cursorBrush = SolidColor(NotesDesign.BrandColor),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        readOnly = readOnly,
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (item.text.isEmpty() && !readOnly) {
+                                    Text("List item...", style = MaterialTheme.typography.bodyLarge.copy(color = palette.textMuted))
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+
+                    if (!readOnly) {
+                        IconButton(onClick = {
+                            val newList = block.items.toMutableList()
+                            newList.removeAt(index)
+                            onChecklistChange(newList)
+                        }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp), tint = palette.textMuted)
+                        }
                     }
                 }
             }
         }
-        
+
         if (!readOnly) {
             TextButton(
                 onClick = {
-                    val newList = block.items.toMutableList()
-                    newList.add(ChecklistItem(text = ""))
-                    onChecklistChange(newList)
+                    val newItem = ChecklistItem(text = "")
+                    onChecklistChange(block.items + newItem)
+                    pendingFocusId = newItem.id
                 },
                 modifier = Modifier.padding(start = 8.dp)
             ) {

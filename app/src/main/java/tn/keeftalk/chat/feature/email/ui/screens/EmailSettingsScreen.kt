@@ -45,6 +45,15 @@ fun EmailSettingsScreen(
                 .padding(padding)
         ) {
             item {
+                tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                    featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.EMAIL_DATA,
+                    description = "Sync saved email data across your devices.",
+                    onEnableClick = { },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            item {
                 Text(
                     text = "Accounts",
                     style = MaterialTheme.typography.titleMedium,

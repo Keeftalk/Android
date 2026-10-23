@@ -260,8 +260,8 @@ class FileUploadManager(
                 ownerId = ownerId,
                 storagePath = storagePath,
                 fileHash = hash,
-                fileName = null,
-                mimeType = null,
+                fileName = file.name,
+                mimeType = mimeType,
                 fileSize = ciphertextSize, // Use ciphertext size for database column
                 fileType = getFileType(mimeType),
                 sourceType = sourceType,

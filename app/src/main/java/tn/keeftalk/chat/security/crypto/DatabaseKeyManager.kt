@@ -61,4 +61,26 @@ object DatabaseKeyManager {
             }
         }
     }
+
+    fun reset(context: Context) {
+        synchronized(this) {
+            cachedPassphrase = null
+            try {
+                val masterKey = MasterKey.Builder(context.applicationContext)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                val sharedPreferences = EncryptedSharedPreferences.create(
+                    context.applicationContext,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+                sharedPreferences.edit().clear().commit()
+                Log.i(TAG, "Database passphrase and secure prefs reset.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to reset database passphrase prefs", e)
+            }
+        }
+    }
 }

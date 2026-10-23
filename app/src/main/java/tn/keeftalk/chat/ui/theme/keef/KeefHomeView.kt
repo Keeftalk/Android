@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraAlt
@@ -279,11 +280,25 @@ fun KeefHomeView(
                             modifier = Modifier.weight(1f),
                             tokens = tokens
                         )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         KeefCategoryCard(
                             title = "My Books",
                             subtitle = "Library & reader",
                             icon = Icons.AutoMirrored.Filled.MenuBook,
                             onClick = { onNavigate(AppScreen.Books) },
+                            modifier = Modifier.weight(1f),
+                            tokens = tokens
+                        )
+                        KeefCategoryCard(
+                            title = "My Docs",
+                            subtitle = "Multi-format viewer",
+                            icon = Icons.Default.Description,
+                            onClick = { onNavigate(AppScreen.Docs) },
                             modifier = Modifier.weight(1f),
                             tokens = tokens
                         )
@@ -328,6 +343,20 @@ fun KeefHomeView(
                             subtitle = "Notebooks & Sync",
                             icon = Icons.Default.Note,
                             onClick = { onNavigate(AppScreen.Notes()) },
+                            modifier = Modifier.weight(1f),
+                            tokens = tokens
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        KeefCategoryCard(
+                            title = "My Maps",
+                            subtitle = "Saved places & map",
+                            icon = LucideIcons.MapPinned,
+                            onClick = { onNavigate(AppScreen.MyMaps) },
                             modifier = Modifier.weight(1f),
                             tokens = tokens
                         )

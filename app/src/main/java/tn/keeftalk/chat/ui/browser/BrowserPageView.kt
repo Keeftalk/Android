@@ -6,6 +6,13 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,19 +20,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -35,12 +48,15 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tab
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +80,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import tn.keeftalk.chat.domain.model.UserBrowserSettings
 import java.net.URLDecoder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalStdlibApi::class)
 @Composable
@@ -90,22 +110,7 @@ fun BrowserPageView(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .background(Color.White)
     ) {
-        // Progress Bar
-        if (isLoading || webProgress < 1f) {
-            LinearProgressIndicator(
-                progress = { if (isLoading) webProgress.coerceAtLeast(0.15f) else 1f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = Color(0xFF0a7cff),
-                trackColor = Color.Transparent
-            )
-        } else {
-            Spacer(modifier = Modifier.height(3.dp))
-        }
-
         // Top Navigation Header
         Row(
             modifier = Modifier
@@ -287,138 +292,175 @@ fun BrowserPageView(
             }
         }
 
+        val FabCyan = Color(0xFF00CCCC)
+        val FabPurple = Color(0xFF7D5CFF)
+        val FabGradient = Brush.linearGradient(listOf(FabCyan, FabPurple))
+
+        // Progress Bar under topbar / url field
+        if (isLoading || webProgress < 1f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(Color.Transparent)
+            ) {
+                val animProgress by animateFloatAsState(
+                    targetValue = if (isLoading) webProgress.coerceAtLeast(0.15f) else 1f,
+                    animationSpec = tween(250),
+                    label = "webProgressAnim"
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(animProgress)
+                        .background(FabGradient)
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.height(3.dp))
+        }
+
         HorizontalDivider(color = Color(0xFFe6e7ea), thickness = 1.dp)
 
-        // Page Content Body
+        // Page Content Body with smooth fade-in transition
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .padding(bottom = 60.dp)
         ) {
-            when {
-                currentUrl.startsWith("search.keeftalk.app?q=") -> {
-                    // Search Results Native Listing
-                    val queryEncoded = currentUrl.substringAfter("q=")
-                    val query = URLDecoder.decode(queryEncoded, "UTF-8")
-                    SearchResultsView(
-                        query = query,
-                        engine = browserSettings.searchEngine,
-                        onResultClick = { url -> viewModel.navigateToUrl(url) }
-                    )
-                }
+            AnimatedContent(
+                targetState = currentUrl,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(350, easing = FastOutSlowInEasing))
+                        .togetherWith(fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing)))
+                },
+                label = "webpageFadeTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { url ->
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when {
+                        url.contains("weather.keeftalk.app") -> {
+                            WeatherForecastPageView(
+                                viewModel = viewModel,
+                                browserSettings = browserSettings
+                            )
+                        }
 
-                currentUrl.endsWith(".keeftalk.app") || currentUrl.contains(".example") -> {
-                    // Mock Preview Page View
-                    MockPagePreviewView(
-                        url = currentUrl,
-                        viewModel = viewModel,
-                        isReader = isReader
-                    )
-                }
+                        url.startsWith("search.keeftalk.app?q=") -> {
+                            // Search Results Native Listing
+                            val queryEncoded = url.substringAfter("q=")
+                            val query = URLDecoder.decode(queryEncoded, "UTF-8")
+                            SearchResultsView(
+                                query = query,
+                                engine = browserSettings.searchEngine,
+                                onResultClick = { targetUrl -> viewModel.navigateToUrl(targetUrl) }
+                            )
+                        }
 
-                else -> {
-                    // Actual Android WebView
-                    @SuppressLint("SetJavaScriptEnabled")
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                settings.javaScriptEnabled = browserSettings.javaScriptEnabled
-                                settings.domStorageEnabled = true
-                                settings.useWideViewPort = true
-                                settings.loadWithOverviewMode = true
-                                settings.userAgentString = if (browserSettings.desktopMode) {
-                                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-                                } else {
-                                    settings.userAgentString
-                                }
+                        url.endsWith(".keeftalk.app") || url.contains(".example") -> {
+                            // Mock Preview Page View
+                            MockPagePreviewView(
+                                url = url,
+                                viewModel = viewModel,
+                                isReader = isReader
+                            )
+                        }
 
-                                webViewClient = object : WebViewClient() {
-                                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                        super.onPageStarted(view, url, favicon)
-                                        isLoading = true
-                                    }
-
-                                    override fun onPageFinished(view: WebView?, url: String?) {
-                                        super.onPageFinished(view, url)
-                                        isLoading = false
-                                        webProgress = 1f
-                                    }
-
-                                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                                        request?.url?.toString()?.let { newUrl ->
-                                            viewModel.navigateToUrl(newUrl)
-                                            return true
+                        else -> {
+                            // Actual Android WebView
+                            @SuppressLint("SetJavaScriptEnabled")
+                            AndroidView(
+                                factory = { ctx ->
+                                    WebView(ctx).apply {
+                                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                                        settings.javaScriptEnabled = browserSettings.javaScriptEnabled
+                                        settings.domStorageEnabled = true
+                                        settings.useWideViewPort = true
+                                        settings.loadWithOverviewMode = true
+                                        settings.userAgentString = if (browserSettings.desktopMode) {
+                                            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+                                        } else {
+                                            settings.userAgentString
                                         }
-                                        return false
+
+                                        webViewClient = object : WebViewClient() {
+                                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                                super.onPageStarted(view, url, favicon)
+                                                isLoading = true
+                                            }
+
+                                            override fun onPageFinished(view: WebView?, url: String?) {
+                                                super.onPageFinished(view, url)
+                                                isLoading = false
+                                                webProgress = 1f
+                                            }
+
+                                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                                request?.url?.toString()?.let { newUrl ->
+                                                    viewModel.navigateToUrl(newUrl)
+                                                    return true
+                                                }
+                                                return false
+                                            }
+                                        }
+
+                                        webChromeClient = object : WebChromeClient() {
+                                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                                webProgress = newProgress / 100f
+                                            }
+                                        }
+
+                                        setDownloadListener { downloadUrl, _, contentDisposition, mimeType, _ ->
+                                            viewModel.startDownload(downloadUrl, contentDisposition, mimeType, ctx)
+                                        }
+
+                                        loadUrl(if (url.startsWith("http")) url else "https://$url")
+                                        webViewRef = this
                                     }
-                                }
-
-                                webChromeClient = object : WebChromeClient() {
-                                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                        super.onProgressChanged(view, newProgress)
-                                        webProgress = newProgress / 100f
+                                },
+                                update = { webView ->
+                                    val target = if (url.startsWith("http")) url else "https://$url"
+                                    if (webView.url != target) {
+                                        webView.loadUrl(target)
                                     }
-                                }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
 
-                                loadUrl(if (currentUrl.startsWith("http")) currentUrl else "https://$currentUrl")
-                                webViewRef = this
-                            }
-                        },
-                        update = { webView ->
-                            val target = if (currentUrl.startsWith("http")) currentUrl else "https://$currentUrl"
-                            if (webView.url != target) {
-                                webView.loadUrl(target)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
+                    // Smooth appearance / loading veil to completely prevent any white or black flash
+                    var isAppearing by remember { mutableStateOf(true) }
+                    androidx.compose.runtime.LaunchedEffect(url) {
+                        isAppearing = true
+                        kotlinx.coroutines.delay(280L)
+                        isAppearing = false
+                    }
+
+                    val veilAlpha by animateFloatAsState(
+                        targetValue = if (isLoading || isAppearing) 1f else 0f,
+                        animationSpec = tween(300),
+                        label = "veilAlpha"
                     )
+
+                    if (veilAlpha > 0f) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(alpha = veilAlpha)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            Color(0xFF070c24),
+                                            Color(0xFF12183c)
+                                        )
+                                    )
+                                )
+                        )
+                    }
                 }
-            }
-        }
-
-        // Bottom Page Controls Bar
-        HorizontalDivider(color = Color(0xFFe6e7ea), thickness = 1.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp, horizontal = 10.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { viewModel.openHome() },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Default.Home, contentDescription = "Home", tint = Color(0xFF16181d))
-            }
-
-            IconButton(
-                onClick = { viewModel.saveCurrentPageToQuickLinks() },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Default.Star, contentDescription = "Save to quick links", tint = Color(0xFF16181d))
-            }
-
-            IconButton(
-                onClick = { viewModel.isTabsOverlayOpen.value = true },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Tab, contentDescription = "Tabs", tint = Color(0xFF16181d))
-                    Text(
-                        text = "${tabs.size}",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF16181d)
-                    )
-                }
-            }
-
-            IconButton(
-                onClick = { viewModel.isMenuOpen.value = !viewModel.isMenuOpen.value },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color(0xFF16181d))
             }
         }
     }
@@ -552,5 +594,36 @@ private fun MockPagePreviewView(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WeatherForecastPageView(
+    viewModel: BrowserViewModel,
+    browserSettings: UserBrowserSettings
+) {
+    val weatherInfo by viewModel.weatherInfo.collectAsState()
+    val isWeatherExpanded by viewModel.isWeatherExpanded.collectAsState()
+    val weatherDayIndex by viewModel.weatherDayIndex.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("weather.keeftalk.app", fontSize = 12.sp, color = Color(0xFF0a7cff))
+        Text("Live Weather & Forecast", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16181d))
+
+        tn.keeftalk.chat.ui.feed.components.WeatherCardExact(
+            weather = weatherInfo,
+            isExpanded = isWeatherExpanded,
+            selectedDayIndex = weatherDayIndex,
+            onToggleExpand = { viewModel.toggleWeatherExpand() },
+            onSelectDay = { viewModel.setWeatherDayIndex(it) },
+            onOpenDetail = { viewModel.showToast("Weather details (${browserSettings.unit})") },
+            onOpenLocationSettings = { viewModel.showToast("Opening location settings") }
+        )
     }
 }

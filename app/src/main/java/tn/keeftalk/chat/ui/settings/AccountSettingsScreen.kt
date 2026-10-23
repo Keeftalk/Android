@@ -38,8 +38,8 @@ enum class AccountSubSetting {
     CLOUD_VAULT, CLOUD_NOTES, CLOUD_CACHE,
     // Privacy
     PRIV_VISIBILITY, PRIV_INTERACTIONS, PRIV_PERMS, PRIV_BLOCKED,
-    // Subscription
-    SUB_STORAGE,
+    // Subscription & Storage
+    SUB_STORAGE, SUB_REDEEM_CODE,
     // Usage
     TIME_ON_KEEFTALK
 }
@@ -102,6 +102,13 @@ fun AccountSettingsScreen(
                                 title = "Subscription & Storage",
                                 subtitle = "Membership & Quota",
                                 onClick = { selectedSubSetting = AccountSubSetting.SUB_STORAGE },
+                                trailing = { ChevronRightIcon() }
+                            )
+                            SettingsItem(
+                                icon = Icons.Rounded.ConfirmationNumber,
+                                title = "Redeem Access Code",
+                                subtitle = "Activate Pro & Feature Syncs",
+                                onClick = { selectedSubSetting = AccountSubSetting.SUB_REDEEM_CODE },
                                 showDivider = false,
                                 trailing = { ChevronRightIcon() }
                             )
@@ -291,7 +298,12 @@ fun AccountSettingsScreen(
                 )
             } else {
                 Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-                    AccountSubSettingDetail(subSetting, viewModel, onSubscriptionPlansClick)
+                    AccountSubSettingDetail(
+                        setting = subSetting,
+                        viewModel = viewModel,
+                        onSubscriptionPlansClick = onSubscriptionPlansClick,
+                        onRedeemCodeClick = { selectedSubSetting = AccountSubSetting.SUB_REDEEM_CODE }
+                    )
                 }
             }
         }
@@ -302,7 +314,8 @@ fun AccountSettingsScreen(
 fun AccountSubSettingDetail(
     setting: AccountSubSetting,
     viewModel: SettingsViewModel,
-    onSubscriptionPlansClick: () -> Unit
+    onSubscriptionPlansClick: () -> Unit,
+    onRedeemCodeClick: () -> Unit = {}
 ) {
     val profile by viewModel.currentUserProfile.collectAsState()
     
@@ -332,7 +345,8 @@ fun AccountSubSettingDetail(
             AccountSubSetting.PRIV_INTERACTIONS -> PrivacyInteractionsView(viewModel)
             AccountSubSetting.PRIV_PERMS -> PermsView()
             AccountSubSetting.PRIV_BLOCKED -> BlockedView(viewModel)
-            AccountSubSetting.SUB_STORAGE -> SubscriptionView(profile, onSubscriptionPlansClick)
+            AccountSubSetting.SUB_STORAGE -> SubscriptionView(profile, onSubscriptionPlansClick, onRedeemCodeClick)
+            AccountSubSetting.SUB_REDEEM_CODE -> RedeemCodeView(viewModel)
             AccountSubSetting.TIME_ON_KEEFTALK -> {}
         }
     }
@@ -722,7 +736,11 @@ fun MfaMethodItem(title: String, subtitle: String, icon: ImageVector, active: Bo
 }
 
 @Composable
-fun SubscriptionView(profile: tn.keeftalk.chat.domain.model.Profile?, onUpgradeClick: () -> Unit) {
+fun SubscriptionView(
+    profile: tn.keeftalk.chat.domain.model.Profile?,
+    onUpgradeClick: () -> Unit,
+    onRedeemCodeClick: () -> Unit = {}
+) {
     val plan = profile?.planType ?: tn.keeftalk.chat.domain.model.SubscriptionPlan.FREE
     val used = profile?.storageUsed ?: 0L
     val limit = profile?.storageLimit ?: plan.storageLimit
@@ -765,15 +783,200 @@ fun SubscriptionView(profile: tn.keeftalk.chat.domain.model.Profile?, onUpgradeC
             }
         }
         
-        if (plan != tn.keeftalk.chat.domain.model.SubscriptionPlan.PRO_MONTHLY && plan != tn.keeftalk.chat.domain.model.SubscriptionPlan.FAMILY_MONTHLY) {
-            AccountControlSection(title = "Special Offers") {
+        AccountControlSection(title = "Special Offers & Promotions") {
+            if (plan != tn.keeftalk.chat.domain.model.SubscriptionPlan.PRO_MONTHLY && plan != tn.keeftalk.chat.domain.model.SubscriptionPlan.FAMILY_MONTHLY) {
                 PremiumActionCard("Upgrade Plan", "Get more storage and features", Icons.Rounded.WorkspacePremium) {
                     onUpgradeClick()
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                PremiumActionCard("Annual Billing Save 20%", "Locked-in pricing", Icons.Rounded.Savings) {
-                    onUpgradeClick()
+            }
+            PremiumActionCard("Redeem Access Code", "Activate Pro or unlock feature syncs", Icons.Rounded.ConfirmationNumber) {
+                onRedeemCodeClick()
+            }
+        }
+    }
+}
+
+@Composable
+fun RedeemCodeView(viewModel: SettingsViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val entitlementManager = remember { tn.keeftalk.chat.di.AppModule.provideEntitlementManager(context) }
+    val isPremium by entitlementManager.isUniversalPremium.collectAsState()
+    val activeKeys by entitlementManager.activeEntitlements.collectAsState()
+
+    var codeInput by remember { mutableStateOf("") }
+    var redeemResult by remember { mutableStateOf<tn.keeftalk.chat.domain.engine.RedeemResult?>(null) }
+    var isRedeeming by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.ConfirmationNumber, null, tint = Color.White, modifier = Modifier.size(24.dp))
                 }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Redeem Access Code", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Enter an access code issued by Keeftalk to unlock Pro features or cloud sync capabilities.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Enter Redemption Code", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                OutlinedTextField(
+                    value = codeInput,
+                    onValueChange = { codeInput = it.uppercase() },
+                    label = { Text("Access Code") },
+                    leadingIcon = { Icon(Icons.Rounded.VpnKey, null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = {
+                        if (codeInput.isNotEmpty()) {
+                            IconButton(onClick = { codeInput = "" }) {
+                                Icon(Icons.Rounded.Clear, "Clear")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = {
+                        if (codeInput.isNotBlank()) {
+                            isRedeeming = true
+                            viewModel.redeemCode(context, codeInput) { result ->
+                                isRedeeming = false
+                                redeemResult = result
+                                if (result is tn.keeftalk.chat.domain.engine.RedeemResult.Success) {
+                                    codeInput = ""
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = codeInput.isNotBlank() && !isRedeeming
+                ) {
+                    if (isRedeeming) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Verifying with server...")
+                    } else {
+                        Icon(Icons.Rounded.AutoAwesome, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Redeem Code", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        redeemResult?.let { result ->
+            when (result) {
+                is tn.keeftalk.chat.domain.engine.RedeemResult.Success -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF2ECC71).copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, Color(0xFF2ECC71).copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.CheckCircle, null, tint = Color(0xFF2ECC71), modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(result.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF2ECC71))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(result.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                            if (result.unlockedFeatures.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Unlocked: ${result.unlockedFeatures.joinToString(", ")}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+                is tn.keeftalk.chat.domain.engine.RedeemResult.Error -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(result.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                    }
+                }
+            }
+        }
+
+        AccountControlSection(title = "Account Feature Cloud Sync Status") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val paidFeatures = tn.keeftalk.chat.domain.model.entitlement.FeatureId.values().filter { !it.isAlwaysFree }
+                paidFeatures.forEach { feature ->
+                    val isActive = isPremium || activeKeys.contains(feature.key)
+                    val statusText = when {
+                        isPremium -> "Included in Pro"
+                        activeKeys.contains(feature.key) -> "Active"
+                        else -> "Locked (Local Only)"
+                    }
+                    FeatureStatusRow(
+                        featureName = feature.displayName,
+                        statusText = statusText,
+                        isActive = isActive
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FeatureStatusRow(featureName: String, statusText: String, isActive: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isActive) Color(0xFF2ECC71).copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, if (isActive) Color(0xFF2ECC71).copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (isActive) Icons.Rounded.CloudDone else Icons.Rounded.Lock,
+                    contentDescription = null,
+                    tint = if (isActive) Color(0xFF2ECC71) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(featureName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+            }
+
+            Surface(shape = RoundedCornerShape(6.dp), color = if (isActive) Color(0xFF2ECC71).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant) {
+                Text(
+                    text = statusText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isActive) Color(0xFF2ECC71) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -1174,6 +1377,7 @@ fun getIconForSubSetting(setting: AccountSubSetting): ImageVector = when (settin
     AccountSubSetting.PRIV_PERMS -> Icons.Rounded.Rule
     AccountSubSetting.PRIV_BLOCKED -> Icons.Rounded.Block
     AccountSubSetting.SUB_STORAGE -> Icons.Rounded.Storage
+    AccountSubSetting.SUB_REDEEM_CODE -> Icons.Rounded.ConfirmationNumber
     AccountSubSetting.TIME_ON_KEEFTALK -> Icons.Rounded.QueryStats
 }
 

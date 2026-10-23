@@ -90,16 +90,29 @@ fun SubscriptionPlansScreen(
                 }
 
                 item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("100% Free Local Features", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Every Keeftalk feature (Notes, Books, Habits, Calendar, Secrets, Market, Chats, Maps) is 100% free and works fully offline on your device. Subscriptions only unlock optional cloud synchronization and cloud persistence.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                }
+
+                item {
                     PlanCard(
                         title = SubscriptionPlan.FREE.displayName,
                         price = "$0",
-                        description = "The complete messenger",
+                        description = "Free Forever Local & Offline Use",
                         features = listOf(
-                            "${SubscriptionPlan.FREE.formatStorageLimit()} encrypted storage",
-                            "Compressed media",
-                            "${SubscriptionPlan.FREE.formatMaxFileSize()} max upload",
-                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getUploadLimit(SubscriptionPlan.FREE))} upload",
-                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getDownloadLimit(SubscriptionPlan.FREE))} download"
+                            "Full offline feature access (Notes, Books, Habits, Secrets, etc.)",
+                            "My Chats, My Vault, My Maps & My Market always free",
+                            "${SubscriptionPlan.FREE.formatStorageLimit()} Vault storage for local files",
+                            "Market posts active for 30 days (+ 1 extension = 60 days max)"
                         ),
                         isActive = profile?.planType == SubscriptionPlan.FREE,
                         isLoading = false,
@@ -108,26 +121,39 @@ fun SubscriptionPlansScreen(
                 }
 
                 item {
-                    val plusMonthly = productDetails.find { it.productId == BillingManager.PLUS_MONTHLY }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Vault Storage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Cloud Sync and Vault Storage are separate. Syncing a feature does not give you additional file storage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                item {
+                    val proMonthly = productDetails.find { it.productId == BillingManager.PRO_MONTHLY }
                     PlanCard(
-                        title = SubscriptionPlan.PLUS_MONTHLY.displayName,
-                        price = plusMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$4.99/mo",
-                        description = "For users who need more space",
+                        title = "Universal Premium",
+                        price = proMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$9.99/mo",
+                        description = "All feature sync + 500 GB Vault storage",
                         features = listOf(
-                            "${SubscriptionPlan.PLUS_MONTHLY.formatStorageLimit()} encrypted storage",
-                            "Original quality media",
-                            "${SubscriptionPlan.PLUS_MONTHLY.formatMaxFileSize()} max upload",
-                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getUploadLimit(SubscriptionPlan.PLUS_MONTHLY))} upload",
-                            "Up to ${BandwidthPolicy.formatLimit(BandwidthPolicy.getDownloadLimit(SubscriptionPlan.PLUS_MONTHLY))} download"
+                            "All paid feature cloud sync (Notes, Books, Habits, Secrets, etc.)",
+                            "500 GB encrypted Vault storage pool",
+                            "Premium themes & Market post extensions (+7d per buyer message)",
+                            "Multi-device & identity verification eligibility"
                         ),
-                        isActive = (profile?.planType == SubscriptionPlan.PLUS_MONTHLY || profile?.planType == SubscriptionPlan.PLUS_YEARLY),
-                        isLoading = isQuerying && plusMonthly == null,
+                        isActive = profile?.planType == SubscriptionPlan.PRO_MONTHLY,
+                        isLoading = isQuerying && proMonthly == null,
                         onSelect = { 
-                            plusMonthly?.let { 
+                            proMonthly?.let { 
                                 billingManager.launchPurchaseFlow(activity, it) 
                             } ?: run {
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("Subscription plan details not found. Please try again later.")
+                                    snackbarHostState.showSnackbar("Subscription plan details not found.")
                                 }
                             }
                         }
@@ -135,57 +161,29 @@ fun SubscriptionPlansScreen(
                 }
 
                 item {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        val proMonthly = productDetails.find { it.productId == BillingManager.PRO_MONTHLY }
-                        PlanCard(
-                            modifier = Modifier.weight(1f),
-                            title = SubscriptionPlan.PRO_MONTHLY.displayName,
-                            price = proMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$14.99/mo",
-                            description = "Power user tools",
-                            features = listOf(
-                                "${SubscriptionPlan.PRO_MONTHLY.formatStorageLimit()} storage",
-                                "AI Assistant",
-                                "${SubscriptionPlan.PRO_MONTHLY.formatMaxFileSize()} max upload",
-                                "Unlimited transfer speed"
-                            ),
-                            isActive = profile?.planType == SubscriptionPlan.PRO_MONTHLY,
-                            isLoading = isQuerying && proMonthly == null,
-                            onSelect = { 
-                                proMonthly?.let { 
-                                    billingManager.launchPurchaseFlow(activity, it) 
-                                } ?: run {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Subscription plan details not found.")
-                                    }
+                    val familyMonthly = productDetails.find { it.productId == BillingManager.FAMILY_MONTHLY }
+                    PlanCard(
+                        title = "Family Premium",
+                        price = familyMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$19.99/mo",
+                        description = "Shared 2 TB Vault pool for up to 6 people",
+                        features = listOf(
+                            "Shared 2 TB Vault storage pool across 6 accounts (1 Owner + 5 Members)",
+                            "Universal Premium capabilities for every active family member",
+                            "Private & end-to-end encrypted (members cannot see each other's data)",
+                            "1-year member removal protection enforced server-side"
+                        ),
+                        isActive = profile?.planType == SubscriptionPlan.FAMILY_MONTHLY,
+                        isLoading = isQuerying && familyMonthly == null,
+                        onSelect = { 
+                            familyMonthly?.let { 
+                                billingManager.launchPurchaseFlow(activity, it) 
+                            } ?: run {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Subscription plan details not found.")
                                 }
                             }
-                        )
-
-                        val familyMonthly = productDetails.find { it.productId == BillingManager.FAMILY_MONTHLY }
-                        PlanCard(
-                            modifier = Modifier.weight(1f),
-                            title = SubscriptionPlan.FAMILY_MONTHLY.displayName,
-                            price = familyMonthly?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice ?: "$14.99/mo",
-                            description = "Shared family pool",
-                            features = listOf(
-                                "${SubscriptionPlan.FAMILY_MONTHLY.formatStorageLimit()} shared pool",
-                                "Up to 6 users",
-                                "Plus features for all",
-                                "Unlimited transfer speed"
-                            ),
-                            isActive = profile?.planType == SubscriptionPlan.FAMILY_MONTHLY,
-                            isLoading = isQuerying && familyMonthly == null,
-                            onSelect = { 
-                                familyMonthly?.let { 
-                                    billingManager.launchPurchaseFlow(activity, it) 
-                                } ?: run {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Subscription plan details not found.")
-                                    }
-                                }
-                            }
-                        )
-                    }
+                        }
+                    )
                 }
             }
 

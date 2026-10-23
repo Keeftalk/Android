@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun CalendarSettingsScreen(
@@ -18,6 +19,15 @@ fun CalendarSettingsScreen(
         topBar = { SettingsHeader(title = "My Calendar", onBack = onBack) }
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
+            item {
+                tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                    featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.CALENDAR,
+                    description = "Sync your events and calendar data across your devices.",
+                    onEnableClick = { },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             item {
                 SettingsSection(title = "Calendar") {
                     SettingsItem(

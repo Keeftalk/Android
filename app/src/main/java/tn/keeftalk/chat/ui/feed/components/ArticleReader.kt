@@ -42,6 +42,8 @@ fun ArticleReader(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    var isRtl by remember { mutableStateOf(false) }
+    val layoutDirection = if (isRtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -49,35 +51,50 @@ fun ArticleReader(
         containerColor = MaterialTheme.colorScheme.surface,
         dragHandle = null
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-        ) {
-            // Hero Section
-            Box(modifier = Modifier.fillMaxWidth().height(320.dp)) {
-                if (article.thumbnailUrl != null) {
-                    AsyncImage(
-                        model = article.thumbnailUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer))
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides layoutDirection) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // Hero Section
+                Box(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+                    if (article.thumbnailUrl != null) {
+                        AsyncImage(
+                            model = article.thumbnailUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer))
+                    }
+                    
+                    // Top buttons overlay
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IconButton(
+                            onClick = { isRtl = !isRtl },
+                            modifier = Modifier
+                                .background(if (isRtl) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                                .size(40.dp)
+                        ) {
+                            Text("RTL", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                                .size(40.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                    }
                 }
-                
-                // Close button overlay
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-            }
 
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp)) {
                 // Attribution & Date
@@ -186,6 +203,7 @@ fun ArticleReader(
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
+      }
     }
 }
 

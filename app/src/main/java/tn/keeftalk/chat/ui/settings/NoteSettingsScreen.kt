@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun NoteSettingsScreen(
@@ -21,6 +22,15 @@ fun NoteSettingsScreen(
         topBar = { SettingsHeader(title = "My Notes", onBack = onBack) }
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
+            item {
+                tn.keeftalk.chat.ui.settings.components.FeatureCloudSyncCard(
+                    featureId = tn.keeftalk.chat.domain.model.entitlement.FeatureId.NOTES,
+                    description = "Sync your notes across your devices.",
+                    onEnableClick = { },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             item {
                 SettingsSection(title = "Behavior") {
                     SettingsToggleItem(

@@ -227,6 +227,26 @@ class FileRepositoryImpl(
         }
     }
 
+    private fun getExtensionFromFile(file: File): String {
+        file.fileName?.let { name ->
+            val ext = name.substringAfterLast('.', "")
+            if (ext.isNotEmpty() && ext.length <= 10) return ext.lowercase(Locale.ROOT)
+        }
+        file.localPath?.let { path ->
+            val ext = path.substringAfterLast('.', "")
+            if (ext.isNotEmpty() && ext.length <= 10) return ext.lowercase(Locale.ROOT)
+        }
+        file.mimeType?.let { mime ->
+            if (mime.contains("pdf", ignoreCase = true)) return "pdf"
+            if (mime.contains("epub", ignoreCase = true)) return "epub"
+            if (mime.contains("png", ignoreCase = true)) return "png"
+            if (mime.contains("jpg", ignoreCase = true) || mime.contains("jpeg", ignoreCase = true)) return "jpg"
+            if (mime.contains("mp4", ignoreCase = true)) return "mp4"
+            if (mime.contains("mp3", ignoreCase = true)) return "mp3"
+        }
+        return ""
+    }
+
     override suspend fun ensureMediaLocal(file: File, chatId: String?): Result<java.io.File> = withContext(Dispatchers.IO) {
         try {
             Log.i("FILE_PIPELINE", "ENSURE_MEDIA_LOCAL_V2 | fileId=${file.id}")
@@ -234,7 +254,9 @@ class FileRepositoryImpl(
             val internalMediaDir = java.io.File(context.filesDir, "media/${file.fileType.name.lowercase(Locale.ROOT)}")
             if (!internalMediaDir.exists()) internalMediaDir.mkdirs()
             
-            val destFile = java.io.File(internalMediaDir, "${file.id}_decrypted")
+            val ext = getExtensionFromFile(file)
+            val fileNameWithExt = if (ext.isNotEmpty()) "${file.id}_decrypted.$ext" else "${file.id}_decrypted"
+            val destFile = java.io.File(internalMediaDir, fileNameWithExt)
             if (destFile.exists()) {
                 Log.d("FILE_PIPELINE", "DECRYPTION_SKIPPED | fileId=${file.id} | message=Decrypted file already exists")
                 return@withContext Result.success(destFile)

@@ -7,8 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import tn.keeftalk.chat.extension.model.ThemePack
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -138,7 +140,44 @@ fun KeeftalkTheme(
         )
     }
 
-    val colorScheme = if (isSkeleton) {
+    val customThemeState = remember(context) {
+        try {
+            tn.keeftalk.chat.di.AppModule.provideExtensionHost(context).registry.themeRegistry.activeCustomTheme
+        } catch (_: Exception) {
+            null
+        }
+    }
+    val customTheme = customThemeState?.collectAsState()?.value
+
+    val colorScheme = if (customTheme != null) {
+        val tc = if (isDark) customTheme.darkColors else customTheme.lightColors
+        val parseColor: (String, Color) -> Color = { hex, fallback ->
+            try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { fallback }
+        }
+        if (isDark) {
+            darkColorScheme(
+                primary = parseColor(tc.primaryHex, Primary),
+                onPrimary = parseColor(tc.onPrimaryHex, Color.White),
+                background = parseColor(tc.backgroundBodyHex, DarkBackgroundBody),
+                onBackground = parseColor(tc.onBackgroundHex, DarkTextPrimary),
+                surface = parseColor(tc.surfaceHex, DarkBackgroundSurface),
+                onSurface = parseColor(tc.onSurfaceHex, DarkTextPrimary),
+                surfaceVariant = parseColor(tc.surfaceVariantHex, DarkBackgroundSurfaceAlt),
+                onSurfaceVariant = parseColor(tc.onSurfaceVariantHex, DarkTextSecondary)
+            )
+        } else {
+            lightColorScheme(
+                primary = parseColor(tc.primaryHex, Primary),
+                onPrimary = parseColor(tc.onPrimaryHex, Color.White),
+                background = parseColor(tc.backgroundBodyHex, BackgroundBody),
+                onBackground = parseColor(tc.onBackgroundHex, TextPrimary),
+                surface = parseColor(tc.surfaceHex, BackgroundSurface),
+                onSurface = parseColor(tc.onSurfaceHex, TextPrimary),
+                surfaceVariant = parseColor(tc.surfaceVariantHex, BackgroundSurfaceAlt),
+                onSurfaceVariant = parseColor(tc.onSurfaceVariantHex, TextSecondary)
+            )
+        }
+    } else if (isSkeleton) {
         if (isDark) DarkColorScheme else LightColorScheme
     } else {
         when {
@@ -167,16 +206,49 @@ fun KeeftalkTheme(
         }
     }
 
-    val chatExtra = remember(appTheme, isSystemDark, keefTokens) {
-        when (appTheme) {
-            AppTheme.SYSTEM -> if (isSystemDark) ChatThemeExtra(Primary, DarkMsgThem) else ChatThemeExtra(MsgMe, MsgThem)
-            AppTheme.LIGHT -> ChatThemeExtra(MsgMe, MsgThem)
-            AppTheme.DARK -> ChatThemeExtra(Primary, DarkMsgThem)
-            AppTheme.KEEF -> ChatThemeExtra(
-                msgMe = keefTokens.accent,
-                msgThem = keefTokens.card,
+    val activeKeefTokens = remember(keefTokens, customTheme, isDark) {
+        if (customTheme != null) {
+            val tc = if (isDark) customTheme.darkColors else customTheme.lightColors
+            val parseColor: (String, Color) -> Color = { hex, fallback ->
+                try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { fallback }
+            }
+            val accentCol = parseColor(tc.accentHex, parseColor(tc.primaryHex, Primary))
+            val cardCol = parseColor(tc.cardHex, parseColor(tc.surfaceHex, DarkBackgroundSurface))
+            val softCol = parseColor(tc.surfaceVariantHex, DarkBackgroundSurfaceAlt)
+            val inkCol = parseColor(tc.onBackgroundHex, DarkTextPrimary)
+            keefTokens.copy(
+                accent = accentCol,
+                card = cardCol,
+                soft = softCol,
+                ink = inkCol
+            )
+        } else {
+            keefTokens
+        }
+    }
+
+    val chatExtra = remember(appTheme, isSystemDark, activeKeefTokens, customTheme) {
+        if (customTheme != null) {
+            val tc = if (isDark) customTheme.darkColors else customTheme.lightColors
+            val parseColor: (String, Color) -> Color = { hex, fallback ->
+                try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { fallback }
+            }
+            ChatThemeExtra(
+                msgMe = parseColor(tc.msgMeHex, parseColor(tc.primaryHex, Primary)),
+                msgThem = parseColor(tc.msgThemHex, parseColor(tc.surfaceVariantHex, DarkBackgroundSurfaceAlt)),
                 useGlassmorphism = true
             )
+        } else {
+            when (appTheme) {
+                AppTheme.SYSTEM -> if (isSystemDark) ChatThemeExtra(Primary, DarkMsgThem) else ChatThemeExtra(MsgMe, MsgThem)
+                AppTheme.LIGHT -> ChatThemeExtra(MsgMe, MsgThem)
+                AppTheme.DARK -> ChatThemeExtra(Primary, DarkMsgThem)
+                AppTheme.KEEF -> ChatThemeExtra(
+                    msgMe = keefTokens.accent,
+                    msgThem = keefTokens.card,
+                    useGlassmorphism = true
+                )
+            }
         }
     }
 
@@ -210,7 +282,7 @@ fun KeeftalkTheme(
         LocalAppIcons provides icons,
         LocalChatThemeExtra provides chatExtra,
         LocalChatSettings provides chatSettings,
-        LocalKeefThemeTokens provides keefTokens,
+        LocalKeefThemeTokens provides activeKeefTokens,
         LocalEnvironmentalState provides environmentalState,
         androidx.compose.ui.platform.LocalDensity provides scaledDensity
     ) {

@@ -23,6 +23,7 @@ import tn.keeftalk.chat.domain.model.NotificationPriority
 import tn.keeftalk.chat.domain.model.NotificationType
 import tn.keeftalk.chat.domain.model.UserNotificationSettings
 import tn.keeftalk.chat.domain.repository.ChatRepository
+import tn.keeftalk.chat.util.SoundEffectManager
 import java.util.UUID
 
 private const val TAG = "KEEFTALK_DISPATCHER"
@@ -92,18 +93,19 @@ class NotificationDispatcher(
      */
     suspend fun dispatchDirect(payload: NotificationPayload) {
         try {
-            val userPrefs = userPrefsRepo.userPreferencesFlow.first()
-            val fullSettings = userPrefsRepo.fullSettingsFlow.first()
-            val settings = fullSettings.notificationSettings
+            val fullSettings = kotlinx.coroutines.withTimeoutOrNull(1500) {
+                userPrefsRepo.fullSettingsFlow.first()
+            }
+            val settings = fullSettings?.notificationSettings ?: UserNotificationSettings()
 
             // Step 1: Global Master Switch
-            if (!settings.allEnabled) {
+            if (fullSettings != null && !settings.allEnabled) {
                 Log.d(TAG, "Suppressed [${payload.feature}]: Master notification switch is OFF")
                 return
             }
 
             // Step 2: Per-Feature Switch Check
-            if (!isFeatureEnabled(payload.feature, settings)) {
+            if (fullSettings != null && !isFeatureEnabled(payload.feature, settings)) {
                 Log.d(TAG, "Suppressed [${payload.feature}]: Feature notifications disabled in Settings")
                 return
             }
@@ -121,17 +123,26 @@ class NotificationDispatcher(
 
             // Step 5: Layer 1 - In-App Notification Delivery
             if (settings.inAppEnabled) {
-                deliverInAppNotification(payload, sanitizedTitle, sanitizedBody)
+                try {
+                    deliverInAppNotification(payload, sanitizedTitle, sanitizedBody)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to deliver in-app notification", e)
+                }
             }
 
-            // Step 6: Layer 2 - System Notification Delivery
-            if (settings.systemEnabled && !isTargetActive && hasPostNotificationsPermission()) {
+            // Step 6: Layer 2 - System Notification Delivery (Fail-open for push/FCM)
+            if (!isTargetActive) {
                 deliverSystemNotification(payload, sanitizedTitle, sanitizedBody)
-            } else if (isTargetActive) {
+            } else {
                 Log.d(TAG, "Suppressed system notification: Chat/Screen ${payload.chatId} actively open in foreground")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error dispatching notification for feature ${payload.feature}", e)
+            Log.e(TAG, "Error dispatching notification for feature ${payload.feature}, falling back to direct delivery", e)
+            try {
+                deliverSystemNotification(payload, payload.title, payload.body)
+            } catch (fallbackError: Exception) {
+                Log.e(TAG, "Fallback notification delivery also failed", fallbackError)
+            }
         }
     }
 
@@ -264,6 +275,23 @@ class NotificationDispatcher(
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         notificationManager?.notify(notificationId, builder.build())
+
+        when (payload.feature) {
+            NotificationFeature.SYSTEM -> {
+                if (payload.title.contains("Nudge", ignoreCase = true) || payload.title.contains("Profile", ignoreCase = true)) {
+                    SoundEffectManager.playNotificationSound(context, SoundEffectManager.RES_PROFILE_BELL)
+                } else {
+                    SoundEffectManager.playNotificationSound(context, SoundEffectManager.RES_ANY_NOTIFICATION)
+                }
+            }
+            NotificationFeature.CHATS -> {
+                SoundEffectManager.playNotificationSound(context, SoundEffectManager.RES_MSG_RECEIVING_APP)
+            }
+            else -> {
+                SoundEffectManager.playNotificationSound(context, SoundEffectManager.RES_ANY_NOTIFICATION)
+            }
+        }
+
         Log.d(TAG, "Delivered System Notification [${payload.feature} / $channelId]: $title")
     }
 

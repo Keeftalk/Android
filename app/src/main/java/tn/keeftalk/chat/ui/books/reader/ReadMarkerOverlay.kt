@@ -67,7 +67,7 @@ fun ReadMarkerOverlay(
 
     LaunchedEffect(isCoolingDown) {
         if (isCoolingDown) {
-            delay(6500L) // 6.5s cooldown against consecutive fast clicks
+            delay(300L) // 300ms debounce
             isCoolingDown = false
         }
     }
@@ -153,7 +153,9 @@ fun ReadMarkerOverlay(
                     .clickable(enabled = !isCoolingDown) {
                         isCoolingDown = true
                         currentOnToggle()
-                        currentOnToggleDetails(lastTapX, lastTapY, lastIsObscured)
+                        if (!isPageRead) {
+                            currentOnToggleDetails(lastTapX, lastTapY, lastIsObscured)
+                        }
                     }
                     // keyed on bounds so the clamp values are never stale after a resize
                     .pointerInput(maxX, maxY) {

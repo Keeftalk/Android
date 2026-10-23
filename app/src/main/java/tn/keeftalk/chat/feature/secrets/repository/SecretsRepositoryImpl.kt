@@ -39,26 +39,15 @@ class SecretsRepositoryImpl(
         private const val TAG = "SecretsRepositoryImpl"
     }
 
-    private var fallbackKey: SecretKey? = null
-
     private fun getEncryptionKey(): SecretKey {
-        return try {
-            KeyManager.getVaultKey()
-        } catch (e: Exception) {
-            fallbackKey ?: StorageCryptoService.generateRandomKey().also { fallbackKey = it }
-        }
+        return KeyManager.getVaultKey()
     }
 
     private fun encryptText(plaintext: String): String {
         if (plaintext.isEmpty()) return ""
-        return try {
-            val key = getEncryptionKey()
-            val encObj = StorageCryptoService.encrypt(plaintext.toByteArray(Charsets.UTF_8), key)
-            "${encObj.version}:${encObj.keyId}:${encObj.iv}:${encObj.ciphertext}"
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to encrypt payload", e)
-            plaintext // Fallback if crypto fails in unauthenticated state
-        }
+        val key = getEncryptionKey()
+        val encObj = StorageCryptoService.encrypt(plaintext.toByteArray(Charsets.UTF_8), key)
+        return "${encObj.version}:${encObj.keyId}:${encObj.iv}:${encObj.ciphertext}"
     }
 
     private fun decryptText(ciphertext: String): String {

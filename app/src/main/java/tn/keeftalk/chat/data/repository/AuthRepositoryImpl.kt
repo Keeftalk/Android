@@ -17,6 +17,7 @@ import tn.keeftalk.chat.util.PerformanceProfiler
 import tn.keeftalk.chat.util.PersistentAvatarManager
 import tn.keeftalk.chat.security.crypto.Argon2idManager
 import tn.keeftalk.chat.security.crypto.KeyManager
+import tn.keeftalk.chat.security.crypto.DatabaseKeyManager
 import tn.keeftalk.chat.security.crypto.EncryptedObject
 import tn.keeftalk.chat.data.remote.UserSecuritySettingsDto
 import android.util.Base64
@@ -105,6 +106,19 @@ class AuthRepositoryImpl(
                                 attemptAutomaticRecovery(userId)
                             }
                         }
+                        // Flush any pending FCM token
+                        try {
+                            val prefsSp = context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
+                            val pendingToken = prefsSp.getString("pending_fcm_token", null)
+                            if (!pendingToken.isNullOrBlank()) {
+                                Log.d(TAG, "Flushing pending FCM token to Supabase")
+                                updateFcmToken(pendingToken)
+                                prefsSp.edit().remove("pending_fcm_token").apply()
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to flush pending FCM token", e)
+                        }
+
                         if (!initDeferred.isCompleted) initDeferred.complete(Unit)
                     }
                 } else if (status is SessionStatus.NotAuthenticated) {
@@ -316,6 +330,10 @@ class AuthRepositoryImpl(
             prefs.updateIsLogged(true)
         }
         
+        try {
+            tn.keeftalk.chat.account.KeeftalkAccountSyncHelper.ensureAccountExists(context, identifier)
+        } catch (_: Exception) {}
+
         Result.success(Unit)
     } catch (e: tn.keeftalk.chat.domain.model.TwoFactorRequiredException) {
         Result.failure(e)
@@ -444,23 +462,55 @@ class AuthRepositoryImpl(
     override suspend fun logout(): Result<Unit> = runCatching {
         Log.d(TAG, "ENDPOINT: auth/logout")
         
+        // Idempotency check
+        if (!prefs.isLoggedFast() && prefs.getUserIdFast().isNullOrEmpty()) {
+            Log.i(TAG, "Logout called but user is already logged out. Returning success.")
+            return@runCatching
+        }
+        
         // --- NEW E2EE ARCHITECTURE: HARDENED LOGOUT ---
-        // 1. Sign out from Supabase (revokes tokens)
+        // 1. Sign out from Supabase (revokes tokens). If offline, log warning and proceed with local teardown.
         try {
             getSupabase().auth.signOut()
         } catch (e: Exception) {
-            Log.e(TAG, "Supabase signOut failed: ${e.message}")
+            Log.e(TAG, "Supabase signOut failed (offline logout proceeding with local teardown): ${e.message}")
         }
 
-        // 2. Clear sensitive in-memory keys while preserving local encrypted AEK for recovery
-        val userId = prefs.getUserIdFast()
-        KeyManager.clearAEK(context, userId, clearDisk = false)
-        securityManager.reset()
-        AppModule.provideConversationKeyManager(context).clearCache()
+        // 2. Clear sensitive in-memory keys and disk storage (clearDisk = true) & DatabaseKeyManager
+        try {
+            val userId = prefs.getUserIdFast()
+            if (!userId.isNullOrEmpty()) {
+                KeyManager.clearAEK(context, userId, clearDisk = true)
+            }
+            securityManager.reset()
+            AppModule.provideConversationKeyManager(context).clearCache()
+            DatabaseKeyManager.reset(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear encryption keys: ${e.message}")
+            throw Exception("Failed to clear encryption keys: ${e.message}", e)
+        }
 
         // 3. Clear all local caches and databases (including decrypted remnants)
-        // This includes deleting filesDir/media and cacheDir
-        tn.keeftalk.chat.di.AppModule.clearAllData(context)
+        try {
+            tn.keeftalk.chat.di.AppModule.clearAllData(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear local data: ${e.message}")
+            throw Exception("Failed to wipe local data and caches: ${e.message}", e)
+        }
+        
+        try {
+            tn.keeftalk.chat.account.KeeftalkAccountSyncHelper.removeAccount(context)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to remove account: ${e.message}")
+        }
+        
+        // 4. If and only if everything is deleted successfully, update login status
+        try {
+            prefs.updateIsLogged(false)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update login preference: ${e.message}")
+            throw Exception("Failed to finalize logout state: ${e.message}", e)
+        }
         
         Log.i(TAG, "Hardened logout complete. All keys and decrypted data removed.")
     }
@@ -637,6 +687,15 @@ class AuthRepositoryImpl(
     override suspend fun updateFcmToken(token: String): Result<Unit> {
         return try {
             Log.d(TAG, "updateFcmToken called")
+            val currentUser = getSupabase().auth.currentUserOrNull()
+            if (currentUser == null) {
+                Log.d(TAG, "User not authenticated yet, caching FCM token locally")
+                context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("pending_fcm_token", token)
+                    .apply()
+                return Result.success(Unit)
+            }
             val user = getAuthenticatedUser() ?: return Result.failure(Exception("Not authenticated"))
             val supabase = getSupabase()
 
@@ -652,6 +711,10 @@ class AuthRepositoryImpl(
                         filter { eq("id", userId) }
                     }
                     Log.d(TAG, "FCM token updated successfully in Supabase")
+                    context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .remove("pending_fcm_token")
+                        .apply()
                     break
                 } catch (e: Exception) {
                     if (i == maxAttempts - 1) throw e
@@ -701,9 +764,22 @@ class AuthRepositoryImpl(
         withContext(Dispatchers.IO) {
             val current = profileDao.getProfile(userId)
             if (current != null) {
-                val updated = current.copy(storageUsed = (current.storageUsed + delta).coerceAtLeast(0L))
+                val newStorageUsed = (current.storageUsed + delta).coerceAtLeast(0L)
+                val updated = current.copy(storageUsed = newStorageUsed)
                 profileDao.insertProfile(updated)
                 Log.d(TAG, "Optimistically updated storage_used for $userId: ${updated.storageUsed} (delta: $delta)")
+                
+                // Also sync storage_used to Supabase profiles table
+                try {
+                    val supabase = getSupabase()
+                    supabase.postgrest["profiles"].update({
+                        set("storage_used", newStorageUsed)
+                    }) {
+                        filter { eq("id", userId) }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to sync storage_used to Supabase: ${e.message}")
+                }
             }
         }
     }
@@ -1103,28 +1179,35 @@ class AuthRepositoryImpl(
             newProfile
         }
         
+        val localProfile = profileDao.getProfile(userId)
+        val finalProfile = if (localProfile != null && localProfile.storageUsed > profile.storageUsed) {
+            profile.copy(storageUsed = localProfile.storageUsed)
+        } else {
+            profile
+        }
+        
         tn.keeftalk.chat.util.PerformanceProfiler.startStage("DB Query: Save Profile")
-        profileDao.insertProfile(profile.toEntity())
+        profileDao.insertProfile(finalProfile.toEntity())
         tn.keeftalk.chat.util.PerformanceProfiler.endStage("DB Query: Save Profile")
 
-        if (!profile.avatarUrl.isNullOrEmpty()) {
+        if (!finalProfile.avatarUrl.isNullOrEmpty()) {
             repositoryScope.launch(Dispatchers.IO) {
-                tn.keeftalk.chat.util.PersistentAvatarManager.downloadAndCacheAvatar(context, userId, profile.avatarUrl)
+                tn.keeftalk.chat.util.PersistentAvatarManager.downloadAndCacheAvatar(context, userId, finalProfile.avatarUrl)
             }
         }
 
         // Also sync UserEntity
         userDao.insertUser(tn.keeftalk.chat.data.local.entities.UserEntity(
-            id = profile.id,
-            name = profile.fullName ?: profile.username,
-            username = profile.username,
-            avatarUrl = profile.avatarUrl,
+            id = finalProfile.id,
+            name = finalProfile.fullName ?: finalProfile.username,
+            username = finalProfile.username,
+            avatarUrl = finalProfile.avatarUrl,
             isActive = true,
-            lastSeen = profile.lastSeen,
+            lastSeen = finalProfile.lastSeen,
             isContact = false
         ))
 
-        return profile
+        return finalProfile
     }
 
     override suspend fun resetSecuritySettings(): Result<Unit> = try {

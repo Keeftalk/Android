@@ -101,8 +101,18 @@ import tn.keeftalk.chat.feature.secrets.data.local.entities.*
         SecretSettingsEntity::class,
         TodoTaskEntity::class,
         TodoListEntity::class,
+        SavedPlaceEntity::class,
+        BrowserHistoryEntity::class,
+        MarketListingEntity::class,
+        MarketChatEntity::class,
+        MarketSellerEntity::class,
+        MarketSavedEntity::class,
+        DocEntity::class,
+        DocBookmarkEntity::class,
+        DocHighlightEntity::class,
+        DocSyncQueueEntity::class
     ],
-    version = 114,
+    version = 120,
     exportSchema = true
 )
 @TypeConverters(KeeftalkConverters::class)
@@ -111,12 +121,14 @@ abstract class KeeftalkDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun messageDao(): MessageDao
     abstract fun profileDao(): ProfileDao
+    abstract fun marketDao(): tn.keeftalk.chat.data.local.dao.MarketDao
     abstract fun noteDao(): NoteDao
     abstract fun syncQueueDao(): SyncQueueDao
     abstract fun notificationDao(): NotificationDao
     abstract fun vaultDao(): VaultDao
     abstract fun vaultSyncQueueDao(): VaultSyncQueueDao
     abstract fun bookDao(): BookDao
+    abstract fun docDao(): DocDao
     abstract fun xpDao(): XpDao
     abstract fun vaultBackupDao(): VaultBackupDao
     abstract fun calendarSyncQueueDao(): CalendarSyncQueueDao
@@ -135,6 +147,8 @@ abstract class KeeftalkDatabase : RoomDatabase() {
     abstract fun secretsDao(): SecretsDao
     abstract fun timeTrackingDao(): TimeTrackingDao
     abstract fun todoDao(): TodoDao
+    abstract fun savedPlaceDao(): SavedPlaceDao
+    abstract fun browserHistoryDao(): BrowserHistoryDao
 
     companion object {
         val CALLBACK = object : RoomDatabase.Callback() {
@@ -242,6 +256,12 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE users ADD COLUMN birthday INTEGER")
                 db.execSQL("ALTER TABLE users ADD COLUMN callingCard TEXT")
                 db.execSQL("ALTER TABLE users ADD COLUMN cloudSyncStatus INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_66_67 = object : Migration(66, 67) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Bridge migration v66 to v67
             }
         }
 
@@ -418,6 +438,23 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                         PRIMARY KEY(id)
                     )
                 """.trimIndent())
+            }
+        }
+
+        val MIGRATION_74_82 = object : Migration(74, 82) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Safely bridge historical versions 74 to 82
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS conversation_keys (
+                            conversationId TEXT NOT NULL,
+                            encryptedKey TEXT NOT NULL,
+                            keyVersion INTEGER NOT NULL,
+                            createdAt INTEGER NOT NULL,
+                            PRIMARY KEY(conversationId)
+                        )
+                    """.trimIndent())
+                } catch (_: Exception) {}
             }
         }
 
@@ -623,6 +660,12 @@ abstract class KeeftalkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_96_100 = object : Migration(96, 100) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Bridge migration v96 to v100
+            }
+        }
+
         val MIGRATION_100_101 = object : Migration(100, 101) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS habits (id TEXT NOT NULL, userId TEXT NOT NULL, name TEXT NOT NULL, icon TEXT NOT NULL, category TEXT NOT NULL, baseDays INTEGER NOT NULL, createdDateEpochDay INTEGER NOT NULL, reminderTimeMinutes INTEGER, slot TEXT NOT NULL, habitType TEXT NOT NULL, updatedAt INTEGER NOT NULL, deleted INTEGER NOT NULL, syncState TEXT NOT NULL, PRIMARY KEY(id))")
@@ -633,11 +676,23 @@ abstract class KeeftalkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_101_102 = object : Migration(101, 102) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Bridge migration v101 to v102
+            }
+        }
+
         val MIGRATION_102_103 = object : Migration(102, 103) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE habits ADD COLUMN isReadingHabit INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE habits ADD COLUMN autoCountReading INTEGER NOT NULL DEFAULT 1")
                 db.execSQL("ALTER TABLE habits ADD COLUMN linkedBookIdsString TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_103_104 = object : Migration(103, 104) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Bridge migration v103 to v104
             }
         }
 
@@ -1094,6 +1149,207 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                             updatedAt INTEGER NOT NULL,
                             deleted INTEGER NOT NULL DEFAULT 0,
                             syncState TEXT NOT NULL DEFAULT 'PENDING',
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_113_114 = object : Migration(113, 114) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Bridge migration v113 to v114
+            }
+        }
+
+        val MIGRATION_114_115 = object : Migration(114, 115) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS saved_places (
+                            id TEXT NOT NULL,
+                            latitude REAL NOT NULL,
+                            longitude REAL NOT NULL,
+                            name TEXT,
+                            address TEXT,
+                            place_id TEXT,
+                            provider TEXT,
+                            created_at INTEGER NOT NULL,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_115_116 = object : Migration(115, 116) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS browser_history (
+                            id TEXT NOT NULL,
+                            url TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            timestamp INTEGER NOT NULL,
+                            cloudSyncStatus INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_browser_history_timestamp ON browser_history(timestamp DESC)")
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_116_117 = object : Migration(116, 117) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS market_listings (
+                            id TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            price REAL NOT NULL,
+                            cat TEXT NOT NULL,
+                            sub TEXT NOT NULL,
+                            cd TEXT NOT NULL,
+                            desc TEXT NOT NULL,
+                            seller TEXT NOT NULL,
+                            as_identity TEXT NOT NULL,
+                            shape TEXT NOT NULL DEFAULT 'v',
+                            ts INTEGER NOT NULL,
+                            exp INTEGER NOT NULL,
+                            ext INTEGER NOT NULL DEFAULT 0,
+                            media_json TEXT NOT NULL DEFAULT '[]',
+                            is_sold INTEGER NOT NULL DEFAULT 0,
+                            pos_lat REAL,
+                            pos_lng REAL,
+                            created_at INTEGER NOT NULL,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_market_listings_cat ON market_listings(cat)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_market_listings_seller ON market_listings(seller)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_market_listings_is_sold ON market_listings(is_sold)")
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS market_chats (
+                            listing_id TEXT NOT NULL,
+                            as_identity TEXT NOT NULL,
+                            start INTEGER NOT NULL,
+                            status TEXT,
+                            messages_json TEXT NOT NULL DEFAULT '[]',
+                            review_state_json TEXT,
+                            updated_at INTEGER NOT NULL,
+                            PRIMARY KEY(listing_id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_market_chats_listing_id ON market_chats(listing_id)")
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS market_sellers (
+                            id TEXT NOT NULL,
+                            alias TEXT NOT NULL,
+                            real TEXT NOT NULL,
+                            since INTEGER NOT NULL,
+                            ver INTEGER NOT NULL DEFAULT 0,
+                            reviews_json TEXT NOT NULL DEFAULT '[]',
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS market_saved (
+                            listing_id TEXT NOT NULL,
+                            saved_at INTEGER NOT NULL,
+                            PRIMARY KEY(listing_id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_market_saved_listing_id ON market_saved(listing_id)")
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_117_118 = object : Migration(117, 118) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE profiles ADD COLUMN total_xp INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_118_119 = object : Migration(118, 119) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE books ADD COLUMN finished_at INTEGER")
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_119_120 = object : Migration(119, 120) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS docs (
+                            id TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            author_or_source TEXT NOT NULL DEFAULT '',
+                            total_pages_or_sections INTEGER NOT NULL DEFAULT 1,
+                            format TEXT NOT NULL DEFAULT 'PDF',
+                            file_path TEXT NOT NULL DEFAULT '',
+                            file_size INTEGER NOT NULL DEFAULT 0,
+                            mime_type TEXT NOT NULL DEFAULT '',
+                            cover_url TEXT,
+                            custom_cover_json TEXT,
+                            percent_progress INTEGER NOT NULL DEFAULT 0,
+                            last_read_page INTEGER NOT NULL DEFAULT 1,
+                            last_read_position_json TEXT,
+                            is_favorite INTEGER NOT NULL DEFAULT 0,
+                            is_archived INTEGER NOT NULL DEFAULT 0,
+                            is_deleted INTEGER NOT NULL DEFAULT 0,
+                            content_hash TEXT,
+                            created_at INTEGER NOT NULL,
+                            updated_at INTEGER NOT NULL,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_docs_is_archived ON docs(is_archived)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_docs_is_deleted ON docs(is_deleted)")
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS doc_bookmarks (
+                            doc_id TEXT NOT NULL,
+                            page_or_position INTEGER NOT NULL,
+                            chapter_title TEXT NOT NULL DEFAULT '',
+                            excerpt TEXT NOT NULL DEFAULT '',
+                            created_at INTEGER NOT NULL,
+                            PRIMARY KEY(doc_id, page_or_position)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_doc_bookmarks_doc_id ON doc_bookmarks(doc_id)")
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS doc_highlights (
+                            id TEXT NOT NULL,
+                            doc_id TEXT NOT NULL,
+                            page_or_position INTEGER NOT NULL,
+                            start_offset INTEGER NOT NULL DEFAULT 0,
+                            end_offset INTEGER NOT NULL DEFAULT 0,
+                            selected_text TEXT NOT NULL,
+                            color_hex TEXT NOT NULL DEFAULT '#2ECC71',
+                            note_text TEXT NOT NULL DEFAULT '',
+                            created_at INTEGER NOT NULL,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_doc_highlights_doc_id ON doc_highlights(doc_id)")
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS doc_sync_queue (
+                            id TEXT NOT NULL,
+                            action TEXT NOT NULL,
+                            entity_type TEXT NOT NULL,
+                            payload_json TEXT NOT NULL,
+                            status TEXT NOT NULL DEFAULT 'PENDING',
+                            created_at INTEGER NOT NULL,
                             PRIMARY KEY(id)
                         )
                     """.trimIndent())

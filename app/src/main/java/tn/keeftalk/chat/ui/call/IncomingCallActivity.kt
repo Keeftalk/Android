@@ -24,11 +24,23 @@ class IncomingCallActivity : ComponentActivity() {
         wakeScreen()
 
         val callId = intent.getStringExtra(EXTRA_CALL_ID) ?: finish().run { return }
+        val action = intent.getStringExtra("action") ?: intent.action
 
         setContent {
             val repository = AppModule.provideChatRepository(applicationContext)
             val callViewModel: CallViewModel = viewModel(key = callId) {
                 CallViewModel(application, repository, callId, false)
+            }
+
+            if (action == "answer") {
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    callViewModel.acceptCall()
+                }
+            } else if (action == "decline" || action == "ACTION_CANCEL_CALL") {
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    callViewModel.rejectCall()
+                    finish()
+                }
             }
 
             KeeftalkTheme {
@@ -42,7 +54,8 @@ class IncomingCallActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.action == "ACTION_CANCEL_CALL") {
+        val action = intent.getStringExtra("action") ?: intent.action
+        if (action == "ACTION_CANCEL_CALL" || action == "decline") {
             finish()
         }
     }

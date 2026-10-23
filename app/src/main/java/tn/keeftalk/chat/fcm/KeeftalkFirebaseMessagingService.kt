@@ -1,45 +1,40 @@
 package tn.keeftalk.chat.fcm
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.Person
-import androidx.core.app.RemoteInput
-import androidx.core.graphics.drawable.IconCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import tn.keeftalk.chat.MainActivity
 import tn.keeftalk.chat.R
 import tn.keeftalk.chat.di.AppModule
-import tn.keeftalk.chat.data.prefs.UserPreferencesRepository
-import tn.keeftalk.chat.domain.model.ChatType
 import tn.keeftalk.chat.data.local.entities.MessageEntity
 import tn.keeftalk.chat.domain.model.DecryptionState
-import tn.keeftalk.chat.util.NotificationAvatarHelper
+import tn.keeftalk.chat.util.notifications.NotificationChannelManager
+import tn.keeftalk.chat.util.notifications.NotificationFeature
+import tn.keeftalk.chat.util.notifications.NotificationPayload
+import tn.keeftalk.chat.domain.model.NotificationType
+import tn.keeftalk.chat.domain.model.NotificationPriority
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.runBlocking
 import java.net.URL
-import android.graphics.Bitmap
 
 private const val TAG = "KEEFTALK_FCM"
-private const val CHANNEL_ID = "chat_messages"
-private const val CALL_CHANNEL_ID = "incoming_calls_v3"
-private const val SECURITY_CHANNEL_ID = "security_alerts"
 
 class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onCreate() {
+        super.onCreate()
+        NotificationChannelManager.createAllChannels(applicationContext)
+    }
 
     override fun onMessageReceived(message: RemoteMessage) {
         Log.d(TAG, "Message received from: ${message.from}")
@@ -80,9 +75,12 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
         val currentOpenChatId = prefs.getString("current_open_chat_id", null)
         val isAppInForeground = prefs.getBoolean("is_app_in_foreground", false)
 
+        val title = data["title"] ?: data["name"] ?: "New Message"
+        var body = data["body"] ?: data["content"] ?: ""
+        val avatarUrl = data["avatar"] ?: data["avatarUrl"]
+
         if (isAppInForeground && currentOpenChatId == chatId) {
             Log.d(TAG, "App in foreground and chat $chatId open, skipping notification")
-            // Still sync chat to get the new message
             serviceScope.launch {
                 try {
                     val repo = AppModule.provideChatRepository(applicationContext)
@@ -97,111 +95,72 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
 
-        val title = data["title"] ?: data["name"] ?: "New Message"
-        var body = data["body"] ?: data["content"] ?: ""
-        val avatarUrl = data["avatar"] ?: data["avatarUrl"]
+        // Quick instant decryption check if encrypted body
+        if ((body.isEmpty() || body == "[Encrypted]") && messageId != null) {
+            val ciphertext = data["ciphertext"]
+            val nonce = data["nonce"]
+            val cryptoVersion = data["cryptoVersion"]?.toIntOrNull() ?: 1
+            val envelopeType = data["envelopeType"]?.toIntOrNull() ?: 100
+            val senderId = data["senderId"] ?: ""
 
-        val repo = AppModule.provideChatRepository(applicationContext)
-        val userPrefsRepo = UserPreferencesRepository(applicationContext)
+            if (!ciphertext.isNullOrEmpty() && !nonce.isNullOrEmpty()) {
+                try {
+                    val decryptionManager = AppModule.provideMessageDecryptionManager(applicationContext)
+                    val transientEntity = MessageEntity(
+                        id = messageId,
+                        chatId = chatId,
+                        senderId = senderId,
+                        content = "",
+                        timestamp = System.currentTimeMillis(),
+                        status = "SENT",
+                        type = "TEXT",
+                        ciphertext = ciphertext,
+                        nonce = nonce,
+                        cryptoVersion = cryptoVersion,
+                        envelopeType = envelopeType,
+                        decryptionState = DecryptionState.PENDING
+                    )
+                    val result = runBlocking {
+                        decryptionManager.decrypt(transientEntity, updateDb = false, source = "FCM_INSTANT")
+                    }
+                    if (result is tn.keeftalk.chat.security.crypto.MessageDecryptionManager.DecryptionResult.Success) {
+                        body = result.plaintext
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "[FCM_DECRYPT] FAILED", e)
+                }
+            }
+            if (body.isEmpty() || body == "[Encrypted]") {
+                body = "New message"
+            }
+        }
 
-        // ALWAYS update status to FCM_RECEIVED if we got the message
+        // 1. POST NOTIFICATION IMMEDIATELY (Do not block on DB or network when killed!)
+        showNotification(title, body, chatId, avatarUrl)
+
+        // 2. Background sync & status update
         serviceScope.launch {
             try {
+                val repo = AppModule.provideChatRepository(applicationContext)
                 if (messageId != null) {
-                    Log.d(TAG, "Updating message $messageId status to FCM_RECEIVED")
                     repo.updateMessageStatus(messageId, tn.keeftalk.chat.domain.model.MessageStatus.FCM_RECEIVED)
                 }
                 repo.syncChat(chatId)
+
+                // Insert internal notification
+                repo.insertNotification(
+                    tn.keeftalk.chat.domain.model.AppNotification(
+                        id = java.util.UUID.randomUUID().toString(),
+                        type = NotificationType.MESSAGE,
+                        title = title,
+                        message = body,
+                        timestamp = System.currentTimeMillis(),
+                        data = tn.keeftalk.chat.domain.model.NotificationData(chatId = chatId)
+                    )
+                )
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to update status or sync chat $chatId on FCM message", e)
+                Log.e(TAG, "Background task after FCM failed", e)
             }
-        }
-        
-        serviceScope.launch {
-            val userPrefs = userPrefsRepo.userPreferencesFlow.first()
-            val globalNotifs = userPrefs.notifications
-            
-            if (!globalNotifs.allEnabled) return@launch
-
-            val chat = repo.getChat(chatId).first()
-            if (chat?.isMuted == true) {
-                val muteUntil = chat.notificationSettings.muteUntil
-                if (muteUntil == null || muteUntil > System.currentTimeMillis()) return@launch
-            }
-
-            if (chat?.type == ChatType.ONE_TO_ONE && !globalNotifs.messagesEnabled) return@launch
-            if (chat?.type == ChatType.GROUP && !globalNotifs.groupsEnabled) return@launch
-
-            val showPreview = chat?.notificationSettings?.showPreview ?: globalNotifs.showPreviewContent
-            var finalBody = if (showPreview) body else "Message from $title"
-            
-            if (showPreview && (finalBody.isEmpty() || finalBody == "[Encrypted]") && messageId != null) {
-                val ciphertext = data["ciphertext"]
-                val nonce = data["nonce"]
-                val cryptoVersion = data["cryptoVersion"]?.toIntOrNull() ?: 1
-                val envelopeType = data["envelopeType"]?.toIntOrNull() ?: 100
-                val senderId = data["senderId"] ?: ""
-
-                if (!ciphertext.isNullOrEmpty() && !nonce.isNullOrEmpty()) {
-                    Log.d(TAG, "[FCM_DECRYPT] Attempting instant decryption...")
-                    try {
-                        val decryptionManager = AppModule.provideMessageDecryptionManager(applicationContext)
-                        val transientEntity = MessageEntity(
-                            id = messageId,
-                            chatId = chatId,
-                            senderId = senderId,
-                            content = "",
-                            timestamp = System.currentTimeMillis(),
-                            status = "SENT",
-                            type = "TEXT",
-                            ciphertext = ciphertext,
-                            nonce = nonce,
-                            cryptoVersion = cryptoVersion,
-                            envelopeType = envelopeType,
-                            decryptionState = DecryptionState.PENDING
-                        )
-                        
-                        val result = decryptionManager.decrypt(transientEntity, updateDb = false, source = "FCM_INSTANT")
-                        if (result is tn.keeftalk.chat.security.crypto.MessageDecryptionManager.DecryptionResult.Success) {
-                            finalBody = result.plaintext
-                            Log.i(TAG, "[FCM_DECRYPT] SUCCESS")
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "[FCM_DECRYPT] FAILED", e)
-                    }
-                }
-
-                // If still encrypted, wait for DB sync fallback
-                if (finalBody == "[Encrypted]" || finalBody.isEmpty()) {
-                    Log.d(TAG, "Notification body is encrypted, waiting for DB sync fallback... messageId=$messageId")
-                    val decryptedMsg = withTimeoutOrNull(5000) {
-                        repo.getMessage(messageId).filter { 
-                            it != null && it.decryptionState == DecryptionState.SUCCESS
-                        }.first()
-                    }
-                    if (decryptedMsg != null) {
-                        finalBody = decryptedMsg.content
-                    } else {
-                        Log.w(TAG, "Decryption timeout. Showing fallback notification.")
-                        finalBody = "New message"
-                    }
-                }
-            }
-            
-            try {
-                repo.insertNotification(tn.keeftalk.chat.domain.model.AppNotification(
-                    id = java.util.UUID.randomUUID().toString(),
-                    type = tn.keeftalk.chat.domain.model.NotificationType.MESSAGE,
-                    title = title,
-                    message = finalBody,
-                    timestamp = System.currentTimeMillis(),
-                    data = tn.keeftalk.chat.domain.model.NotificationData(chatId = chatId)
-                ))
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to insert internal notification", e)
-            }
-
-            showNotification(title, finalBody, chatId, avatarUrl)
         }
     }
 
@@ -209,10 +168,9 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
         val callId = data["callId"] ?: data["call_id"] ?: return
         val type = data["type"] ?: "call"
 
-        // Acquire WakeLock to ensure Activity has time to start
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Keeftalk:CallFCMWakeLock")
-        wakeLock.acquire(15000L) // Hold for 15 seconds
+        wakeLock.acquire(15000L)
 
         if (type == "CANCEL_CALL") {
             Log.d(TAG, "[FCM_CALL] CANCEL RECEIVED | id=$callId")
@@ -233,8 +191,6 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-
-        // 1. Prepare Full-screen Intent (Reliable background Activity launch)
         val fullScreenIntent = Intent(this, tn.keeftalk.chat.ui.call.IncomingCallActivity::class.java).apply {
             putExtra("extra_call_id", callId)
             action = "ACTION_INCOMING_CALL"
@@ -248,9 +204,8 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 2. Build High-Priority Call Notification (Must have Ringtone & Vibration for Fullscreen)
         val ringtoneUri = android.provider.Settings.System.DEFAULT_RINGTONE_URI
-        val builder = NotificationCompat.Builder(this, CALL_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, NotificationChannelManager.CHANNEL_CALLS)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(callerName)
             .setContentText("Incoming Keeftalk Call...")
@@ -276,7 +231,6 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
             }
         }
 
-        // 3. Add Answer/Decline Actions
         val answerIntent = Intent(this, tn.keeftalk.chat.ui.call.IncomingCallActivity::class.java).apply {
             putExtra("extra_call_id", callId)
             putExtra("action", "answer")
@@ -285,20 +239,24 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
         val answerPendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 1, answerIntent, PendingIntent.FLAG_IMMUTABLE)
         builder.addAction(0, "Answer", answerPendingIntent)
 
-        // 4. Post Notification
+        val declineIntent = Intent(this, tn.keeftalk.chat.ui.call.IncomingCallActivity::class.java).apply {
+            putExtra("extra_call_id", callId)
+            putExtra("action", "decline")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val declinePendingIntent = PendingIntent.getActivity(this, callId.hashCode() + 2, declineIntent, PendingIntent.FLAG_IMMUTABLE)
+        builder.addAction(0, "Decline", declinePendingIntent)
+
         notificationManager.notify(callId.hashCode(), builder.build())
-        
-        // Also try direct launch if possible (works better in foreground)
-        tn.keeftalk.chat.ui.call.IncomingCallActivity.start(this, callId)
     }
 
     private fun showNotification(title: String, body: String, chatId: String, avatarUrl: String?) {
         val dispatcher = AppModule.provideNotificationDispatcher(applicationContext)
         dispatcher.dispatch(
-            tn.keeftalk.chat.util.notifications.NotificationPayload(
-                feature = tn.keeftalk.chat.util.notifications.NotificationFeature.CHATS,
-                type = tn.keeftalk.chat.domain.model.NotificationType.MESSAGE,
-                priority = tn.keeftalk.chat.domain.model.NotificationPriority.HIGH,
+            NotificationPayload(
+                feature = NotificationFeature.CHATS,
+                type = NotificationType.MESSAGE,
+                priority = NotificationPriority.HIGH,
                 title = title,
                 body = body,
                 chatId = chatId,
@@ -313,17 +271,17 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
         val body = data["body"] ?: ""
         
         val feature = when (type) {
-            "profile_view" -> tn.keeftalk.chat.util.notifications.NotificationFeature.SYSTEM
-            "security_alert" -> tn.keeftalk.chat.util.notifications.NotificationFeature.SECRETS
-            else -> tn.keeftalk.chat.util.notifications.NotificationFeature.CHATS
+            "profile_view" -> NotificationFeature.SYSTEM
+            "security_alert" -> NotificationFeature.SECRETS
+            else -> NotificationFeature.CHATS
         }
 
         val dispatcher = AppModule.provideNotificationDispatcher(applicationContext)
         dispatcher.dispatch(
-            tn.keeftalk.chat.util.notifications.NotificationPayload(
+            NotificationPayload(
                 feature = feature,
-                type = if (type == "profile_view") tn.keeftalk.chat.domain.model.NotificationType.PROFILE_VIEW else tn.keeftalk.chat.domain.model.NotificationType.SYSTEM,
-                priority = tn.keeftalk.chat.domain.model.NotificationPriority.HIGH,
+                type = if (type == "profile_view") NotificationType.PROFILE_VIEW else NotificationType.SYSTEM,
+                priority = NotificationPriority.HIGH,
                 title = title,
                 body = body,
                 chatId = data["chatId"],
@@ -331,7 +289,6 @@ class KeeftalkFirebaseMessagingService : FirebaseMessagingService() {
             )
         )
     }
-
 
     override fun onNewToken(token: String) {
         Log.d(TAG, "New FCM token: $token")
