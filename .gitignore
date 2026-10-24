@@ -1,15 +1,81 @@
+# ==========================================
+# Keeftalk Android Project - Root .gitignore
+# ==========================================
+
+# ------------------------------------------
+# A. Android Studio, IDE, and Tooling
+# ------------------------------------------
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+.idea/
+!.idea/codeStyles/
+!.idea/misc.xml
+!.idea/gradle.xml
+!.idea/vcs.xml
+!.idea/runConfigurations.xml
+.vscode/
 .DS_Store
-/build
-/captures
+Thumbs.db
+*.swp
+*.swo
+*~
+.agent/
+.artifacts/
+
+# ------------------------------------------
+# B. Gradle and Android Build Artifacts
+# ------------------------------------------
+.gradle/
+build/
+**/build/
+local.properties
+.kotlin/
 .externalNativeBuild
 .cxx
-local.properties
+captures/
+*.apk
+*.aab
+*.dex
+*.dm
+app/release/
+
+# ------------------------------------------
+# C. Secrets, Credentials, and Signing
+# ------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+secrets.properties
+keystore.properties
+!keystore.properties.example
+credentials.json
+service-account*.json
+secrets/
+private/
+
+# ------------------------------------------
+# D. Local Databases and User Data
+# ------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+*.dump
+*.bak
+
+# ------------------------------------------
+# E. Logs, Diagnostics, and Temporary Files
+# ------------------------------------------
+*.log
+*.hprof
+fingerprints.txt
+dependencies.txt
+task.gradle
+*working version*

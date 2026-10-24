@@ -1,5 +1,0 @@
-- `[x]` Add FAB pulse animation states to `ChatInput`
-- `[x]` Update `ChatInput` send/mic button background to brand gradient
-- `[x]` Update `ChatInput` send/mic button shadow to match FAB style
-- `[x]` Implement pulse ring effect for the chat input button
-- `[x]` Verify changes with a build

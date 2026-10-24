@@ -1,6 +1,0 @@
-- [x] Fix decryption by preferring authenticated downloads in `FileRepositoryImpl`
-- [x] Add `refresh()` and auto-fetch logic to `VaultViewModel`
-- [x] Add `PullToRefreshBox` to `VaultScreen`
-- [x] Improve error handling and logging in `ChatRepositoryImpl.shareVaultFileToChat`
-- [ ] Verify Vault thumbnails and refresh
-- [ ] Verify Shared Vault file appearance in Chat

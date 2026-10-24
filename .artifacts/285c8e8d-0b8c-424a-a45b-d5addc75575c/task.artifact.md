@@ -1,4 +1,0 @@
-- [x] Update `FileEntity.kt` to mark `localPath` as `@Transient`
-- [x] Verify the change by checking if the project builds
-- [x] Update `FileEntity.kt` to use `TimestampSerializer` for date fields
-- [x] Verify the timestamp fix
