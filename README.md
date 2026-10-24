@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/res/drawable/ic_app_logo.png" width="128" height="128" alt="Keeftalk Logo" />
+  <img src="https://keeftalk.com/keeftalk_logo.png" />
 </p>
 
 <h1 align="center">Keeftalk</h1>
