@@ -36,10 +36,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -681,6 +683,69 @@ fun MainScaffold(
     val fabActionFlow = remember { MutableSharedFlow<tn.keeftalk.chat.ui.components.FabActionType>(extraBufferCapacity = 1) }
     var showFabSearchDialog by remember { mutableStateOf(false) }
     var fabSearchQuery by remember { mutableStateOf("") }
+
+    var showReleaseNotesDialog by remember {
+        mutableStateOf(
+            context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
+                .getBoolean("has_shown_v1_release_notes", false).not()
+        )
+    }
+
+    if (showReleaseNotesDialog) {
+        AlertDialog(
+            onDismissRequest = { /* mandatory read */ },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.RocketLaunch, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Welcome to Keeftalk v1.0", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("The Zero-Knowledge Privacy-First Super App is officially here v1.0!", style = MaterialTheme.typography.bodyMedium)
+                    
+                    HorizontalDivider()
+                    
+                    Text("✨ What's New in Version 1.0:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    
+                    ReleaseNoteItem(
+                        icon = Icons.Default.NotificationsActive,
+                        title = "New Notification System",
+                        description = "Realtime unread badges, sound & vibration alerts, and an integrated notification center accessible directly from the FAB menu."
+                    )
+                    
+                    ReleaseNoteItem(
+                        icon = Icons.Default.Apps,
+                        title = "19 Integrated Super App Modules",
+                        description = "Access all 19 productivity, messaging, vault, and security features (My Chats, Calls, SMS/MMS, Notes, Vault, Secrets, Calendar, Wallet, Finances, E-Mail, Feed, Books, Docs, Market, Habits, Todo, Browser, Maps, and My Din) instantly via the FAB '+' menu."
+                    )
+                    
+                    ReleaseNoteItem(
+                        icon = Icons.Default.Security,
+                        title = "Privacy-First Architecture",
+                        description = "Zero-knowledge end-to-end encryption (AES-256-GCM + Argon2id), hardware-backed Android Keystore, zero ad-tracking, and complete user data sovereignty."
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("has_shown_v1_release_notes", true)
+                            .apply()
+                        showReleaseNotesDialog = false
+                    }
+                ) {
+                    Text("Get Started")
+                }
+            }
+        )
+    }
 
     val connectivityObserver = remember { NetworkConnectivityObserver(context) }
     val networkStatus by connectivityObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Available)
@@ -3244,5 +3309,25 @@ private fun handleAttachmentAction(
             onScreenChange(AppScreen.MyMapsDetail(isPicker = true, chatId = chatId))
         }
         else -> {}
+    }
+}
+
+@Composable
+fun ReleaseNoteItem(icon: ImageVector, title: String, description: String) {
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
