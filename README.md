@@ -60,25 +60,25 @@ Keeftalk merges your communications, confidential files, productivity tools, web
 
 At the heart of Keeftalk's intuitive navigation is the adaptive **Floating Action Button (`+` FAB)**. Tapping the `+` button opens the unified control hub, providing instant one-tap access to all **19 core Super App modules**, complete with realtime unread badge counters and quick tools (Night Mode, Text Scaling A+/A-, Search, and Notification Center):
 
-1. **1. My Chats:** Signal-inspired end-to-end encrypted messaging with Account Encryption Keys (AEK) and Per-Conversation Keys (PCK), voice notes, reaction pickers, thread replies, and media compression.
-2. **2. My Calls:** Peer-to-peer low-latency encrypted voice and video calls powered by WebRTC with adaptive bitrate streaming.
-3. **3. My SMS/MMS:** Native Android Telephony integration enabling seamless sending and receiving of carrier SMS/MMS threads alongside cloud messages with dual-SIM selection.
-4. **4. My Notes:** WYSIWYG rich text editor featuring live Markdown previews, audio note attachments, embedded inline images, and searchable tag organization.
-5. **5. My Vault:** Isolated hardware-backed secure storage container encrypted via SQLCipher and protected by biometric or PIN authentication, supporting direct cloud imports from Google Drive, Dropbox, and Google Photos.
-6. **6. My Secrets:** Built-in TOTP Two-Factor Authentication (2FA) authenticator compatible with Google Authenticator and Aegis, QR code scanner, password generator, and encrypted credential vault.
-7. **7. My Calendar:** Encrypted agenda scheduler, prioritized task reminders, birthdays, meetings, and goal planner with customizable notification alerts.
-8. **8. My Wallet:** Secure payment tracker, QR code scan-and-pay utility, and digital asset fund ledger.
-9. **9. My Finances:** Comprehensive expense and income tracking, budget management, and financial analysis tools.
-10. **10. My E-Mail:** Secure email client for managing accounts, composing encrypted messages, and organizing inbox threads with quick avatars.
-11. **11. My Feed:** Personal RSS and Atom XML feed reader featuring distraction-free article extraction and category filters (Tech, Science, Economy, Culture).
-12. **12. My Books:** Full-featured EPUB and PDF e-book reader with custom typography, bookmarks, dark mode, and a gamified **Reading XP System** rewarding reading milestones.
-13. **13. My Docs:** Multi-format document and spreadsheet viewer with page thumbnails, text searching, and annotation tools.
-14. **14. My Market:** Real-time financial tickers, cryptocurrency prices, interactive candlestick and line charts, market cap rankings, and watchlists.
-15. **15. My Habits:** Habit tracker supporting custom schedules, streak counters, completion heatmaps, and statistical progress charts.
-16. **16. My Todo:** Prioritized task management list with due dates, priority sorting, and completion checklists.
-17. **17. My Browser:** Privacy web browser with built-in ad blocker, tracker mitigation, custom user-agents, and a **Live Astronomical Sky Engine** rendering real-time celestial physics.
-18. **18. My Maps:** Secure saved places, interactive map tools, and location tracking powered by MapLibre GL.
-19. **19. My Din:** Spiritual and lifestyle tracker tailored for prayer schedules, Qibla compass, Quran reading, and daily reminders.
+1. **My Chats:** Signal-inspired end-to-end encrypted messaging with Account Encryption Keys (AEK) and Per-Conversation Keys (PCK), voice notes, reaction pickers, thread replies, and media compression.
+2. **My Calls:** Peer-to-peer low-latency encrypted voice and video calls powered by WebRTC with adaptive bitrate streaming.
+3. **My SMS/MMS:** Native Android Telephony integration enabling seamless sending and receiving of carrier SMS/MMS threads alongside cloud messages with dual-SIM selection.
+4. **My Notes:** WYSIWYG rich text editor featuring live Markdown previews, audio note attachments, embedded inline images, and searchable tag organization.
+5. **My Vault:** Isolated hardware-backed secure storage container encrypted via SQLCipher and protected by biometric or PIN authentication, supporting direct cloud imports from Google Drive, Dropbox, and Google Photos.
+6. **My Secrets:** Built-in TOTP Two-Factor Authentication (2FA) authenticator compatible with Google Authenticator and Aegis, QR code scanner, password generator, and encrypted credential vault.
+7. **My Calendar:** Encrypted agenda scheduler, prioritized task reminders, birthdays, meetings, and goal planner with customizable notification alerts.
+8. **My Wallet:** Secure payment tracker, QR code scan-and-pay utility, and digital asset fund ledger.
+9. **My Finances:** Comprehensive expense and income tracking, budget management, and financial analysis tools.
+10. **My E-Mail:** Secure email client for managing accounts, composing encrypted messages, and organizing inbox threads with quick avatars.
+11. **My Feed:** Personal RSS and Atom XML feed reader featuring distraction-free article extraction and category filters (Tech, Science, Economy, Culture).
+12. **My Books:** Full-featured EPUB and PDF e-book reader with custom typography, bookmarks, dark mode, and a gamified **Reading XP System** rewarding reading milestones.
+13. **My Docs:** Multi-format document and spreadsheet viewer with page thumbnails, text searching, and annotation tools.
+14. **My Market:** Real-time financial tickers, cryptocurrency prices, interactive candlestick and line charts, market cap rankings, and watchlists.
+15. **My Habits:** Habit tracker supporting custom schedules, streak counters, completion heatmaps, and statistical progress charts.
+16. **My Todo:** Prioritized task management list with due dates, priority sorting, and completion checklists.
+17. **My Browser:** Privacy web browser with built-in ad blocker, tracker mitigation, custom user-agents, and a **Live Astronomical Sky Engine** rendering real-time celestial physics.
+18. **My Maps:** Secure saved places, interactive map tools, and location tracking powered by MapLibre GL.
+19. **My Din:** Spiritual and lifestyle tracker tailored for prayer schedules, Qibla compass, Quran reading, and daily reminders.
 
 ---
 
@@ -138,22 +138,22 @@ At the heart of Keeftalk's intuitive navigation is the adaptive **Floating Actio
 ### Ecosystem Feature Matrix
 
 ```mermaid
-graph LR
-    subgraph KEEFTALK ["KEEFTALK SUPER APP HUB"]
-        COMM["Communication Engine (E2EE Chat + SMS)"]
-        CALL["WebRTC HD Calls (P2P Encrypted)"]
-        VAULT["Zero-Knowledge Vault (SQLCipher)"]
-        PROD["Productivity Suite (Notes, Habits, Books)"]
-        BROWSER["Privacy Browser (AdBlock + Sky)"]
-        FINANCE["Financial Market (Crypto & Stocks)"]
-        GRAPH["3D Social Engine (Spatial Graph)"]
-        SECURITY["Security & 2FA (TOTP & Recovery)"]
+flowchart LR
+    subgraph KEEFTALK["KEEFTALK SUPER APP HUB"]
+        COMM["Communication Engine<br/>E2EE Chat and SMS"]
+        CALL["WebRTC HD Calls<br/>P2P Encrypted"]
+        VAULT["Zero-Knowledge Vault<br/>SQLCipher"]
+        PROD["Productivity Suite<br/>Notes, Habits, Books"]
+        BROWSER["Privacy Browser<br/>AdBlock and Sky"]
+        FINANCE["Financial Market<br/>Crypto and Stocks"]
+        GRAPH["3D Social Engine<br/>Spatial Graph"]
+        SECURITY["Security and 2FA<br/>TOTP and Recovery"]
     end
 
     USER["User Device"] --> KEEFTALK
-    KEEFTALK --> LOCAL_STORAGE["Encrypted Room DB (SQLCipher)"]
-    KEEFTALK --> REMOTE_CLOUD["Supabase Relay (Ciphertexts)"]
-    KEEFTALK --> CARRIER["Telephony Network (SMS/MMS)"]
+    KEEFTALK --> LOCAL_STORAGE["Encrypted Room DB<br/>SQLCipher"]
+    KEEFTALK --> REMOTE_CLOUD["Supabase Relay<br/>Ciphertexts"]
+    KEEFTALK --> CARRIER["Telephony Network<br/>SMS and MMS"]
 ```
 
 ---
@@ -161,8 +161,8 @@ graph LR
 ### Layered Technical Architecture
 
 ```mermaid
-graph TD
-    subgraph PRESENTATION ["Presentation Layer (Jetpack Compose & Material 3)"]
+flowchart TD
+    subgraph PRESENTATION["Presentation Layer<br/>Jetpack Compose and Material 3"]
         UI_CHAT["Chat and SMS UI"]
         UI_VAULT["Vault and Media UI"]
         UI_PROD["Productivity and Notes UI"]
@@ -170,7 +170,7 @@ graph TD
         UI_GRAPH["3D Graph Engine"]
     end
 
-    subgraph DOMAIN ["Domain Layer (Business Logic & ViewModel)"]
+    subgraph DOMAIN["Domain Layer<br/>Business Logic and ViewModel"]
         VM_CHAT["ChatViewModel"]
         VM_VAULT["VaultViewModel"]
         VM_PROD["ProductivityViewModel"]
@@ -178,16 +178,16 @@ graph TD
         USECASES["Clean Architecture UseCases"]
     end
 
-    subgraph SECURITY_LAYER ["Cryptographic Security Layer"]
+    subgraph SECURITY_LAYER["Cryptographic Security Layer"]
         ARGON["Argon2id KDF"]
         KEY_MGR["KeyManager"]
         KEYSTORE["Android Keystore System"]
-        CRYPTO["CryptoManager (AES-256-GCM)"]
+        CRYPTO["CryptoManager<br/>AES-256-GCM"]
     end
 
-    subgraph DATA ["Data Layer (Repositories & Data Sources)"]
+    subgraph DATA["Data Layer<br/>Repositories and Data Sources"]
         ROOM_DB["Room DB with SQLCipher"]
-        SUPABASE["Supabase SDK (Auth & Realtime)"]
+        SUPABASE["Supabase SDK<br/>Auth and Realtime"]
         SMS_MGR["Phone SMS Manager"]
         PREFS["DataStore Preferences"]
     end
@@ -208,23 +208,23 @@ graph TD
 ### Zero-Knowledge Key Derivation & Cryptographic Flow
 
 ```mermaid
-graph TD
-    PASS["User Master Password"] --> KDF["Argon2id KDF (64MB, 3 Iterations, 4 Threads)"]
+flowchart TD
+    PASS["User Master Password"] --> KDF["Argon2id KDF<br/>64MB, 3 Iterations, 4 Threads"]
     SALT["Cryptographic Salt"] --> KDF
-    KDF --> KEK["Key Encryption Key (KEK)"]
-    
-    KEK --> DEC_AEK["Decrypt Account Encryption Key (AEK)"]
+    KDF --> KEK["Key Encryption Key<br/>KEK"]
+
+    KEK --> DEC_AEK["Decrypt Account Encryption Key<br/>AEK"]
     KEK --> DEC_DB["Unlock SQLCipher Local Database"]
-    
+
     KEYSTORE["Hardware Android Keystore"] --> DEC_DB
-    
-    DEC_AEK --> AEK["Account Encryption Key (AEK)"]
+
+    DEC_AEK --> AEK["Account Encryption Key<br/>AEK"]
     AEK --> PCK1["Per-Conversation Key 1"]
     AEK --> PCK2["Per-Conversation Key 2"]
-    
+
     PCK1 --> MSG1["AES-256-GCM Encrypted Message"]
     PCK2 --> MSG2["AES-256-GCM Encrypted Message"]
-    
+
     AEK --> VAULT_KEY["Vault Master Key"]
     VAULT_KEY --> VAULT_FILE["Encrypted Local Files"]
 ```
@@ -236,17 +236,17 @@ graph TD
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Alice as Alice (Sender)
-    participant Relay as Supabase Relay (Zero-Knowledge)
-    participant Bob as Bob (Receiver)
+    participant Alice as Alice Sender
+    participant Relay as Supabase Relay Zero-Knowledge
+    participant Bob as Bob Receiver
 
     Alice->>Alice: 1. Fetch Conversation Key
-    Alice->>Alice: 2. Encrypt Payload (AES-256-GCM)
-    Alice->>Relay: 3. Transmit Opaque Ciphertext & Nonce
+    Alice->>Alice: 2. Encrypt Payload AES-256-GCM
+    Alice->>Relay: 3. Transmit Opaque Ciphertext and Nonce
     Note over Relay: Server stores only encrypted bytes.<br/>No plaintext, no master keys.
     Relay->>Bob: 4. Push Realtime Ciphertext Event
     Bob->>Bob: 5. Fetch Local Key from Hardware Storage
-    Bob->>Bob: 6. Decrypt Payload (AES-256-GCM)
+    Bob->>Bob: 6. Decrypt Payload AES-256-GCM
     Bob->>Bob: 7. Render Plaintext Message in UI
 ```
 
@@ -257,14 +257,14 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     DATA_IN["User Data Input"] --> EVAL["Data Type Evaluation"]
-    
-    EVAL --> LOCAL_TEL["SMS/MMS: Processed locally via Android Telephony"]
-    EVAL --> ENC_LOCAL["Vault & Notes: AES-256-GCM SQLCipher Local Encryption"]
-    EVAL --> ENC_NET["E2EE Chat: Encrypted client-side, sent to Supabase"]
-    EVAL --> LOCAL_ONLY["Browser History: Saved in local isolated DB only"]
+
+    EVAL --> LOCAL_TEL["SMS and MMS<br/>Processed locally via Android Telephony"]
+    EVAL --> ENC_LOCAL["Vault and Notes<br/>AES-256-GCM SQLCipher Local Encryption"]
+    EVAL --> ENC_NET["E2EE Chat<br/>Encrypted client-side, sent to Supabase"]
+    EVAL --> LOCAL_ONLY["Browser History<br/>Saved in local isolated DB only"]
 
     ENC_LOCAL --> STORAGE_LOCAL["Secure On-Device Storage"]
-    ENC_NET --> STORAGE_CLOUD["Opaque Cloud Database (Encrypted)"]
+    ENC_NET --> STORAGE_CLOUD["Opaque Cloud Database<br/>Encrypted"]
     LOCAL_TEL --> CARRIER_NET["Local Cellular Carrier Network"]
     LOCAL_ONLY --> STORAGE_LOCAL
 ```
@@ -273,7 +273,7 @@ flowchart TD
 
 ## 🛡️ Privacy Policy (v1.0)
 
-**Effective Date:** January 1, 2025  
+**Effective Date:** January 1, 2026  
 **Publisher:** Keeftalk LLC  
 
 At Keeftalk LLC, privacy is not a setting—it is the foundational architecture of our software. This Privacy Policy details how Keeftalk handles your data.
@@ -309,7 +309,7 @@ You retain complete ownership over your data:
 
 ## 📜 Terms of Service (v1.0)
 
-**Effective Date:** January 1, 2025  
+**Effective Date:** January 1, 2026  
 **Version:** 1.0 Release  
 
 Please read these Terms of Service ("Terms") carefully before using the Keeftalk mobile application ("Application" or "Service") operated by Keeftalk LLC ("us", "we", or "our").
@@ -429,18 +429,17 @@ tn.keeftalk.chat
 
 ---
 
-## 🤝 Security Disclosures
+## 🤝 Contact & Support
 
-Security vulnerabilities are treated with the highest priority. If you discover a security flaw or cryptographic vulnerability in Keeftalk, please report it privately:
+For general questions, legal inquiries, or product feedback, reach out to the appropriate team:
 
-- **Security Email:** `security@keeftalk.tn`
-- **PGP Key:** Available upon request.
-
-*Please do not post unresolved security vulnerabilities publicly on GitHub issues.*
+- **General Support:** `support@keeftalk.com`
+- **Legal & Privacy:** `legal@keeftalk.com`
+- **Feedback:** `feedback@keeftalk.com`
 
 ---
 
 ## ⚖️ License
 
-Copyright © 2025 **Keeftalk LLC**. All rights reserved.  
+Copyright © 2026 **Keeftalk LLC**. All rights reserved.  
 Licensed under proprietary and open software license terms as specified in the project repository.
