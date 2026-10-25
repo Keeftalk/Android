@@ -31,9 +31,22 @@ class SmsViewModel(
         _phoneContacts,
         _showArchived
     ) { smsList, profiles, phoneContacts, archived ->
+        val profileMap = mutableMapOf<String, tn.keeftalk.chat.domain.model.Profile>()
+        for (p in profiles) {
+            val key = p.phone?.filter { it.isDigit() }?.takeLast(7)
+            if (!key.isNullOrBlank()) profileMap[key] = p
+        }
+        val contactMap = mutableMapOf<String, User>()
+        for (c in phoneContacts) {
+            val key = c.phone?.filter { it.isDigit() }?.takeLast(7)
+            if (!key.isNullOrBlank()) contactMap[key] = c
+        }
+
         smsList.filter { it.isArchived == archived }.map { sms ->
-            val profile = profiles.find { isSamePhoneNumber(it.phone, sms.address) || it.id == sms.recipientId }
-            val phoneContact = phoneContacts.find { isSamePhoneNumber(it.phone, sms.address) }
+            val digits = sms.address.filter { it.isDigit() }.takeLast(7)
+            val profile = if (digits.isNotBlank()) profileMap[digits] else profiles.find { it.id == sms.recipientId }
+            val phoneContact = if (digits.isNotBlank()) contactMap[digits] else null
+
             val displayName = profile?.fullName ?: profile?.username ?: phoneContact?.name ?: sms.address
             val avatar = profile?.avatarUrl ?: phoneContact?.avatarUrl
             sms.copy(

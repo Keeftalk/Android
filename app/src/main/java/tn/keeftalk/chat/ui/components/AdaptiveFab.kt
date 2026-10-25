@@ -101,17 +101,17 @@ fun calculateModuleUnreadCount(
 
     val unreadNotifs = notifications.count { notif ->
         if (notif.isRead) return@count false
+        val src = notif.sourceId?.uppercase() ?: ""
         when (featureKey) {
             "CHATS" -> {
-                val isSms = notif.sourceId?.startsWith("SMS_MMS", ignoreCase = true) == true
+                val isSms = src.startsWith("SMS")
                 !isSms && (
-                    notif.sourceId?.startsWith("CHATS", ignoreCase = true) == true ||
-                    notif.data?.chatId != null ||
-                    (notif.type == tn.keeftalk.chat.domain.model.NotificationType.MESSAGE && notif.sourceId == null)
+                    src.startsWith("CHATS") ||
+                    (notif.data?.chatId != null && !notif.data.chatId.startsWith("sms", ignoreCase = true))
                 )
             }
             "SMS_MMS" -> {
-                notif.sourceId?.startsWith("SMS_MMS", ignoreCase = true) == true
+                src.startsWith("SMS") || (notif.data?.chatId != null && notif.data.chatId.startsWith("sms", ignoreCase = true))
             }
             "CALLS" -> {
                 notif.sourceId?.startsWith("CALLS", ignoreCase = true) == true ||
@@ -559,26 +559,71 @@ fun AdaptiveFab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             quickTools.forEach { tool ->
-                                IconButton(
-                                    onClick = tool.action,
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .then(
-                                            if (tool.isActive) {
-                                                Modifier
-                                                    .clip(CircleShape)
-                                                    .background(FabGradient)
-                                            } else {
-                                                Modifier
+                                val isBell = tool.label == "Notifications"
+                                val totalUnread = if (isBell) notifications.count { !it.isRead } else 0
+
+                                if (isBell && totalUnread > 0) {
+                                    BadgedBox(
+                                        badge = {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .background(Color(0xFFEF4444), CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    if (totalUnread > 99) "99+" else totalUnread.toString(),
+                                                    color = Color.White,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
                                             }
+                                        }
+                                    ) {
+                                        IconButton(
+                                            onClick = tool.action,
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .then(
+                                                    if (tool.isActive) {
+                                                        Modifier
+                                                            .clip(CircleShape)
+                                                            .background(FabGradient)
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                        ) {
+                                            Icon(
+                                                tool.icon,
+                                                contentDescription = tool.label,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = if (tool.isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    IconButton(
+                                        onClick = tool.action,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .then(
+                                                if (tool.isActive) {
+                                                    Modifier
+                                                        .clip(CircleShape)
+                                                        .background(FabGradient)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                    ) {
+                                        Icon(
+                                            tool.icon,
+                                            contentDescription = tool.label,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (tool.isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                ) {
-                                    Icon(
-                                        tool.icon,
-                                        contentDescription = tool.label,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = if (tool.isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    }
                                 }
                             }
                         }

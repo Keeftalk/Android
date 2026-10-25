@@ -60,7 +60,8 @@ class TelephonySyncManager(
         scope.launch {
             try {
                 val threads = fetchThreadsFromProvider()
-                val profiles = chatRepository.getSearchableProfiles().first()
+                val profiles = runCatching { chatRepository.getSearchableProfiles().first() }.getOrDefault(emptyList())
+                val lastTimestamp = smsDao.getLastMessageTimestamp() ?: 0L
                 
                 val threadEntities = threads.map { thread ->
                     val profile = profiles.find { it.phone == thread.address }
@@ -73,10 +74,11 @@ class TelephonySyncManager(
                         recipientId = profile?.id
                     )
                 }
-                smsDao.clearAndInsertThreads(threadEntities)
+                smsDao.insertThreads(threadEntities)
                 
-                // Sync messages for each active thread
-                threadEntities.forEach { syncMessages(it.threadId) }
+                // Sync messages only for newly updated or unread threads
+                val threadsToSync = threadEntities.filter { it.unreadCount > 0 || it.timestamp >= lastTimestamp - 60_000 }.ifEmpty { threadEntities.take(5) }
+                threadsToSync.forEach { syncMessages(it.threadId) }
             } catch (e: Exception) {
                 Log.e("TelephonySyncManager", "Error syncing threads", e)
             }

@@ -111,11 +111,30 @@ fun SmsDetailScreen(
                 AndroidView(
                     factory = { ctx ->
                         RecyclerView(ctx).apply {
-                            layoutManager = LinearLayoutManager(ctx).apply {
+                            val lm = LinearLayoutManager(ctx).apply {
                                 stackFromEnd = true
                                 reverseLayout = true
                             }
+                            layoutManager = lm
                             this.adapter = adapter
+
+                            adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+                                override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                                    if (positionStart == 0) {
+                                        post {
+                                            lm.scrollToPositionWithOffset(0, 0)
+                                        }
+                                    }
+                                }
+                            })
+                        }
+                    },
+                    update = { recyclerView ->
+                        val lm = recyclerView.layoutManager as? LinearLayoutManager
+                        if (adapter.itemCount > 0 && lm != null) {
+                            recyclerView.post {
+                                lm.scrollToPositionWithOffset(0, 0)
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxSize()
