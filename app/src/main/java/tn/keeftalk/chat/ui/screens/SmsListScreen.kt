@@ -51,6 +51,12 @@ fun SmsListScreen(
     val smsPermissionState = rememberPermissionState(android.Manifest.permission.READ_SMS)
     val pullToRefreshState = rememberPullToRefreshState()
 
+    LaunchedEffect(smsPermissionState.status.isGranted) {
+        if (smsPermissionState.status.isGranted) {
+            viewModel.refresh()
+        }
+    }
+
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->

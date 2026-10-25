@@ -68,8 +68,71 @@ data class FabMenuItem(
     val isActive: Boolean = false,
     val trailingAvatars: List<String?> = emptyList(),
     val module: tn.keeftalk.chat.domain.model.KeeftalkModule? = null,
-    val actionType: tn.keeftalk.chat.domain.model.FabAction? = null
+    val actionType: tn.keeftalk.chat.domain.model.FabAction? = null,
+    val unreadCount: Int = 0
 )
+
+fun calculateModuleUnreadCount(
+    module: tn.keeftalk.chat.domain.model.KeeftalkModule?,
+    notifications: List<tn.keeftalk.chat.domain.model.AppNotification>,
+    fastChats: List<tn.keeftalk.chat.domain.model.ChatListItemUiModel> = emptyList()
+): Int {
+    if (module == null) return 0
+    val featureKey = when (module) {
+        tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS -> "CHATS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS -> "CALLS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.SMS -> "SMS_MMS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS -> "HABITS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS -> "BOOKS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.TODO -> "TODO"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.NOTES -> "NOTES"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA -> "CALENDAR"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL -> "EMAIL"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES -> "FINANCES"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS -> "SECRETS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT -> "VAULT"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET -> "WALLET"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.FEED -> "FEED"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET -> "MARKET"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS -> "DOCS"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER -> "BROWSER"
+        else -> module.name
+    }
+
+    val unreadNotifs = notifications.count { notif ->
+        if (notif.isRead) return@count false
+        when (featureKey) {
+            "CHATS" -> {
+                val isSms = notif.sourceId?.startsWith("SMS_MMS", ignoreCase = true) == true
+                !isSms && (
+                    notif.sourceId?.startsWith("CHATS", ignoreCase = true) == true ||
+                    notif.data?.chatId != null ||
+                    (notif.type == tn.keeftalk.chat.domain.model.NotificationType.MESSAGE && notif.sourceId == null)
+                )
+            }
+            "SMS_MMS" -> {
+                notif.sourceId?.startsWith("SMS_MMS", ignoreCase = true) == true
+            }
+            "CALLS" -> {
+                notif.sourceId?.startsWith("CALLS", ignoreCase = true) == true ||
+                notif.type == tn.keeftalk.chat.domain.model.NotificationType.CALL
+            }
+            "NOTES" -> {
+                notif.sourceId?.startsWith("NOTES", ignoreCase = true) == true ||
+                notif.type == tn.keeftalk.chat.domain.model.NotificationType.NOTE_SHARE
+            }
+            else -> {
+                notif.sourceId?.startsWith(featureKey, ignoreCase = true) == true
+            }
+        }
+    }
+
+    val directChats = if (module == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS) {
+        fastChats.count { !it.isArchived && it.unreadCount > 0 }
+    } else 0
+
+    return maxOf(unreadNotifs, directChats)
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -237,7 +300,8 @@ fun AdaptiveFab(
 
     // Configuration state based on current screen
     val closeMenu = { expanded = false }
-    val commonNavItems = buildCommonNavigationItems(currentScreen, bottomTab, icons, currentChatIcon, emailAvatars, onNavigate, onBottomTabChange, closeMenu)
+    val fastChats = mainViewModel.fastChats.collectAsState().value
+    val commonNavItems = buildCommonNavigationItems(currentScreen, bottomTab, icons, currentChatIcon, emailAvatars, notifications, fastChats, onNavigate, onBottomTabChange, closeMenu)
     val qrAndAiItems = listOf(
         FabMenuItem("Scan / Show QR", icons.qrCode, { onAction(FabActionType.QR); closeMenu() }),
         FabMenuItem("Chat with AI", icons.brain, { onAction(FabActionType.AI); closeMenu() }, actionType = tn.keeftalk.chat.domain.model.FabAction.AI)
@@ -247,6 +311,8 @@ fun AdaptiveFab(
     val primaryAction: FabMenuItem? = FabMenuItem("+", icons.add, { expanded = !expanded }, isPrimary = true)
     val secondaryAction: FabMenuItem? = if (currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS) {
         FabMenuItem("Dialer", icons.dialpad, { onAction(FabActionType.DIALER) })
+    } else if (currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS) {
+        FabMenuItem("New SMS", icons.messageSquare, { onAction(FabActionType.NEW_SMS) })
     } else {
         null
     }
@@ -259,7 +325,7 @@ fun AdaptiveFab(
                 divider
             ) + qrAndAiItems + divider + commonNavItems
         }
-        currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS && chatTab == 1 -> {
+        currentScreen == AppScreen.ChatList && (bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS || (bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS && chatTab == 1)) -> {
             listOf(
                 FabMenuItem("New SMS", icons.messageSquare, { onAction(FabActionType.NEW_SMS); closeMenu() }),
                 divider
@@ -590,19 +656,46 @@ fun AdaptiveFab(
             }
 
             // Primary FAB (Always in the same spot as the '+' in main screen)
-            val unreadCount = notifications.count { !it.isRead }
-            val showFabBadge = customization.isMinimalMode && unreadCount > 0
+            val currentModule: tn.keeftalk.chat.domain.model.KeeftalkModule? = when {
+                currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS -> tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS
+                currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS -> tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS
+                currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS -> tn.keeftalk.chat.domain.model.KeeftalkModule.SMS
+                currentScreen is AppScreen.Notes -> tn.keeftalk.chat.domain.model.KeeftalkModule.NOTES
+                currentScreen == AppScreen.Vault -> tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT
+                currentScreen == AppScreen.Secrets || currentScreen == AppScreen.SecretsSettings -> tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS
+                currentScreen == AppScreen.Calendar || currentScreen is AppScreen.CalendarEditor -> tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA
+                currentScreen == AppScreen.Wallet -> tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET
+                currentScreen == AppScreen.Finances -> tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES
+                currentScreen == AppScreen.Email -> tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL
+                currentScreen == AppScreen.Feed -> tn.keeftalk.chat.domain.model.KeeftalkModule.FEED
+                currentScreen == AppScreen.Books -> tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS
+                currentScreen == AppScreen.Docs -> tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS
+                currentScreen == AppScreen.Market -> tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET
+                currentScreen == AppScreen.Habits -> tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS
+                currentScreen == AppScreen.Todo -> tn.keeftalk.chat.domain.model.KeeftalkModule.TODO
+                currentScreen is AppScreen.Browser -> tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER
+                else -> null
+            }
+
+            val currentScreenUnreadCount = calculateModuleUnreadCount(currentModule, notifications, fastChats)
+            val showFabBadge = currentScreenUnreadCount > 0 || (customization.isMinimalMode && notifications.any { !it.isRead })
+            val badgeDisplayCount = if (currentScreenUnreadCount > 0) currentScreenUnreadCount else notifications.count { !it.isRead }
 
             if (showFabBadge) {
                 BadgedBox(
                     badge = {
                         Box(
                             modifier = Modifier
-                                .size(18.dp)
+                                .size(20.dp)
                                 .background(Color(0xFFEF4444), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(unreadCount.toString(), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (badgeDisplayCount > 99) "99+" else badgeDisplayCount.toString(),
+                                fontSize = 10.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 ) {
@@ -691,6 +784,23 @@ fun MenuItem(
                     modifier = Modifier.weight(1f)
                 )
                 
+                if (item.unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .background(Color(0xFFEF4444), CircleShape)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (item.unreadCount > 99) "99+" else item.unreadCount.toString(),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 if (item.trailingAvatars.isNotEmpty()) {
                     Box(
                         modifier = Modifier.padding(start = 8.dp),
@@ -719,30 +829,33 @@ private fun buildCommonNavigationItems(
     icons: tn.keeftalk.chat.ui.theme.AppIcons,
     currentChatIcon: ImageVector,
     emailAvatars: List<String?>,
+    notifications: List<tn.keeftalk.chat.domain.model.AppNotification>,
+    fastChats: List<tn.keeftalk.chat.domain.model.ChatListItemUiModel>,
     onNavigate: (AppScreen) -> Unit,
     onBottomTabChange: (tn.keeftalk.chat.domain.model.KeeftalkModule) -> Unit,
     closeMenu: () -> Unit
 ): List<FabMenuItem> {
+    fun cnt(mod: tn.keeftalk.chat.domain.model.KeeftalkModule) = calculateModuleUnreadCount(mod, notifications, fastChats)
     return listOf(
-        FabMenuItem("My Chats", currentChatIcon, { onNavigate(AppScreen.ChatList); onBottomTabChange(tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS); closeMenu() }, isActive = currentScreen is AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS, module = tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS),
-        FabMenuItem("My Calls", icons.phone, { onNavigate(AppScreen.ChatList); onBottomTabChange(tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS); closeMenu() }, isActive = currentScreen is AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS, module = tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS),
-        FabMenuItem("My SMS/MMS", icons.messageSquare, { onNavigate(AppScreen.ChatList); onBottomTabChange(tn.keeftalk.chat.domain.model.KeeftalkModule.SMS); closeMenu() }, isActive = currentScreen is AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS, module = tn.keeftalk.chat.domain.model.KeeftalkModule.SMS),
-        FabMenuItem("My Notes", icons.notes, { onNavigate(AppScreen.Notes()); closeMenu() }, isActive = currentScreen is AppScreen.Notes, module = tn.keeftalk.chat.domain.model.KeeftalkModule.NOTES),
-        FabMenuItem("My Vault", icons.folderLock, { onNavigate(AppScreen.Vault); closeMenu() }, isActive = currentScreen == AppScreen.Vault, module = tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT),
-        FabMenuItem("My Secrets", icons.lock, { onNavigate(AppScreen.Secrets); closeMenu() }, isActive = currentScreen == AppScreen.Secrets || currentScreen == AppScreen.SecretsSettings, module = tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS),
-        FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); closeMenu() }, isActive = currentScreen == AppScreen.Calendar || currentScreen is AppScreen.CalendarEditor, module = tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA),
-        FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); closeMenu() }, isActive = currentScreen == AppScreen.Wallet, module = tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET),
-        FabMenuItem("My Finances", icons.finances, { onNavigate(AppScreen.Finances); closeMenu() }, isActive = currentScreen == AppScreen.Finances, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES),
-        FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); closeMenu() }, isActive = currentScreen == AppScreen.Email, trailingAvatars = emailAvatars, module = tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL),
-        FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); closeMenu() }, isActive = currentScreen == AppScreen.Feed, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FEED),
-        FabMenuItem("My Books", Icons.AutoMirrored.Filled.MenuBook, { onNavigate(AppScreen.Books); closeMenu() }, isActive = currentScreen == AppScreen.Books, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS),
-        FabMenuItem("My Docs", Icons.Default.Description, { onNavigate(AppScreen.Docs); closeMenu() }, isActive = currentScreen == AppScreen.Docs, module = tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS),
-        FabMenuItem("My Market", Icons.Default.Storefront, { onNavigate(AppScreen.Market); closeMenu() }, isActive = currentScreen == AppScreen.Market, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET),
-        FabMenuItem("My Habits", Icons.Default.CheckCircle, { onNavigate(AppScreen.Habits); closeMenu() }, isActive = currentScreen == AppScreen.Habits, module = tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS),
-        FabMenuItem("My Todo", tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo, { onNavigate(AppScreen.Todo); closeMenu() }, isActive = currentScreen == AppScreen.Todo, module = tn.keeftalk.chat.domain.model.KeeftalkModule.TODO),
-        FabMenuItem("My Browser", Icons.Default.Language, { onNavigate(AppScreen.Browser()); closeMenu() }, isActive = currentScreen is AppScreen.Browser, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER),
-        FabMenuItem("My Maps", tn.keeftalk.chat.ui.theme.LucideIcons.MapPinned, { onNavigate(AppScreen.MyMaps); closeMenu() }, isActive = currentScreen is AppScreen.MyMaps, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MAPS),
-        FabMenuItem("My Din", Icons.Default.Mosque, { onNavigate(AppScreen.MyDin); closeMenu() }, isActive = currentScreen == AppScreen.MyDin, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MY_DIN),
+        FabMenuItem("My Chats", currentChatIcon, { onNavigate(AppScreen.ChatList); onBottomTabChange(tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS); closeMenu() }, isActive = currentScreen is AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS, module = tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS)),
+        FabMenuItem("My Calls", icons.phone, { onNavigate(AppScreen.ChatList); onBottomTabChange(tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS); closeMenu() }, isActive = currentScreen is AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS, module = tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS)),
+        FabMenuItem("My SMS/MMS", icons.messageSquare, { onNavigate(AppScreen.ChatList); onBottomTabChange(tn.keeftalk.chat.domain.model.KeeftalkModule.SMS); closeMenu() }, isActive = currentScreen is AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS, module = tn.keeftalk.chat.domain.model.KeeftalkModule.SMS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.SMS)),
+        FabMenuItem("My Notes", icons.notes, { onNavigate(AppScreen.Notes()); closeMenu() }, isActive = currentScreen is AppScreen.Notes, module = tn.keeftalk.chat.domain.model.KeeftalkModule.NOTES, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.NOTES)),
+        FabMenuItem("My Vault", icons.folderLock, { onNavigate(AppScreen.Vault); closeMenu() }, isActive = currentScreen == AppScreen.Vault, module = tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT)),
+        FabMenuItem("My Secrets", icons.lock, { onNavigate(AppScreen.Secrets); closeMenu() }, isActive = currentScreen == AppScreen.Secrets || currentScreen == AppScreen.SecretsSettings, module = tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS)),
+        FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); closeMenu() }, isActive = currentScreen == AppScreen.Calendar || currentScreen is AppScreen.CalendarEditor, module = tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA)),
+        FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); closeMenu() }, isActive = currentScreen == AppScreen.Wallet, module = tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET)),
+        FabMenuItem("My Finances", icons.finances, { onNavigate(AppScreen.Finances); closeMenu() }, isActive = currentScreen == AppScreen.Finances, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES)),
+        FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); closeMenu() }, isActive = currentScreen == AppScreen.Email, trailingAvatars = emailAvatars, module = tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)),
+        FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); closeMenu() }, isActive = currentScreen == AppScreen.Feed, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FEED, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.FEED)),
+        FabMenuItem("My Books", Icons.AutoMirrored.Filled.MenuBook, { onNavigate(AppScreen.Books); closeMenu() }, isActive = currentScreen == AppScreen.Books, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS)),
+        FabMenuItem("My Docs", Icons.Default.Description, { onNavigate(AppScreen.Docs); closeMenu() }, isActive = currentScreen == AppScreen.Docs, module = tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS)),
+        FabMenuItem("My Market", Icons.Default.Storefront, { onNavigate(AppScreen.Market); closeMenu() }, isActive = currentScreen == AppScreen.Market, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET)),
+        FabMenuItem("My Habits", Icons.Default.CheckCircle, { onNavigate(AppScreen.Habits); closeMenu() }, isActive = currentScreen == AppScreen.Habits, module = tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS)),
+        FabMenuItem("My Todo", tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo, { onNavigate(AppScreen.Todo); closeMenu() }, isActive = currentScreen == AppScreen.Todo, module = tn.keeftalk.chat.domain.model.KeeftalkModule.TODO, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.TODO)),
+        FabMenuItem("My Browser", Icons.Default.Language, { onNavigate(AppScreen.Browser()); closeMenu() }, isActive = currentScreen is AppScreen.Browser, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER)),
+        FabMenuItem("My Maps", tn.keeftalk.chat.ui.theme.LucideIcons.MapPinned, { onNavigate(AppScreen.MyMaps); closeMenu() }, isActive = currentScreen is AppScreen.MyMaps, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MAPS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.MAPS)),
+        FabMenuItem("My Din", Icons.Default.Mosque, { onNavigate(AppScreen.MyDin); closeMenu() }, isActive = currentScreen == AppScreen.MyDin, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MY_DIN, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.MY_DIN)),
         FabMenuItem("Settings", Icons.Default.Settings, { onNavigate(AppScreen.Settings); closeMenu() }, isActive = currentScreen == AppScreen.Settings)
     )
 }

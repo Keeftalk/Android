@@ -1,21 +1,21 @@
 package tn.keeftalk.chat.ui.screens
 
 import android.view.ViewGroup
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import tn.keeftalk.chat.domain.repository.SmsMessage
-import androidx.compose.ui.platform.ComposeView
-import tn.keeftalk.chat.ui.theme.KeeftalkTheme
-import tn.keeftalk.chat.ui.theme.LocalChatTheme
-import tn.keeftalk.chat.ui.screens.chatdetail.MessageBubble
-import tn.keeftalk.chat.ui.screens.chatdetail.DateSeparator
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import tn.keeftalk.chat.domain.model.Message
+import tn.keeftalk.chat.domain.model.MessageStatus
 import tn.keeftalk.chat.domain.model.MessageType
+import tn.keeftalk.chat.domain.repository.SmsMessage
+import tn.keeftalk.chat.ui.screens.chatdetail.DateSeparator
+import tn.keeftalk.chat.ui.screens.chatdetail.MessageBubble
+import tn.keeftalk.chat.ui.theme.KeeftalkTheme
 
 class SmsMessagePagingAdapter(
     private val currentUserId: String,
@@ -103,7 +103,7 @@ class SmsMessagePagingAdapter(
                         onReplySwipe = { },
                         transferProgress = null,
                         onDownloadClick = { },
-                        isLatest = false,
+                        isLatest = true,
                         isTimestampExpanded = expandedMessageId == smsMessage.id.toString(),
                         onToggleTimestamp = {
                             expandedMessageId = if (expandedMessageId == smsMessage.id.toString()) null else smsMessage.id.toString()
@@ -119,17 +119,23 @@ class SmsMessagePagingAdapter(
 }
 
 private fun SmsMessage.toKeeftalkMessage(): Message {
+    val isMe = type == 2 || type == 4 || type == 5 || type == 6
+    val msgStatus = when {
+        type == 5 || status == 64 -> MessageStatus.FAILED
+        type == 4 || type == 6 || status == 32 -> MessageStatus.SENDING
+        deliveryStatus == 0 || status == 0 -> MessageStatus.DELIVERED
+        isMe -> MessageStatus.SENT
+        else -> MessageStatus.DELIVERED
+    }
+
     return Message(
         id = id.toString(),
         chatId = threadId.toString(),
-        senderId = if (type == 2) "me" else address, // type 2 is sent
+        senderId = if (isMe) "me" else address,
         content = body,
         timestamp = timestamp,
-        status = when (deliveryStatus) {
-            0 -> tn.keeftalk.chat.domain.model.MessageStatus.DELIVERED
-            else -> if (type == 2) tn.keeftalk.chat.domain.model.MessageStatus.SENT else tn.keeftalk.chat.domain.model.MessageStatus.FCM_RECEIVED
-        },
-        type = if (isMms) MessageType.IMAGE else MessageType.TEXT // Simplified
+        status = msgStatus,
+        type = if (isMms) MessageType.IMAGE else MessageType.TEXT
     )
 }
 

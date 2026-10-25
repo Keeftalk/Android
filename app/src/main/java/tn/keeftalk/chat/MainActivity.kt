@@ -716,6 +716,26 @@ fun MainScaffold(
     val icons = LocalAppIcons.current
     val myId = userPrefs.userId
 
+    LaunchedEffect(currentScreen, bottomTab) {
+        val featureKey = when {
+            currentScreen == AppScreen.Habits -> "HABITS"
+            currentScreen == AppScreen.Books -> "BOOKS"
+            currentScreen == AppScreen.Todo -> "TODO"
+            currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS -> "SMS_MMS"
+            currentScreen == AppScreen.ChatList && bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS -> "CALLS"
+            currentScreen is AppScreen.Notes -> "NOTES"
+            currentScreen == AppScreen.Calendar -> "CALENDAR"
+            currentScreen == AppScreen.Email -> "EMAIL"
+            currentScreen == AppScreen.Finances -> "FINANCES"
+            currentScreen == AppScreen.Secrets -> "SECRETS"
+            currentScreen == AppScreen.Vault -> "VAULT"
+            else -> null
+        }
+        if (featureKey != null) {
+            mainViewModel.markFeatureNotificationsAsRead(featureKey)
+        }
+    }
+
     // Progressive Data Fetching
     val chatListViewModel: tn.keeftalk.chat.ui.screens.ChatListViewModel? = if (isHydrated) {
         viewModel { tn.keeftalk.chat.ui.screens.ChatListViewModel(mainViewModel.chatRepository) }
@@ -1361,38 +1381,35 @@ fun MainScaffold(
                                                             onMarkAllNotificationsAsRead = { mainViewModel.markAllNotificationsAsRead() }
                                                         )
                                                     }
-
-                                                    if (bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS) {
-                                                        // SMS SECTION
-                                                        val smsViewModel: tn.keeftalk.chat.ui.screens.SmsViewModel = viewModel {
-                                                            tn.keeftalk.chat.ui.screens.SmsViewModel(
-                                                                context.applicationContext as android.app.Application,
-                                                                tn.keeftalk.chat.di.AppModule.provideSmsRepository(context),
-                                                                tn.keeftalk.chat.di.AppModule.provideChatRepository(context)
-                                                            )
-                                                        }
-                                                        tn.keeftalk.chat.ui.screens.SmsListScreen(
-                                                            viewModel = smsViewModel,
-                                                            onConversationClick = { threadId, address ->
-                                                                onScreenChange(AppScreen.SmsDetail(threadId, address))
-                                                            },
-                                                            modifier = Modifier.weight(1f)
-                                                        )
-                                                    } else {
-                                                        if (!isSearching && showContainersActual) {
-                                                            ChatContainersRow(
-                                                                containers = containers,
-                                                                selectedId = selectedContainerId,
-                                                                onContainerClick = {
-                                                                    selectedContainerId = it
-                                                                    lastInteractionTime = System.currentTimeMillis()
-                                                                }
-                                                            )
-                                                        }
-                                                    }
                                                 }
 
-                                                if (bottomTab != tn.keeftalk.chat.domain.model.KeeftalkModule.SMS || customization.isMinimalMode) {
+                                                if (bottomTab == tn.keeftalk.chat.domain.model.KeeftalkModule.SMS) {
+                                                    // SMS SECTION
+                                                    val smsViewModel: tn.keeftalk.chat.ui.screens.SmsViewModel = viewModel {
+                                                        tn.keeftalk.chat.ui.screens.SmsViewModel(
+                                                            context.applicationContext as android.app.Application,
+                                                            tn.keeftalk.chat.di.AppModule.provideSmsRepository(context),
+                                                            tn.keeftalk.chat.di.AppModule.provideChatRepository(context)
+                                                        )
+                                                    }
+                                                    tn.keeftalk.chat.ui.screens.SmsListScreen(
+                                                        viewModel = smsViewModel,
+                                                        onConversationClick = { threadId, address ->
+                                                            onScreenChange(AppScreen.SmsDetail(threadId, address))
+                                                        },
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                } else {
+                                                    if (!customization.isMinimalMode && !isSearching && showContainersActual) {
+                                                        ChatContainersRow(
+                                                            containers = containers,
+                                                            selectedId = selectedContainerId,
+                                                            onContainerClick = {
+                                                                selectedContainerId = it
+                                                                lastInteractionTime = System.currentTimeMillis()
+                                                            }
+                                                        )
+                                                    }
                                                     PullToRefreshBox(
                                                         isRefreshing = isSyncing,
                                                         onRefresh = {
@@ -2561,6 +2578,7 @@ fun MainScaffold(
                                     tn.keeftalk.chat.ui.screens.NewSmsViewModel(
                                         context.applicationContext as android.app.Application,
                                         tn.keeftalk.chat.di.AppModule.provideChatRepository(context),
+                                        tn.keeftalk.chat.di.AppModule.provideSmsRepository(context),
                                         currentScreen.phoneNumber
                                     )
                                 }

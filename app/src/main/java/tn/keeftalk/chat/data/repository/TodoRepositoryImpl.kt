@@ -89,6 +89,27 @@ class TodoRepositoryImpl(
             syncState = "PENDING"
         )
         todoDao.upsertTask(entity)
+
+        if (!task.deleted && !task.completed) {
+            var triggerTime = 0L
+            if (task.reminder.isNotBlank()) {
+                triggerTime = runCatching {
+                    java.time.LocalDateTime.parse(task.reminder).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                }.getOrDefault(0L)
+            } else if (task.dueDate.isNotBlank()) {
+                triggerTime = runCatching {
+                    java.time.LocalDate.parse(task.dueDate).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() + (9 * 3600 * 1000)
+                }.getOrDefault(0L)
+            }
+            if (triggerTime > 0L) {
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.scheduleAllTaskAlarms(context, task.id, task.title, triggerTime)
+            } else {
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, task.id)
+            }
+        } else {
+            tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, task.id)
+        }
+
         runCatching {
             remoteDataSource.upsertTask(TodoTaskDto.fromEntity(entity))
             todoDao.updateTaskSyncState(entity.id, "SYNCED")
@@ -98,6 +119,7 @@ class TodoRepositoryImpl(
     override suspend fun deleteTask(taskId: String) {
         val timestamp = System.currentTimeMillis()
         todoDao.softDeleteTask(taskId, timestamp)
+        tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, taskId)
     }
 
     override suspend fun clearCompleted() {

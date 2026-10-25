@@ -2384,6 +2384,7 @@ class ChatRepositoryImpl(
     override suspend fun insertNotification(notification: AppNotification) { notificationDao.insertNotification(NotificationEntity.fromDomain(notification)) }
     override suspend fun pushNotification(recipientId: String, notification: AppNotification) {}
     override suspend fun markNotificationAsRead(id: String) { notificationDao.markAsRead(id) }
+    override suspend fun markFeatureNotificationsAsRead(featureKey: String) { notificationDao.markFeatureAsRead(featureKey.uppercase()) }
     override suspend fun markAllNotificationsAsRead() { notificationDao.markAllAsRead() }
     override suspend fun deleteNotification(id: String) { notificationDao.deleteNotification(id) }
     override suspend fun clearAllNotifications() { notificationDao.clearAll() }

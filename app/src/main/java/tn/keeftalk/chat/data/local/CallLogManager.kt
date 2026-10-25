@@ -11,6 +11,7 @@ import android.util.Log
 import tn.keeftalk.chat.data.local.dao.CallLogDao
 import tn.keeftalk.chat.data.local.entities.toDomain
 import tn.keeftalk.chat.data.local.entities.toEntity
+import tn.keeftalk.chat.di.AppModule
 
 private const val TAG = "CallLogManager"
 
@@ -56,6 +57,23 @@ class CallLogManager(
         val gsm = fetchGsmCallLog()
         if (gsm.isNotEmpty()) {
             callLogDao.insertCallLogs(gsm.map { it.toEntity(callType = "GSM") })
+            val recentMissed = gsm.filter { it.type == CallLogType.MISSED && it.timestamp > System.currentTimeMillis() - 10 * 60 * 1000 }
+            if (recentMissed.isNotEmpty()) {
+                val dispatcher = AppModule.provideNotificationDispatcher(context)
+                for (missed in recentMissed) {
+                    val caller = missed.name ?: missed.number.ifBlank { "Unknown" }
+                    dispatcher.dispatch(
+                        tn.keeftalk.chat.util.notifications.NotificationPayload(
+                            feature = tn.keeftalk.chat.util.notifications.NotificationFeature.CALLS,
+                            type = tn.keeftalk.chat.domain.model.NotificationType.CALL,
+                            priority = tn.keeftalk.chat.domain.model.NotificationPriority.HIGH,
+                            title = "Missed Call from $caller",
+                            body = "Tap to open Call History in My Calls",
+                            sourceId = "CALLS:${missed.id}"
+                        )
+                    )
+                }
+            }
         }
         ingestKeeftalkCalls()
     }

@@ -27,6 +27,9 @@ interface NotificationDao {
     @Query("UPDATE notifications SET isRead = 1 WHERE id = :id")
     suspend fun markAsRead(id: String)
 
+    @Query("UPDATE notifications SET isRead = 1 WHERE sourceId = :sourceId OR sourceId LIKE :sourceId || ':%' OR type = :sourceId")
+    suspend fun markFeatureAsRead(sourceId: String)
+
     @Query("UPDATE notifications SET isRead = 1")
     suspend fun markAllAsRead()
 

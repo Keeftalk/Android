@@ -155,6 +155,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun markFeatureNotificationsAsRead(featureKey: String) {
+        viewModelScope.launch {
+            chatRepository.markFeatureNotificationsAsRead(featureKey)
+        }
+    }
+
     fun markAllNotificationsAsRead() {
         viewModelScope.launch {
             chatRepository.markAllNotificationsAsRead()

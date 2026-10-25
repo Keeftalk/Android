@@ -44,7 +44,8 @@ enum class NotificationFeature {
     MARKET,
     HABITS,
     BROWSER,
-    SYSTEM
+    SYSTEM,
+    TODO
 }
 
 data class NotificationActionSpec(
@@ -164,6 +165,7 @@ class NotificationDispatcher(
             NotificationFeature.HABITS -> settings.habitsEnabled
             NotificationFeature.BROWSER -> settings.browserEnabled
             NotificationFeature.SYSTEM -> settings.systemNudgesEnabled
+            NotificationFeature.TODO -> settings.habitsEnabled || settings.systemNudgesEnabled
         }
     }
 
@@ -199,6 +201,12 @@ class NotificationDispatcher(
         title: String,
         body: String
     ) {
+        val effectiveSourceId = when {
+            !payload.sourceId.isNullOrBlank() && !payload.sourceId.startsWith(payload.feature.name, ignoreCase = true) -> "${payload.feature.name}:${payload.sourceId}"
+            !payload.sourceId.isNullOrBlank() -> payload.sourceId
+            else -> payload.feature.name
+        }
+
         val appNotification = AppNotification(
             id = UUID.randomUUID().toString(),
             type = payload.type,
@@ -212,12 +220,12 @@ class NotificationDispatcher(
                 contactName = payload.title,
                 fullMessage = payload.body
             ),
-            sourceId = payload.sourceId,
+            sourceId = effectiveSourceId,
             imageUrl = payload.avatarUrl,
             actionUrl = payload.actionUrl
         )
         chatRepository.insertNotification(appNotification)
-        Log.d(TAG, "Delivered In-App Notification [${payload.feature}]: $title")
+        Log.d(TAG, "Delivered In-App Notification [${payload.feature} / $effectiveSourceId]: $title")
     }
 
     private fun deliverSystemNotification(
@@ -284,7 +292,7 @@ class NotificationDispatcher(
                     SoundEffectManager.playNotificationSound(context, SoundEffectManager.RES_ANY_NOTIFICATION)
                 }
             }
-            NotificationFeature.CHATS -> {
+            NotificationFeature.CHATS, NotificationFeature.SMS_MMS -> {
                 SoundEffectManager.playNotificationSound(context, SoundEffectManager.RES_MSG_RECEIVING_APP)
             }
             else -> {

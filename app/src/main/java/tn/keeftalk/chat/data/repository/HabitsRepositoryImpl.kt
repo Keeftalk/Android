@@ -66,11 +66,7 @@ class HabitsRepositoryImpl(
         nativeHabitDao.upsertHabit(habit.toEntity(userId))
         nativeHabitDao.upsertSchedule(schedule.toEntity(habit.id))
         context?.let { ctx ->
-            if (habit.reminderTime != null) {
-                HabitReminderManager.scheduleReminder(ctx, habit)
-            } else {
-                HabitReminderManager.cancelReminder(ctx, habit.id)
-            }
+            HabitReminderManager.scheduleAllHabitAlarms(ctx, habit)
         }
     }
 
@@ -81,11 +77,7 @@ class HabitsRepositoryImpl(
             nativeHabitDao.upsertSchedule(newSchedule.toEntity(habit.id))
         }
         context?.let { ctx ->
-            if (habit.reminderTime != null) {
-                HabitReminderManager.scheduleReminder(ctx, habit)
-            } else {
-                HabitReminderManager.cancelReminder(ctx, habit.id)
-            }
+            HabitReminderManager.scheduleAllHabitAlarms(ctx, habit)
         }
     }
 

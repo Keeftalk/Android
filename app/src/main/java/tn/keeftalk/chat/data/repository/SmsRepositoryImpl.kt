@@ -1,21 +1,24 @@
 package tn.keeftalk.chat.data.repository
 
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.util.Log
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
-import tn.keeftalk.chat.data.local.dao.SmsDao
-import tn.keeftalk.chat.data.local.entities.SmsMessageEntity
-import tn.keeftalk.chat.data.local.entities.SmsThreadEntity
-import tn.keeftalk.chat.domain.repository.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import tn.keeftalk.chat.data.local.dao.SmsDao
+import tn.keeftalk.chat.data.local.entities.SmsMessageEntity
+import tn.keeftalk.chat.data.local.entities.SmsThreadEntity
+import tn.keeftalk.chat.domain.repository.*
 
 class SmsRepositoryImpl(
     private val context: Context,
@@ -45,14 +48,88 @@ class SmsRepositoryImpl(
 
     override suspend fun sendSms(address: String, body: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val smsManager = context.getSystemService(SmsManager::class.java)
+            val timestamp = System.currentTimeMillis()
+            val threadId = try {
+                Telephony.Threads.getOrCreateThreadId(context, address)
+            } catch (e: Exception) {
+                Log.e("SmsRepositoryImpl", "Error creating threadId for address $address", e)
+                timestamp // Fallback timestamp if thread creation fails
+            }
+
+            // 1. Save to system Telephony provider if permitted
+            var messageId = timestamp
+            val values = ContentValues().apply {
+                put(Telephony.Sms.ADDRESS, address)
+                put(Telephony.Sms.BODY, body)
+                put(Telephony.Sms.DATE, timestamp)
+                put(Telephony.Sms.READ, 1)
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT) // 2
+                put(Telephony.Sms.THREAD_ID, threadId)
+                put(Telephony.Sms.STATUS, Telephony.Sms.STATUS_NONE)
+            }
+            try {
+                val uri = context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+                if (uri != null) {
+                    messageId = ContentUris.parseId(uri)
+                }
+            } catch (e: Exception) {
+                Log.e("SmsRepositoryImpl", "Error saving sent message to system provider", e)
+            }
+
+            // 2. Insert message into Room DB so UI updates instantly
+            val messageEntity = SmsMessageEntity(
+                id = messageId,
+                threadId = threadId,
+                address = address,
+                body = body,
+                timestamp = timestamp,
+                read = 1,
+                type = Telephony.Sms.MESSAGE_TYPE_SENT, // 2
+                status = Telephony.Sms.STATUS_NONE,
+                isMms = false,
+                attachmentsJson = null,
+                deliveryStatus = -1
+            )
+            smsDao.insertMessages(listOf(messageEntity))
+
+            // 3. Update thread in Room DB
+            val threadEntity = SmsThreadEntity(
+                threadId = threadId,
+                address = address,
+                snippet = body,
+                timestamp = timestamp,
+                unreadCount = 0
+            )
+            smsDao.insertThreads(listOf(threadEntity))
+
+            // 4. Send message via SmsManager
+            val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                context.getSystemService(SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            }
+
+            val reqCode = (messageId % Int.MAX_VALUE).toInt()
             val sentIntent = android.app.PendingIntent.getBroadcast(
-                context, 0, android.content.Intent("SMS_SENT"), android.app.PendingIntent.FLAG_IMMUTABLE
+                context,
+                reqCode,
+                android.content.Intent("SMS_SENT").apply {
+                    putExtra("message_id", messageId)
+                    putExtra("thread_id", threadId)
+                },
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             )
             val deliveredIntent = android.app.PendingIntent.getBroadcast(
-                context, 0, android.content.Intent("SMS_DELIVERED"), android.app.PendingIntent.FLAG_IMMUTABLE
+                context,
+                reqCode,
+                android.content.Intent("SMS_DELIVERED").apply {
+                    putExtra("message_id", messageId)
+                    putExtra("thread_id", threadId)
+                },
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             )
-            
+
             val parts = smsManager.divideMessage(body)
             if (parts.size > 1) {
                 val sentIntents = java.util.ArrayList<android.app.PendingIntent>().apply { repeat(parts.size) { add(sentIntent) } }
@@ -61,29 +138,33 @@ class SmsRepositoryImpl(
             } else {
                 smsManager.sendTextMessage(address, null, body, sentIntent, deliveredIntent)
             }
+
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("SmsRepositoryImpl", "Failed to send SMS", e)
             Result.failure(e)
         }
     }
 
     override suspend fun sendMms(address: String, body: String, attachments: List<SmsAttachment>): Result<Unit> = withContext(Dispatchers.IO) {
-        // MMS implementation using MmsManager
         Result.failure(Exception("Not implemented yet"))
     }
 
     override suspend fun markAsRead(threadId: Long) {
         withContext(Dispatchers.IO) {
             smsDao.markAsRead(threadId)
-            // Also update system provider
-            val values = android.content.ContentValues()
-            values.put(Telephony.Sms.READ, 1)
-            context.contentResolver.update(
-                Telephony.Sms.CONTENT_URI,
-                values,
-                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
-                arrayOf(threadId.toString())
-            )
+            try {
+                val values = ContentValues()
+                values.put(Telephony.Sms.READ, 1)
+                context.contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
+                    arrayOf(threadId.toString())
+                )
+            } catch (e: Exception) {
+                Log.e("SmsRepositoryImpl", "Error marking SMS as read in system provider", e)
+            }
         }
     }
 
@@ -91,10 +172,14 @@ class SmsRepositoryImpl(
         withContext(Dispatchers.IO) {
             smsDao.deleteThread(threadId)
             smsDao.deleteMessagesForThread(threadId)
-            context.contentResolver.delete(
-                Uri.parse("content://sms/conversations/$threadId"),
-                null, null
-            )
+            try {
+                context.contentResolver.delete(
+                    Uri.parse("content://sms/conversations/$threadId"),
+                    null, null
+                )
+            } catch (e: Exception) {
+                Log.e("SmsRepositoryImpl", "Error deleting conversation from system provider", e)
+            }
         }
     }
 
@@ -142,7 +227,7 @@ private fun SmsThreadEntity.toDomain(): SmsConversation {
     return SmsConversation(
         threadId = threadId,
         address = address,
-        contactName = null, // Enrichment should happen in the ViewModel or via a Flow
+        contactName = null,
         lastMessage = snippet,
         timestamp = timestamp,
         unreadCount = unreadCount,

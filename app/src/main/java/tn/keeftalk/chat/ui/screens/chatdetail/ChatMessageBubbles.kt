@@ -1714,20 +1714,45 @@ fun MessageStatusIcon(
     }
 
     when (status) {
+        MessageStatus.SENDING -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(10.dp),
+                    strokeWidth = 1.5.dp,
+                    color = contentColor.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text("Sending", fontSize = 9.sp, color = contentColor.copy(alpha = 0.7f))
+            }
+        }
         MessageStatus.SENT -> {
-            Icon(LucideIcons.EyeClosed, null, modifier = Modifier.size(12.dp), tint = contentColor.copy(alpha = 0.6f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(LucideIcons.EyeClosed, null, modifier = Modifier.size(12.dp), tint = contentColor.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.width(2.dp))
+                Text("Sent", fontSize = 9.sp, color = contentColor.copy(alpha = 0.7f))
+            }
         }
         MessageStatus.DELIVERED, MessageStatus.FCM_RECEIVED -> {
-            Icon(LucideIcons.EyeOff, null, modifier = Modifier.size(12.dp), tint = contentColor.copy(alpha = 0.6f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(LucideIcons.EyeOff, null, modifier = Modifier.size(12.dp), tint = contentColor.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.width(2.dp))
+                Text("Delivered", fontSize = 9.sp, color = contentColor.copy(alpha = 0.7f), fontWeight = FontWeight.SemiBold)
+            }
         }
         MessageStatus.SEEN -> {
-            // Usually SEEN is handled by showing the avatar, but if we fall back here:
-            Icon(Icons.Default.Visibility, null, modifier = Modifier.size(12.dp), tint = if (chatTheme.id == "rosa") Color(0xFFD44AD6) else Color(0xFF00BFFF))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Visibility, null, modifier = Modifier.size(12.dp), tint = if (chatTheme.id == "rosa") Color(0xFFD44AD6) else Color(0xFF00BFFF))
+                Spacer(modifier = Modifier.width(2.dp))
+                Text("Delivered", fontSize = 9.sp, color = if (chatTheme.id == "rosa") Color(0xFFD44AD6) else Color(0xFF00BFFF), fontWeight = FontWeight.SemiBold)
+            }
         }
         MessageStatus.FAILED -> {
-            Icon(Icons.Default.Error, null, modifier = Modifier.size(12.dp), tint = Color.Red)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Error, null, modifier = Modifier.size(12.dp), tint = Color.Red)
+                Spacer(modifier = Modifier.width(2.dp))
+                Text("Failed", fontSize = 9.sp, color = Color.Red, fontWeight = FontWeight.Bold)
+            }
         }
-        MessageStatus.SENDING -> {}
     }
 }
 

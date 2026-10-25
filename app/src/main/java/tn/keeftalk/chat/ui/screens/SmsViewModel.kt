@@ -3,11 +3,13 @@ package tn.keeftalk.chat.ui.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import tn.keeftalk.chat.di.AppModule
+import tn.keeftalk.chat.domain.model.User
 import tn.keeftalk.chat.domain.repository.ChatRepository
 import tn.keeftalk.chat.domain.repository.SmsConversation
 import tn.keeftalk.chat.domain.repository.SmsRepository
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 class SmsViewModel(
     application: Application,
@@ -21,27 +23,44 @@ class SmsViewModel(
     private val _showArchived = MutableStateFlow(false)
     val showArchived: StateFlow<Boolean> = _showArchived
 
+    private val _phoneContacts = MutableStateFlow<List<User>>(emptyList())
+
     val conversations: StateFlow<List<SmsConversation>> = combine(
         smsRepository.getConversations(),
         chatRepository.getSearchableProfiles(),
+        _phoneContacts,
         _showArchived
-    ) { smsList, profiles, archived ->
+    ) { smsList, profiles, phoneContacts, archived ->
         smsList.filter { it.isArchived == archived }.map { sms ->
-            val profile = profiles.find { it.phone == sms.address || it.id == sms.recipientId }
+            val profile = profiles.find { isSamePhoneNumber(it.phone, sms.address) || it.id == sms.recipientId }
+            val phoneContact = phoneContacts.find { isSamePhoneNumber(it.phone, sms.address) }
+            val displayName = profile?.fullName ?: profile?.username ?: phoneContact?.name ?: sms.address
+            val avatar = profile?.avatarUrl ?: phoneContact?.avatarUrl
             sms.copy(
-                contactName = profile?.fullName ?: profile?.username ?: sms.address,
+                contactName = displayName,
                 isKeeftalkUser = profile != null,
-                avatarUrl = profile?.avatarUrl
+                avatarUrl = avatar
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         checkDefaultSmsApp()
+        refresh()
     }
 
     fun onResume() {
         checkDefaultSmsApp()
+        refresh()
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            try {
+                _phoneContacts.value = AppModule.providePhoneContactManager(getApplication()).fetchPhoneContacts()
+                AppModule.provideTelephonySyncManager(getApplication()).syncThreads()
+            } catch (_: Exception) {}
+        }
     }
 
     private fun checkDefaultSmsApp() {
@@ -89,5 +108,18 @@ class SmsViewModel(
 
     fun setShowArchived(show: Boolean) {
         _showArchived.value = show
+    }
+
+    private fun isSamePhoneNumber(p1: String?, p2: String?): Boolean {
+        if (p1.isNullOrBlank() || p2.isNullOrBlank()) return false
+        val clean1 = p1.replace(Regex("[^0-9+]"), "")
+        val clean2 = p2.replace(Regex("[^0-9+]"), "")
+        if (clean1 == clean2) return true
+        val digits1 = clean1.replace(Regex("[^0-9]"), "")
+        val digits2 = clean2.replace(Regex("[^0-9]"), "")
+        if (digits1.length >= 7 && digits2.length >= 7) {
+            return digits1.takeLast(9) == digits2.takeLast(9) || digits1.takeLast(7) == digits2.takeLast(7)
+        }
+        return false
     }
 }

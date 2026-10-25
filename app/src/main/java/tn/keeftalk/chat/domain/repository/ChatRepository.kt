@@ -100,6 +100,7 @@ interface ChatRepository {
     suspend fun insertNotification(notification: tn.keeftalk.chat.domain.model.AppNotification)
     suspend fun pushNotification(recipientId: String, notification: tn.keeftalk.chat.domain.model.AppNotification)
     suspend fun markNotificationAsRead(id: String)
+    suspend fun markFeatureNotificationsAsRead(featureKey: String)
     suspend fun markAllNotificationsAsRead()
     suspend fun deleteNotification(id: String)
     suspend fun clearAllNotifications()

@@ -31,9 +31,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
                     val activeHabits = habits.filter { !it.deleted }
                     for (habitEntity in activeHabits) {
                         val habit = habitEntity.toDomain()
-                        if (habit.reminderTime != null) {
-                            HabitReminderManager.scheduleReminder(context, habit)
-                        }
+                        HabitReminderManager.scheduleAllHabitAlarms(context, habit)
                     }
                 } catch (e: Exception) {
                     Log.e("HabitReminderReceiver", "Error rescheduling habit alarms on boot", e)
@@ -49,8 +47,11 @@ class HabitReminderReceiver : BroadcastReceiver() {
         val reminderType = intent.getStringExtra("reminder_type") ?: "REGULAR"
 
         val (title, body) = when (reminderType) {
+            "WINDOW_START_WARNING" -> {
+                "$habitName · Check-in Window Opening 🌅" to "Your $habitName check-in window is opening in 15 minutes! Get ready to check in."
+            }
             "SLOT_EXPIRY_WARNING" -> {
-                "$habitName · Slot Closing Soon!" to "30 minutes left in this time slot! Check in now before it expires."
+                "$habitName · Slot Closing Soon! ⏰" to "30 minutes left in this time slot! Check in now before it expires."
             }
             "GRACE_TACTIC_RECOVERY" -> {
                 "Missed $habitName?" to "Use a Grace Tactic token from your monthly pool to save your streak!"
