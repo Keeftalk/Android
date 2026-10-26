@@ -9,9 +9,6 @@ private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 private val dayFormat = SimpleDateFormat("EEEE", Locale.getDefault())
 private val monthDayFormat = SimpleDateFormat("MMMM d", Locale.getDefault())
 private val fullDateFormat = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
-private val recentCallFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-private val dayAbbrFormat = SimpleDateFormat("EEE", Locale.getDefault())
-private val shortDateFormat = SimpleDateFormat("dd/MM/yy", Locale.getDefault())
 private val joinDateFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
 
 fun formatJoinDate(timestamp: Long): String {
@@ -41,10 +38,9 @@ fun formatRecentCallDate(timestamp: Long): String {
     val callDate = Calendar.getInstance().apply { timeInMillis = timestamp }
 
     return when {
-        isSameDay(now, callDate) -> recentCallFormat.format(callDate.time)
+        isSameDay(now, callDate) -> "Today"
         isYesterday(now, callDate) -> "Yesterday"
-        isSameWeek(now, callDate) -> dayAbbrFormat.format(callDate.time)
-        else -> shortDateFormat.format(callDate.time)
+        else -> SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(callDate.time)
     }
 }
 

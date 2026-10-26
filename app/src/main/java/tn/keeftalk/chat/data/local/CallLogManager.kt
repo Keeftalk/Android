@@ -168,8 +168,7 @@ class CallLogManager(
                 val durationIndex = it.getColumnIndex(CallLog.Calls.DURATION)
                 val nameIndex = it.getColumnIndex(CallLog.Calls.CACHED_NAME)
 
-                var count = 0
-                while (it.moveToNext() && count < 100) {
+                while (it.moveToNext()) {
                     val number = it.getString(numberIndex)
                     val type = it.getInt(typeIndex)
                     val date = it.getLong(dateIndex)
@@ -202,7 +201,6 @@ class CallLogManager(
                             isKeeftalk = false
                         )
                     )
-                    count++
                 }
             }
         } catch (e: Exception) {
