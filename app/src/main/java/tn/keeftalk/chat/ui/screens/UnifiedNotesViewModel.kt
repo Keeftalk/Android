@@ -411,7 +411,7 @@ class UnifiedNotesViewModel(
     fun createNote() {
         // Optimization: Use Fast cache for ID to avoid waiting for Flow on UI event
         val fastId = prefs.getUserIdFast() ?: ""
-        val userId = if (fastId.isNotEmpty()) fastId else currentUserId.value
+        val userId = if (fastId.isNotEmpty()) fastId else currentUserId.value.ifEmpty { "local_user" }
         
         NotesLogger.i("UI", "createNote requested by user '$userId'")
         
@@ -422,7 +422,7 @@ class UnifiedNotesViewModel(
                 val finalUserId = if (userId.isEmpty()) {
                     withTimeoutOrNull(3000) {
                         authRepository.getCurrentSession()?.id
-                    } ?: ""
+                    } ?: "local_user"
                 } else userId
 
                 if (finalUserId.isEmpty()) {

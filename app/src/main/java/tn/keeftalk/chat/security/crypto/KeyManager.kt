@@ -146,6 +146,15 @@ object KeyManager {
             }
 
             if (encoded == null) {
+                Log.i(TAG, "AEK not found in persistent storage for user $userId. Generating local AEK...")
+                val newAek = generateAEK()
+                val success = prefs.edit().putString(KEY_WRAPPED_AEK, Base64.encodeToString(newAek.encoded, B64_FLAGS)).commit()
+                if (success) {
+                    accountEncryptionKey = newAek
+                    currentUserId = userId
+                    Log.i(TAG, "Local AEK generated and persisted for user $userId.")
+                    return true
+                }
                 Log.w(TAG, "AEK not found in any local persistent storage for user $userId.")
                 return false
             }
@@ -262,13 +271,39 @@ object KeyManager {
      * @throws SecurityRecoveryRequiredException if the user is not logged in or AEK is missing.
      */
     fun getMasterKey(): SecretKey {
-        val key = accountEncryptionKey
+        var key = accountEncryptionKey
         if (key == null) {
+            val ctx = appContext
+            val targetUid = currentUserId ?: "local_user"
+            if (ctx != null) {
+                try {
+                    val prefs = getPrefs(ctx, targetUid)
+                    val encoded = prefs.getString(KEY_WRAPPED_AEK, null)
+                    if (encoded != null) {
+                        val aekBytes = Base64.decode(encoded, B64_FLAGS)
+                        key = SecretKeySpec(aekBytes, "AES")
+                        accountEncryptionKey = key
+                    } else {
+                        val newAek = generateAEK()
+                        val success = prefs.edit().putString(KEY_WRAPPED_AEK, Base64.encodeToString(newAek.encoded, B64_FLAGS)).commit()
+                        if (success) {
+                            key = newAek
+                            accountEncryptionKey = key
+                            currentUserId = targetUid
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to auto-initialize local master key", e)
+                }
+            }
+        }
+        val finalKey = accountEncryptionKey ?: key
+        if (finalKey == null) {
             val msg = "Account Encryption Key (AEK) is MISSING from memory. Recovery is required."
             Log.w(TAG, msg)
             throw SecurityRecoveryRequiredException()
         }
-        return key
+        return finalKey
     }
 
     /**

@@ -1,6 +1,7 @@
 package tn.keeftalk.chat.ui.components
 
 import tn.keeftalk.chat.ui.theme.LucideIcons
+import kotlinx.coroutines.delay
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -69,7 +70,8 @@ data class FabMenuItem(
     val trailingAvatars: List<String?> = emptyList(),
     val module: tn.keeftalk.chat.domain.model.KeeftalkModule? = null,
     val actionType: tn.keeftalk.chat.domain.model.FabAction? = null,
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    val enabled: Boolean = true
 )
 
 fun calculateModuleUnreadCount(
@@ -144,7 +146,8 @@ fun KeeftalkFab(
     showPulse: Boolean = true,
     enabled: Boolean = true,
     size: androidx.compose.ui.unit.Dp = 64.dp,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    isDimmed: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -163,6 +166,16 @@ fun KeeftalkFab(
             )
         },
         label = "fab_scale"
+    )
+
+    val fabAlpha by animateFloatAsState(
+        targetValue = when {
+            !enabled -> 0.5f
+            isDimmed -> 0.3f
+            else -> 1.0f
+        },
+        animationSpec = tween(durationMillis = 300),
+        label = "fab_alpha"
     )
 
     val rotation by animateFloatAsState(
@@ -198,7 +211,7 @@ fun KeeftalkFab(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                alpha = if (enabled) 1f else 0.5f
+                alpha = fabAlpha
             }
             .combinedClickable(
                 enabled = enabled,
@@ -208,7 +221,12 @@ fun KeeftalkFab(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onClick()
                 },
-                onLongClick = onLongClick
+                onLongClick = onLongClick?.let { action ->
+                    {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        action()
+                    }
+                }
             )
     ) {
         // Pulse Ring
@@ -449,7 +467,29 @@ fun AdaptiveFab(
 
     if (primaryAction == null) return
 
-    Box(
+    var isDimmed by remember { mutableStateOf(false) }
+    var longPressCount by remember { mutableIntStateOf(0) }
+    var timerKey by remember { mutableIntStateOf(0) }
+
+    val handleLongPress: () -> Unit = {
+        longPressCount++
+        timerKey++
+    }
+
+    LaunchedEffect(timerKey) {
+        if (timerKey > 0) {
+            val durationMs = when (longPressCount) {
+                1 -> 5000L
+                2 -> 10000L
+                else -> 30000L
+            }
+            isDimmed = true
+            delay(durationMs)
+            isDimmed = false
+        }
+    }
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
@@ -457,6 +497,9 @@ fun AdaptiveFab(
             .padding(end = 16.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
+        val maxMenuHeight = (maxHeight - 88.dp).coerceAtLeast(200.dp)
+        val fabScrollState = rememberScrollState()
+
         // Menu content
         AnimatedVisibility(
             visible = expanded,
@@ -468,6 +511,8 @@ fun AdaptiveFab(
                 modifier = Modifier
                     .padding(bottom = 80.dp)
                     .fillMaxWidth(0.75f)
+                    .heightIn(max = maxMenuHeight)
+                    .verticalScroll(fabScrollState)
                     .shadow(8.dp, shape = fabMenuShape)
                     .clip(fabMenuShape),
                 shape = fabMenuShape,
@@ -749,7 +794,9 @@ fun AdaptiveFab(
                         onClick = primaryAction.action,
                         modifier = Modifier.size(primarySize),
                         isExpanded = if (secondaryAction == null) expanded else false,
-                        showPulse = primaryAction.icon == icons.add && !expanded
+                        showPulse = primaryAction.icon == icons.add && !expanded,
+                        isDimmed = isDimmed,
+                        onLongClick = handleLongPress
                     )
                 }
             } else {
@@ -758,7 +805,9 @@ fun AdaptiveFab(
                     onClick = primaryAction.action,
                     modifier = Modifier.size(primarySize),
                     isExpanded = if (secondaryAction == null) expanded else false,
-                    showPulse = primaryAction.icon == icons.add && !expanded
+                    showPulse = primaryAction.icon == icons.add && !expanded,
+                    isDimmed = isDimmed,
+                    onLongClick = handleLongPress
                 )
             }
         }
@@ -889,7 +938,7 @@ private fun buildCommonNavigationItems(
         FabMenuItem("My Vault", icons.folderLock, { onNavigate(AppScreen.Vault); closeMenu() }, isActive = currentScreen == AppScreen.Vault, module = tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.VAULT)),
         FabMenuItem("My Secrets", icons.lock, { onNavigate(AppScreen.Secrets); closeMenu() }, isActive = currentScreen == AppScreen.Secrets || currentScreen == AppScreen.SecretsSettings, module = tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.SECRETS)),
         FabMenuItem("My Calendar", icons.calendar, { onNavigate(AppScreen.Calendar); closeMenu() }, isActive = currentScreen == AppScreen.Calendar || currentScreen is AppScreen.CalendarEditor, module = tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.AGENDA)),
-        FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); closeMenu() }, isActive = currentScreen == AppScreen.Wallet, module = tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET)),
+        FabMenuItem("My Wallet", icons.wallet, { onNavigate(AppScreen.Wallet); closeMenu() }, isActive = currentScreen == AppScreen.Wallet, module = tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.WALLET), enabled = false),
         FabMenuItem("My Finances", icons.finances, { onNavigate(AppScreen.Finances); closeMenu() }, isActive = currentScreen == AppScreen.Finances, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.FINANCES)),
         FabMenuItem("My E-Mail", Icons.Default.Email, { onNavigate(AppScreen.Email); closeMenu() }, isActive = currentScreen == AppScreen.Email, trailingAvatars = emailAvatars, module = tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.EMAIL)),
         FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); closeMenu() }, isActive = currentScreen == AppScreen.Feed, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FEED, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.FEED)),

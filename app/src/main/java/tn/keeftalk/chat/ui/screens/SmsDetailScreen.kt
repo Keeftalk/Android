@@ -1,17 +1,25 @@
 package tn.keeftalk.chat.ui.screens
 
+import android.content.ClipData
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import tn.keeftalk.chat.domain.repository.SmsMessage
+import tn.keeftalk.chat.ui.components.MessageContextMenu
 import tn.keeftalk.chat.ui.screens.chatdetail.ChatInput
 import tn.keeftalk.chat.ui.theme.ChatThemes
 import tn.keeftalk.chat.ui.theme.LocalChatTheme
@@ -24,6 +32,13 @@ fun SmsDetailScreen(
 ) {
     val contactInfo by viewModel.contactInfo.collectAsState()
     var messageText by remember { mutableStateOf("") }
+    var selectedSmsMessage by remember { mutableStateOf<SmsMessage?>(null) }
+    var showContextMenu by remember { mutableStateOf(false) }
+    var replyingToMessage by remember { mutableStateOf<SmsMessage?>(null) }
+
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val currentChatTheme = ChatThemes.getById("default")
 
@@ -31,9 +46,15 @@ fun SmsDetailScreen(
         SmsMessagePagingAdapter(
             currentUserId = "me",
             onMessageClick = { },
-            onShowContextMenu = { },
+            onShowContextMenu = { smsMsg ->
+                selectedSmsMessage = smsMsg
+                showContextMenu = true
+            },
             peerName = contactInfo.name,
-            peerAvatarUrl = contactInfo.avatarUrl
+            peerAvatarUrl = contactInfo.avatarUrl,
+            onReplySwipe = { smsMsg ->
+                replyingToMessage = smsMsg
+            }
         )
     }
 
@@ -84,6 +105,7 @@ fun SmsDetailScreen(
                             if (messageText.isNotBlank()) {
                                 viewModel.sendMessage(messageText)
                                 messageText = ""
+                                replyingToMessage = null
                             }
                         },
                         onCameraClick = { },
@@ -94,7 +116,9 @@ fun SmsDetailScreen(
                         onMicStop = { },
                         onMicCancel = { },
                         focusRequester = focusRequester,
-                        autoDeleteTimer = null
+                        autoDeleteTimer = null,
+                        replyingToMessage = replyingToMessage?.toKeeftalkMessage(),
+                        onCancelReply = { replyingToMessage = null }
                     )
                 }
             },
@@ -139,6 +163,57 @@ fun SmsDetailScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                if (showContextMenu && selectedSmsMessage != null) {
+                    val msg = selectedSmsMessage!!
+                    val textToCopy = msg.body.ifBlank {
+                        msg.attachments.firstOrNull()?.name
+                            ?: msg.attachments.firstOrNull()?.uri
+                            ?: ""
+                    }
+                    val isMe = msg.type == 2 || msg.type == 4 || msg.type == 5 || msg.type == 6
+
+                    MessageContextMenu(
+                        onDismiss = { showContextMenu = false },
+                        onCopy = {
+                            if (textToCopy.isNotBlank()) {
+                                scope.launch {
+                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", textToCopy)))
+                                }
+                                Toast.makeText(context, "Message copied to clipboard", Toast.LENGTH_SHORT).show()
+                            }
+                            showContextMenu = false
+                        },
+                        onForward = {
+                            if (textToCopy.isNotBlank()) {
+                                messageText = textToCopy
+                            }
+                            showContextMenu = false
+                        },
+                        onReply = {
+                            replyingToMessage = msg
+                            showContextMenu = false
+                        },
+                        onTranslate = { showContextMenu = false },
+                        onReport = { showContextMenu = false },
+                        onBump = { showContextMenu = false },
+                        onDelete = {
+                            viewModel.deleteConversation()
+                            showContextMenu = false
+                        },
+                        onInfo = {
+                            val timeStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp))
+                            val infoText = "Address: ${msg.address}\nType: ${if (isMe) "Sent" else "Received"}\nTime: $timeStr"
+                            Toast.makeText(context, infoText, Toast.LENGTH_LONG).show()
+                            showContextMenu = false
+                        },
+                        onCreateEvent = { showContextMenu = false },
+                        isOwnMessage = isMe,
+                        hasText = textToCopy.isNotBlank(),
+                        isMedia = msg.isMms,
+                        isLocked = false
+                    )
+                }
             }
         }
     }

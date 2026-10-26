@@ -22,7 +22,8 @@ class SmsMessagePagingAdapter(
     private val onMessageClick: (SmsMessage) -> Unit,
     private val onShowContextMenu: (SmsMessage) -> Unit,
     private val peerName: String,
-    private val peerAvatarUrl: String?
+    private val peerAvatarUrl: String?,
+    private val onReplySwipe: ((SmsMessage) -> Unit)? = null
 ) : PagingDataAdapter<SmsChatItem, RecyclerView.ViewHolder>(SmsChatItemDiffCallback()) {
 
     var expandedMessageId by mutableStateOf<String?>(null)
@@ -100,7 +101,7 @@ class SmsMessagePagingAdapter(
                         onMoreClick = { onShowContextMenu(smsMessage) },
                         isStackRoot = false,
                         stackMessages = emptyList(),
-                        onReplySwipe = { },
+                        onReplySwipe = { onReplySwipe?.invoke(smsMessage) },
                         transferProgress = null,
                         onDownloadClick = { },
                         isLatest = true,
@@ -118,7 +119,7 @@ class SmsMessagePagingAdapter(
     }
 }
 
-private fun SmsMessage.toKeeftalkMessage(): Message {
+fun SmsMessage.toKeeftalkMessage(): Message {
     val isMe = type == 2 || type == 4 || type == 5 || type == 6
     val msgStatus = when {
         type == 5 || status == 64 -> MessageStatus.FAILED

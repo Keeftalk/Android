@@ -228,7 +228,7 @@ fun ViewProfileContent(
                             Spacer(modifier = Modifier.height(24.dp))
                         }
 
-                        ProfileInfoSection(profile, viewModel)
+                        ProfileInfoSection(profile, viewModel, isCurrentUser)
 
                         Spacer(modifier = Modifier.height(32.dp))
                         
@@ -565,7 +565,7 @@ fun RelationshipCardPlaceholder() {
 }
 
 @Composable
-fun ProfileInfoSection(profile: Profile, viewModel: ProfileViewModel) {
+fun ProfileInfoSection(profile: Profile, viewModel: ProfileViewModel, isCurrentUser: Boolean = true) {
     val icons = LocalAppIcons.current
     val context = LocalContext.current
     val phoneNumberService = remember { tn.keeftalk.chat.di.AppModule.providePhoneNumberService(context) }
@@ -592,6 +592,7 @@ fun ProfileInfoSection(profile: Profile, viewModel: ProfileViewModel) {
             value = formattedPhone,
             isPhoneSet = profile.phone != null,
             isVerified = profile.phoneVerified,
+            isCurrentUser = isCurrentUser,
             onVerifyClick = { showPhoneDialog = true }
         )
 
@@ -609,6 +610,7 @@ fun PhoneInfoRow(
     value: String,
     isPhoneSet: Boolean,
     isVerified: Boolean,
+    isCurrentUser: Boolean = true,
     onVerifyClick: () -> Unit
 ) {
     Row(
@@ -629,7 +631,7 @@ fun PhoneInfoRow(
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(value, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                if (isPhoneSet && !isVerified) {
+                if (isPhoneSet && isCurrentUser && !isVerified) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.errorContainer,
@@ -646,7 +648,7 @@ fun PhoneInfoRow(
                 }
             }
         }
-        if (isPhoneSet && !isVerified) {
+        if (isPhoneSet && isCurrentUser && !isVerified) {
             TextButton(onClick = onVerifyClick) {
                 Text("Verify phone number", style = MaterialTheme.typography.labelSmall)
             }
