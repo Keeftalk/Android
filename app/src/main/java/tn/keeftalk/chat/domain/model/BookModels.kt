@@ -100,13 +100,13 @@ data class BookSettings(
     val trackReadingTime: Boolean = true,
     val dailyGoalMinutes: Int = 30,
     val yearlyGoalBooks: Int = 24,
-    val pdfDpiOption: String = "lowest", // "lowest", "middle", "custom"
-    val pdfCustomDpi: Int = 200, // 100 to 750
+    val pdfDpiOption: String = "custom", // "lowest", "middle", "custom"
+    val pdfCustomDpi: Int = 400, // 100 to 750
     val hasSeenLibraryTour: Boolean = false,
     val hasSeenQuotesCard: Boolean = false,
     val hasSeenGoalsCard: Boolean = false,
     val hasSeenAchievementsCard: Boolean = false,
-    val showTimerBadge: Boolean = true,
+    val showTimerBadge: Boolean = false,
     val timerBadgeOpacityPercent: Int = 100,
     val readingDirection: String = "AUTO", // "AUTO", "LTR", "RTL"
     val hasSeenRtlPrompt: Boolean = false
@@ -115,7 +115,8 @@ data class BookSettings(
         return when (pdfDpiOption) {
             "lowest" -> 108
             "middle" -> 162
-            else -> pdfCustomDpi.coerceIn(100, 750)
+            "400" -> 400
+            else -> if (pdfCustomDpi in 100..750) pdfCustomDpi else 400
         }
     }
 

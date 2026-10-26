@@ -47,6 +47,8 @@ class TodoReminderReceiver : BroadcastReceiver() {
                         }
                         if (triggerTime > nowMillis - (30 * 60 * 1000)) {
                             TodoReminderScheduler.scheduleAllTaskAlarms(context, task.id, task.title, triggerTime)
+                        } else if (task.dueDate.isBlank() && task.reminder.isBlank()) {
+                            TodoReminderScheduler.scheduleUndatedTaskReminder(context, task.id, task.title, task.createdAt)
                         }
                     }
                 } catch (e: Exception) {
@@ -70,6 +72,58 @@ class TodoReminderReceiver : BroadcastReceiver() {
                 val currentTask = tasks.find { it.id == taskId }
 
                 if (currentTask == null || currentTask.deleted || currentTask.completed) {
+                    TodoReminderScheduler.cancelTaskReminder(context, taskId)
+                    return@launch
+                }
+
+                if (reminderType == "UNDATED_REMINDER") {
+                    if (currentTask.dueDate.isNotBlank() || currentTask.reminder.isNotBlank()) {
+                        TodoReminderScheduler.cancelUndatedTaskReminder(context, taskId)
+                        return@launch
+                    }
+                    val title = "📋 Pending Task: $taskTitle"
+                    val body = "Don't forget to review or schedule this undated task!"
+                    
+                    val actions = mutableListOf<NotificationActionSpec>()
+                    val completeIntent = Intent(context, TodoActionReceiver::class.java).apply {
+                        putExtra("task_id", taskId)
+                    }
+                    val completePendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        ("todo_complete_" + taskId).hashCode(),
+                        completeIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    actions.add(NotificationActionSpec("✅ Complete Task", completePendingIntent))
+
+                    val openIntent = Intent(context, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra("feature", "TODO")
+                        putExtra("taskId", taskId)
+                    }
+                    val openPendingIntent = PendingIntent.getActivity(
+                        context,
+                        ("todo_open_" + taskId).hashCode(),
+                        openIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    actions.add(NotificationActionSpec("📋 Open Todo", openPendingIntent))
+
+                    val dispatcher = AppModule.provideNotificationDispatcher(context)
+                    dispatcher.dispatchDirect(
+                        NotificationPayload(
+                            feature = NotificationFeature.TODO,
+                            type = NotificationType.REMINDER,
+                            priority = NotificationPriority.NORMAL,
+                            title = title,
+                            body = body,
+                            sourceId = taskId,
+                            actions = actions
+                        )
+                    )
+
+                    // Reschedule for 24h later
+                    TodoReminderScheduler.scheduleUndatedTaskReminder(context, taskId, taskTitle, System.currentTimeMillis())
                     return@launch
                 }
 

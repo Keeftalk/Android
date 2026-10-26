@@ -6,7 +6,7 @@ data class TodoTask(
     val title: String,
     val notes: String = "",
     val dueDate: String = "",
-    val priority: Int = 1, // 0: low, 1: medium, 2: high
+    val priority: Int = 1, // 0: low, 1: medium, 2: high, 3: urgent
     val listId: String = "personal",
     val completed: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

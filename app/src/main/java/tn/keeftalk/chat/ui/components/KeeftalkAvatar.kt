@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -106,7 +108,16 @@ fun KeeftalkAvatar(
                         alignment = Alignment.Center
                     )
                 } else {
-                    InitialsAvatar(initials, fontSize, textColor)
+                    if (initials == "?") {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(size * 0.5f),
+                            tint = textColor
+                        )
+                    } else {
+                        InitialsAvatar(initials, fontSize, textColor)
+                    }
                 }
             }
         }

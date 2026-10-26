@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.toArgb
 
 object AvatarUtils {
     fun getInitials(name: String?): String {
-        if (name.isNullOrBlank()) return "?"
+        if (name.isNullOrBlank() || name.equals("Unknown", ignoreCase = true) || name.equals("Unknown Number", ignoreCase = true) || name.equals("Private Number", ignoreCase = true) || name == "-1") return "?"
         return name.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
     }
 

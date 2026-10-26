@@ -59,4 +59,34 @@ class PhoneContactManager(private val context: Context) {
         }
         contacts.distinctBy { it.phone }
     }
+
+    fun getContactName(context: Context, phoneNumber: String): String? {
+        try {
+            if (context.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return null
+            }
+            val uri = android.net.Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                android.net.Uri.encode(phoneNumber)
+            )
+            val cursor = context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIdx = it.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    if (nameIdx != -1) {
+                        return it.getString(nameIdx)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PhoneContactManager", "Error looking up contact name for $phoneNumber", e)
+        }
+        return null
+    }
 }

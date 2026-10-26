@@ -631,7 +631,7 @@ fun ChatItem(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                color = if (chat.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                color = if (chat.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Normal,
                                 fontSize = 15.sp,
                                 letterSpacing = 0.sp

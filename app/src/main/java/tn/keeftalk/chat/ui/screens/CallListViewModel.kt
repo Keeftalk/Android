@@ -317,24 +317,35 @@ class CallListViewModel(
 
     private fun isUssdCode(phone: String): Boolean = (phone.startsWith("*") || phone.startsWith("#")) && phone.endsWith("#")
 
-    fun onCallClick(isVideo: Boolean = false) {
+    fun onCallClick() {
+        launchGsmCall(_dialerInput.value)
+    }
+
+    fun launchGsmCall(phoneNumber: String) {
         viewModelScope.launch {
-            val currentInput = _dialerInput.value
-            if (currentInput.isEmpty()) return@launch
+            if (phoneNumber.isNotBlank()) {
+                _events.emit(DialerEvent.LaunchGsmCall(phoneNumber))
+            }
+        }
+    }
 
-            val isEmergency = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                app.getSystemService(android.telephony.TelephonyManager::class.java).isEmergencyNumber(currentInput)
+    fun startKeeftalkCall(isVideo: Boolean) {
+        viewModelScope.launch {
+            val d = _decision.value
+            if (d is DialerDecision.KeeftalkCall) {
+                if (d.isOnline) {
+                    repository.getOrCreateOneToOneChat(d.profile.id).onSuccess { chatId ->
+                        val callId = java.util.UUID.randomUUID().toString()
+                        val type = if (isVideo) "VIDEO" else "VOICE"
+                        repository.startCall(chatId, type, callId)
+                        _events.emit(DialerEvent.NavigateToCall(callId, isVideo))
+                    }
+                } else {
+                    _events.emit(DialerEvent.Error("Internet calling is currently unavailable (user is offline)."))
+                }
             } else {
-                @Suppress("DEPRECATION")
-                android.telephony.PhoneNumberUtils.isEmergencyNumber(currentInput)
+                _events.emit(DialerEvent.Error("Internet calling is unsupported or unavailable for this number."))
             }
-
-            if (isEmergency) {
-                _events.emit(DialerEvent.LaunchGsmCall(currentInput))
-                return@launch
-            }
-
-            startCallWithNumber(currentInput, if (isVideo) "VIDEO" else "VOICE")
         }
     }
 

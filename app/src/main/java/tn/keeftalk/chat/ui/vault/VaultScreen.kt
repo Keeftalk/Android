@@ -1068,6 +1068,43 @@ fun VaultTabPage(
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+                if (uiState.isOffline) {
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Offline Mode",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Showing securely cached local data.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 item {
                     Row(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text(if (tab == VaultTab.FOLDERS) "FILES & FOLDERS" else tab.name, style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1087,13 +1124,13 @@ fun VaultTabPage(
                 }
                 if (filteredItems.isEmpty()) {
                     item { 
-                        if (uiState.currentParentId != null) {
+                        if (uiState.currentParentId != null && !uiState.isOffline) {
                             EmptyFolderState(
                                 onUploadClick = onUploadClick, 
                                 onCreateFolderClick = onCreateFolderClick
                             )
                         } else {
-                            VaultEmptyState(tab, uiState.selectedCategory)
+                            VaultEmptyState(tab, uiState.selectedCategory, isOffline = uiState.isOffline)
                         }
                     }
                 } else {

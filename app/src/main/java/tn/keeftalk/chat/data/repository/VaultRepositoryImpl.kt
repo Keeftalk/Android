@@ -632,16 +632,28 @@ class VaultRepositoryImpl(
             // 0. Process outgoing sync queue
             processSyncQueue()
 
-            // 1. Sync Folders
-            val remoteFolders = supabase.postgrest["vault_folders"].select { filter { eq("user_id", userId) } }.decodeList<VaultFolderEntity>()
+            // 1. Sync Folders with safeguards against empty/incomplete server responses
+            val remoteFolders = try {
+                supabase.postgrest["vault_folders"].select { filter { eq("user_id", userId) } }.decodeList<VaultFolderEntity>()
+            } catch (e: Exception) {
+                Log.w("VAULT_SYNC", "Failed to fetch remote folders (offline/error): ${e.message}")
+                emptyList()
+            }
             if (remoteFolders.isNotEmpty()) {
                 remoteFolders.forEach { vaultDao.insertFolder(it) }
+            } else {
+                Log.w("VAULT_SYNC", "Server returned empty folders list or request failed; preserving local database folders.")
             }
             
-            // 2. Sync Items (and their associated Files)
-            val remoteItems = supabase.postgrest["vault_items"].select { 
-                filter { eq("user_id", userId) } 
-            }.decodeList<VaultItemEntity>()
+            // 2. Sync Items (and their associated Files) with safeguards against empty/incomplete server responses
+            val remoteItems = try {
+                supabase.postgrest["vault_items"].select { 
+                    filter { eq("user_id", userId) } 
+                }.decodeList<VaultItemEntity>()
+            } catch (e: Exception) {
+                Log.w("VAULT_SYNC", "Failed to fetch remote items (offline/error): ${e.message}")
+                emptyList()
+            }
             
             if (remoteItems.isNotEmpty()) {
                 val fileIdsToFetch = remoteItems.asSequence().map { it.fileId }.toSet()
@@ -668,6 +680,8 @@ class VaultRepositoryImpl(
                 if (validItems.isNotEmpty()) {
                     vaultDao.insertItems(validItems)
                 }
+            } else {
+                Log.w("VAULT_SYNC", "Server returned empty items list or request failed; preserving local database items (never silently overwriting valid local data).")
             }
             
             Result.success(Unit)

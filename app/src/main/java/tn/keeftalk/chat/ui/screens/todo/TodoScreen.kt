@@ -1,5 +1,8 @@
 package tn.keeftalk.chat.ui.screens.todo
 
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,8 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,9 +33,11 @@ import tn.keeftalk.chat.domain.model.todo.TodoTask
 import tn.keeftalk.chat.ui.theme.FabGradient
 import tn.keeftalk.chat.ui.theme.FabPurple
 import tn.keeftalk.chat.ui.theme.LucideIcons
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 
 val C1 @Composable get() = MaterialTheme.colorScheme.primary
 val C2 @Composable get() = MaterialTheme.colorScheme.secondary
@@ -39,7 +49,53 @@ val TextColor @Composable get() = MaterialTheme.colorScheme.onBackground
 val MutedColor @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 val LineColor @Composable get() = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
 
-@OptIn(ExperimentalMaterial3Api::class)
+val UrgentColor = Color(0xFFFF2A4B)
+
+class TodoInputVisualTransformation(private val availableLists: List<TodoListMeta>) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val originalText = text.text
+        val builder = AnnotatedString.Builder(originalText)
+
+        val words = originalText.split(Regex("(?<=\\s)|(?=\\s)"))
+        var currentIndex = 0
+        for (word in words) {
+            val trimmed = word.trim()
+            val lower = trimmed.lowercase()
+            val isRecognized = lower == "#tomorrow" || lower == "tomorrow" || lower == "tmrw" ||
+                    lower == "#today" || lower == "today" ||
+                    lower == "!urgent" || lower == "!!!" ||
+                    lower == "!high" || lower == "!!" ||
+                    lower == "!low" ||
+                    (lower.startsWith("reminder@") && isValidTimeToken(lower.removePrefix("reminder@"))) ||
+                    (lower.startsWith("@") && isValidTimeToken(lower.removePrefix("@"))) ||
+                    (lower.startsWith("#") && lower.length > 1 && availableLists.any { it.id.startsWith(lower.removePrefix("#")) || it.n.lowercase().startsWith(lower.removePrefix("#")) })
+
+            if (isRecognized && trimmed.isNotEmpty()) {
+                val start = originalText.indexOf(trimmed, currentIndex)
+                if (start >= 0) {
+                    builder.addStyle(
+                        style = SpanStyle(color = Color.Gray.copy(alpha = 0.6f), fontWeight = FontWeight.SemiBold),
+                        start = start,
+                        end = start + trimmed.length
+                    )
+                }
+            }
+            currentIndex += word.length
+        }
+
+        return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
+    }
+
+    private fun isValidTimeToken(token: String): Boolean {
+        val parts = token.split(":")
+        if (parts.size != 2) return false
+        val h = parts[0].toIntOrNull() ?: return false
+        val m = parts[1].toIntOrNull() ?: return false
+        return h in 0..23 && m in 0..59
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TodoScreen(
     viewModel: TodoViewModel,
@@ -54,11 +110,20 @@ fun TodoScreen(
     val isSheetOpen by viewModel.isSheetOpen.collectAsState()
     val editingTaskId by viewModel.editingTaskId.collectAsState()
 
+    val allListMetas by viewModel.allListMetas.collectAsState()
+    val showAddListDialog by viewModel.showAddListDialog.collectAsState()
+
+    val showDatePickerForUpcoming by viewModel.showDatePickerForUpcoming.collectAsState()
+
+    var showHelpDialog by remember { mutableStateOf(false) }
+
     val listState = rememberLazyListState()
     val scrollOffset = remember { derivedStateOf { listState.firstVisibleItemScrollOffset } }
     val headerShrink = remember(scrollOffset) { (scrollOffset.value / 80f).coerceIn(0f, 1f) }
 
     val todayStr = remember { LocalDate.now().toString() }
+    val tomorrowStr = remember { LocalDate.now().plusDays(1).toString() }
+
     val activeTasks = remember(tasks) { tasks.filter { !it.deleted } }
     val incompleteTasks = remember(activeTasks) { activeTasks.filter { !it.completed } }
 
@@ -77,6 +142,28 @@ fun TodoScreen(
     val upcomingCount = remember(incompleteTasks, todayStr) { incompleteTasks.filter { t -> t.dueDate.isNotEmpty() && t.dueDate > todayStr }.size }
 
     val isAllDone = todaySet.isNotEmpty() && progressPercent == 100
+
+    if (showHelpDialog) {
+        HelpSyntaxDialog(onDismiss = { showHelpDialog = false })
+    }
+
+    if (showAddListDialog) {
+        CreateListDialog(
+            onDismiss = { viewModel.showAddListDialog.value = false },
+            onCreate = { name, colorHex ->
+                viewModel.addNewList(name, colorHex)
+            }
+        )
+    }
+
+    if (showDatePickerForUpcoming) {
+        DatePickerPromptDialog(
+            onDismiss = { viewModel.showDatePickerForUpcoming.value = false },
+            onDateSelected = { selectedDate ->
+                viewModel.confirmUpcomingTaskWithDate(selectedDate)
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -103,6 +190,15 @@ fun TodoScreen(
                     )
                     .padding(heroPadding)
             ) {
+                IconButton(
+                    onClick = { showHelpDialog = true },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(28.dp)
+                ) {
+                    Icon(LucideIcons.Sparkles, contentDescription = "Todo Syntax & Priorities", tint = Color.White)
+                }
+
                 if (isAllDone) {
                     Column {
                         Row(
@@ -118,7 +214,7 @@ fun TodoScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             Button(
-                                onClick = { viewModel.setView("up") },
+                                onClick = { viewModel.setView("tomorrow") },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = FabPurple),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
@@ -182,7 +278,7 @@ fun TodoScreen(
                 }
             }
 
-            // View Segment Switcher (seg4) - compact height
+            // View Segment Switcher in exact order: Today, Tomorrow, Upcoming, All, Done, Stats
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -194,13 +290,14 @@ fun TodoScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 ViewTab("Today", currentView == "today") { viewModel.setView("today") }
+                ViewTab("Tomorrow", currentView == "tomorrow") { viewModel.setView("tomorrow") }
                 ViewTab("Upcoming", currentView == "up") { viewModel.setView("up") }
                 ViewTab("All", currentView == "all") { viewModel.setView("all") }
                 ViewTab("Done", currentView == "done") { viewModel.setView("done") }
                 ViewTab("Stats", currentView == "stats") { viewModel.setView("stats") }
             }
 
-            // Chips & Search toggle
+            // Chips & Search toggle & Custom Lists
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,7 +318,7 @@ fun TodoScreen(
                     label = { Text("All lists", fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(containerColor = CardBg, selectedContainerColor = C2)
                 )
-                viewModel.defaultLists.forEach { l ->
+                allListMetas.forEach { l ->
                     FilterChip(
                         selected = selectedList == l.id,
                         onClick = { viewModel.setSelectedList(l.id) },
@@ -234,6 +331,17 @@ fun TodoScreen(
                         colors = FilterChipDefaults.filterChipColors(containerColor = CardBg, selectedContainerColor = C2)
                     )
                 }
+                FilterChip(
+                    selected = false,
+                    onClick = { viewModel.showAddListDialog.value = true },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = "New list", modifier = Modifier.size(14.dp))
+                            Text("New list", fontSize = 12.sp)
+                        }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(containerColor = CardBg)
+                )
             }
 
             if (showSearchBox) {
@@ -267,7 +375,7 @@ fun TodoScreen(
             ) {
                 if (currentView == "stats") {
                     item {
-                        StatsView(activeTasks, viewModel)
+                        StatsView(viewModel)
                     }
                 } else {
                     val filtered = activeTasks.filter { t ->
@@ -277,50 +385,73 @@ fun TodoScreen(
 
                     val overdue = filtered.filter { !it.completed && it.dueDate.isNotEmpty() && it.dueDate < todayStr }
                     val today = filtered.filter { !it.completed && it.dueDate == todayStr }
-                    val upcoming = filtered.filter { !it.completed && it.dueDate.isNotEmpty() && it.dueDate > todayStr }
+                    val tomorrow = filtered.filter { !it.completed && it.dueDate == tomorrowStr }
+                    val upcoming = filtered.filter { !it.completed && it.dueDate.isNotEmpty() && it.dueDate > tomorrowStr }
                     val noDate = filtered.filter { !it.completed && it.dueDate.isEmpty() }
                     val completedTasks = filtered.filter { it.completed }.sortedByDescending { it.completedAt }
 
-                    if (currentView == "today") {
-                        item { TaskGroup("Overdue", overdue, viewModel, isOverdue = true) }
-                        item { TaskGroup("Today", today, viewModel) }
-                    } else if (currentView == "up") {
-                        item { TaskGroup("Upcoming", upcoming, viewModel) }
-                        item { TaskGroup("No date", noDate, viewModel) }
-                    } else if (currentView == "all") {
-                        item { TaskGroup("Overdue", overdue, viewModel, isOverdue = true) }
-                        item { TaskGroup("Today", today, viewModel) }
-                        item { TaskGroup("Upcoming", upcoming, viewModel) }
-                        item { TaskGroup("No date", noDate, viewModel) }
-                        item {
-                            Column {
-                                TextButton(onClick = { /* toggle completed in all */ }) {
-                                    Text("Completed (${completedTasks.size})", color = C2, fontWeight = FontWeight.Bold)
-                                }
-                                completedTasks.forEach { task ->
-                                    TaskItem(task, viewModel)
+                    when (currentView) {
+                        "today" -> {
+                            item { TaskGroup("Overdue", overdue, viewModel, isOverdue = true) }
+                            item { TaskGroup("Today", today, viewModel) }
+                        }
+                        "tomorrow" -> {
+                            item { TaskGroup("Tomorrow", tomorrow, viewModel) }
+                        }
+                        "up" -> {
+                            val upcomingGroups = groupUpcomingTasksByRange(upcoming)
+                            upcomingGroups.forEach { group ->
+                                item { TaskGroup(group.first, group.second, viewModel) }
+                            }
+                        }
+                        "all" -> {
+                            item { TaskGroup("Overdue", overdue, viewModel, isOverdue = true) }
+                            item { TaskGroup("Today", today, viewModel) }
+                            item { TaskGroup("Tomorrow", tomorrow, viewModel) }
+                            val upcomingGroups = groupUpcomingTasksByRange(upcoming)
+                            upcomingGroups.forEach { group ->
+                                item { TaskGroup("Upcoming - ${group.first}", group.second, viewModel) }
+                            }
+                            item { TaskGroup("No date", noDate, viewModel) }
+                            item {
+                                Column {
+                                    TextButton(onClick = { /* toggle completed */ }) {
+                                        Text("Completed (${completedTasks.size})", color = C2, fontWeight = FontWeight.Bold)
+                                    }
+                                    completedTasks.forEach { task ->
+                                        TaskItem(task, viewModel)
+                                    }
                                 }
                             }
                         }
-                    } else if (currentView == "done") {
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Completed", fontWeight = FontWeight.Bold, color = TextColor, fontSize = 13.sp)
-                                TextButton(onClick = { viewModel.clearCompleted() }) {
-                                    Text("Clear all", color = Hi, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        "done" -> {
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Completed", fontWeight = FontWeight.Bold, color = TextColor, fontSize = 13.sp)
+                                    TextButton(onClick = { viewModel.clearCompleted() }) {
+                                        Text("Clear all", color = Hi, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
-                        }
-                        items(completedTasks, key = { it.id }) { task ->
-                            TaskItem(task, viewModel)
+                            items(completedTasks, key = { it.id }) { task ->
+                                TaskItem(task, viewModel)
+                            }
                         }
                     }
 
-                    if (filtered.isEmpty() || (currentView == "today" && overdue.isEmpty() && today.isEmpty()) || (currentView == "done" && completedTasks.isEmpty())) {
+                    val isSectionEmpty = when (currentView) {
+                        "today" -> overdue.isEmpty() && today.isEmpty()
+                        "tomorrow" -> tomorrow.isEmpty()
+                        "up" -> upcoming.isEmpty()
+                        "done" -> completedTasks.isEmpty()
+                        else -> filtered.isEmpty()
+                    }
+
+                    if (isSectionEmpty) {
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -356,7 +487,7 @@ fun TodoScreen(
                 OutlinedTextField(
                     value = quickAddText,
                     onValueChange = { viewModel.quickAddText.value = it },
-                    placeholder = { Text("Add a task, try “Call Sam tomorrow #work !high”", color = MutedColor, fontSize = 14.sp) },
+                    placeholder = { Text("Add a task, try “Call Sam tomorrow reminder@14:30 !urgent”", color = MutedColor, fontSize = 13.5.sp) },
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 4.dp),
@@ -368,7 +499,8 @@ fun TodoScreen(
                         focusedTextColor = TextColor,
                         unfocusedTextColor = TextColor
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    visualTransformation = TodoInputVisualTransformation(allListMetas)
                 )
                 Button(
                     onClick = { viewModel.addNewTask(quickAddText) },
@@ -438,7 +570,7 @@ fun TodoScreen(
                             maxLines = 3
                         )
 
-                        Text("Due", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = MutedColor)
+                        Text("Due Date", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = MutedColor)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             DuePill("Today", task.dueDate == LocalDate.now().toString()) {
                                 viewModel.updateEditingTask { it.copy(dueDate = LocalDate.now().toString()) }
@@ -456,11 +588,15 @@ fun TodoScreen(
                             PriorityPill("Low", task.priority == 0) { viewModel.updateEditingTask { it.copy(priority = 0) } }
                             PriorityPill("Medium", task.priority == 1) { viewModel.updateEditingTask { it.copy(priority = 1) } }
                             PriorityPill("High", task.priority == 2) { viewModel.updateEditingTask { it.copy(priority = 2) } }
+                            PriorityPill("Urgent", task.priority == 3) { viewModel.updateEditingTask { it.copy(priority = 3) } }
                         }
 
-                        Text("List", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = MutedColor)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            viewModel.defaultLists.forEach { l ->
+                        Text("List / Container", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = MutedColor)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            allListMetas.forEach { l ->
                                 FilterChip(
                                     selected = task.listId == l.id,
                                     onClick = { viewModel.updateEditingTask { it.copy(listId = l.id) } },
@@ -499,6 +635,136 @@ fun TodoScreen(
 }
 
 @Composable
+fun CreateListDialog(
+    onDismiss: () -> Unit,
+    onCreate: (name: String, colorHex: String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    val colors = listOf("#7D5CFF", "#00CCCC", "#FF8A5B", "#2ED9A0", "#FF5722", "#E91E63", "#9C27B0", "#3F51B5", "#FFC107", "#4CAF50")
+    var selectedColor by remember { mutableStateOf(colors[0]) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create New List / Container", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text("List name (e.g. Study, Fitness)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Pick Color", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MutedColor)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    colors.forEach { hex ->
+                        val parsedColor = Color(android.graphics.Color.parseColor(hex))
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(parsedColor)
+                                .border(
+                                    width = if (selectedColor == hex) 3.dp else 0.dp,
+                                    color = if (selectedColor == hex) TextColor else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable { selectedColor = hex }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onCreate(name, selectedColor) },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Create List")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        containerColor = CardBg
+    )
+}
+
+@Composable
+fun HelpSyntaxDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(LucideIcons.Sparkles, contentDescription = null, tint = C1)
+                Text("Todo Syntax & Priorities", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Scheduling Shortcuts:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextColor)
+                Text("• #Today or today → Schedules for today\n• #Tomorrow or tmrw → Schedules for tomorrow\n• reminder@14:30 or @09:00 → Sets reminder time", fontSize = 12.5.sp, color = MutedColor)
+
+                Text("List Tags:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextColor)
+                Text("• #work, #personal, #shop, #health → Assigns task to list", fontSize = 12.5.sp, color = MutedColor)
+
+                Text("Priority Levels:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextColor)
+                Text("• !low → Low priority\n• !high or !! → High priority\n• !urgent or !!! → Urgent priority (pulsing red border)", fontSize = 12.5.sp, color = MutedColor)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Got it", fontWeight = FontWeight.Bold, color = C1)
+            }
+        },
+        containerColor = CardBg
+    )
+}
+
+@Composable
+fun DatePickerPromptDialog(onDismiss: () -> Unit, onDateSelected: (String) -> Unit) {
+    var selectedDateStr by remember { mutableStateOf(LocalDate.now().plusDays(2).toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Date for Upcoming Task", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("When is this upcoming task due?", fontSize = 13.sp, color = MutedColor)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selectedDateStr == LocalDate.now().plusDays(2).toString(),
+                        onClick = { selectedDateStr = LocalDate.now().plusDays(2).toString() },
+                        label = { Text("In 2 Days") }
+                    )
+                    FilterChip(
+                        selected = selectedDateStr == LocalDate.now().plusDays(7).toString(),
+                        onClick = { selectedDateStr = LocalDate.now().plusDays(7).toString() },
+                        label = { Text("Next Week") }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onDateSelected(selectedDateStr) }) {
+                Text("Confirm Date")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        containerColor = CardBg
+    )
+}
+
+@Composable
 fun MiniStatBox(label: String, value: Int, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
@@ -525,10 +791,10 @@ fun ViewTab(title: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = mod
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else MutedColor)
+        Text(title, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else MutedColor)
     }
 }
 
@@ -552,29 +818,59 @@ fun TaskGroup(title: String, tasks: List<TodoTask>, viewModel: TodoViewModel, is
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TaskItem(task: TodoTask, viewModel: TodoViewModel) {
+    val context = LocalContext.current
     val listMeta = viewModel.getListMeta(task.listId)
     val listColor = remember(listMeta) { Color(android.graphics.Color.parseColor(listMeta.c)) }
     val formattedDue = viewModel.formatDueDate(task.dueDate)
+
+    val accessibilityManager = remember { context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager }
+    val isTouchExploration = remember { accessibilityManager?.isTouchExplorationEnabled == true }
+
+    val isUrgentIncomplete = task.priority == 3 && !task.completed
+
+    val borderModifier = if (isUrgentIncomplete) {
+        if (isTouchExploration) {
+            Modifier.border(2.dp, UrgentColor, RoundedCornerShape(18.dp))
+        } else {
+            val infiniteTransition = rememberInfiniteTransition(label = "urgentPulse")
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1200, easing = LinearOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "alpha"
+            )
+            Modifier.border(2.dp, UrgentColor.copy(alpha = alpha), RoundedCornerShape(18.dp))
+        }
+    } else {
+        Modifier.border(1.dp, LineColor, RoundedCornerShape(18.dp))
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(CardBg)
-            .border(1.dp, LineColor, RoundedCornerShape(18.dp))
-            .clickable { viewModel.openSheet(task.id) }
+            .then(borderModifier)
+            .combinedClickable(
+                onClick = { viewModel.openSheet(task.id) },
+                onLongClick = { viewModel.openSheet(task.id) }
+            )
             .padding(12.dp, 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Checkbox button reduced size (20x20 circle, 2px border)
+        // Checkbox button
         Box(
             modifier = Modifier
                 .size(20.dp)
                 .clip(CircleShape)
-                .border(2.dp, if (task.priority == 2) Hi else C1, CircleShape)
+                .border(2.dp, if (task.priority == 3 && !task.completed) UrgentColor else if (task.priority == 2) Hi else C1, CircleShape)
                 .clickable { viewModel.toggleTaskCompletion(task.id) },
             contentAlignment = Alignment.Center
         ) {
@@ -630,7 +926,20 @@ fun TaskItem(task: TodoTask, viewModel: TodoViewModel) {
                         Text(listMeta.n, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MutedColor)
                     }
                 }
-                if (task.priority == 2 && !task.completed) {
+                if (task.priority == 3 && !task.completed) {
+                    Surface(
+                        shape = RoundedCornerShape(99.dp),
+                        color = UrgentColor.copy(alpha = 0.16f)
+                    ) {
+                        Text(
+                            text = "Urgent",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = UrgentColor,
+                            modifier = Modifier.padding(8.dp, 2.dp)
+                        )
+                    }
+                } else if (task.priority == 2 && !task.completed) {
                     Surface(
                         shape = RoundedCornerShape(99.dp),
                         color = Hi.copy(alpha = 0.14f)
@@ -650,28 +959,24 @@ fun TaskItem(task: TodoTask, viewModel: TodoViewModel) {
 }
 
 @Composable
-fun StatsView(tasks: List<TodoTask>, viewModel: TodoViewModel) {
-    val completedTasks = remember(tasks) { tasks.filter { it.completed } }
-    val totalCount = tasks.size
-    val completedCount = completedTasks.size
-    val completionRate = if (totalCount > 0) (completedCount * 100) / totalCount else 0
-    val overdueCount = remember(tasks) { tasks.filter { !it.completed && it.dueDate.isNotEmpty() && it.dueDate < LocalDate.now().toString() }.size }
+fun StatsView(viewModel: TodoViewModel) {
+    val stats by viewModel.statistics.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Grid KPI cards matching HTML stats grid (.kg, .kp)
+        // Grid KPI cards
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatMetricBox("Completed", completedCount.toString(), Modifier.weight(1f))
-            StatMetricBox("Completion rate", "$completionRate%", Modifier.weight(1f), isGradient = true)
+            StatMetricBox("Completed", stats.totalCompleted.toString(), Modifier.weight(1f))
+            StatMetricBox("Completion rate", "${stats.completionRate}%", Modifier.weight(1f), isGradient = true)
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatMetricBox("Current streak", "0 days", Modifier.weight(1f))
-            StatMetricBox("Best streak", "0 days", Modifier.weight(1f))
+            StatMetricBox("Current streak", "${stats.currentStreak} days", Modifier.weight(1f))
+            StatMetricBox("Best streak", "${stats.bestStreak} days", Modifier.weight(1f))
         }
 
-        // By priority breakdown card matching HTML stats priority section
+        // By priority breakdown
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = CardBg,
@@ -680,18 +985,22 @@ fun StatsView(tasks: List<TodoTask>, viewModel: TodoViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("By priority", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextColor)
-                listOf(Triple(2, "High", Hi), Triple(1, "Medium", C1), Triple(0, "Low", MutedColor)).forEach { (p, name, color) ->
-                    val pTasks = tasks.filter { it.priority == p }
-                    val pDone = pTasks.filter { it.completed }.size
+                listOf(
+                    Triple(3, "Urgent", UrgentColor),
+                    Triple(2, "High", Hi),
+                    Triple(1, "Medium", C1),
+                    Triple(0, "Low", MutedColor)
+                ).forEach { (p, name, color) ->
+                    val counts = stats.priorityCounts[p] ?: (0 to 0)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextColor)
-                        Text("$pDone/${pTasks.size}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MutedColor)
+                        Text(name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
+                        Text("${counts.first}/${counts.second}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MutedColor)
                     }
                 }
             }
         }
 
-        // When you get things done card matching HTML stats chart
+        // Real data chart
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = CardBg,
@@ -701,31 +1010,36 @@ fun StatsView(tasks: List<TodoTask>, viewModel: TodoViewModel) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("When you get things done", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextColor)
 
-                // Weekly activity bar chart (M, T, W, T, F, S, S)
+                // Real weekly activity bar chart (M, T, W, T, F, S, S)
                 Row(
                     modifier = Modifier.fillMaxWidth().height(80.dp).padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
                     val days = listOf("M", "T", "W", "T", "F", "S", "S")
-                    val sampleHeights = listOf(0.2f, 0.3f, 0.25f, 0.4f, 0.15f, 0.9f, 0.3f)
                     days.forEachIndexed { idx, day ->
+                        val heightFraction = stats.dayOfWeekHeights.getOrElse(idx) { 0.05f }
+                        val rawCount = stats.dayOfWeekCounts.getOrElse(idx) { 0 }
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Bottom,
                             modifier = Modifier.weight(1f)
                         ) {
-                            val bgMod = if (idx == 5) {
+                            if (rawCount > 0) {
+                                Text(rawCount.toString(), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MutedColor)
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val barModifier = if (rawCount > 0) {
                                 Modifier.background(Brush.linearGradient(listOf(C1, C2)))
                             } else {
                                 Modifier.background(SoftBg)
                             }
                             Box(
                                 modifier = Modifier
-                                    .width(24.dp)
-                                    .fillMaxHeight(sampleHeights[idx])
+                                    .width(22.dp)
+                                    .fillMaxHeight(heightFraction)
                                     .clip(RoundedCornerShape(6.dp))
-                                    .then(bgMod)
+                                    .then(barModifier)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(day, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MutedColor)
@@ -734,16 +1048,16 @@ fun StatsView(tasks: List<TodoTask>, viewModel: TodoViewModel) {
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
-                listOf("Morning" to "28%", "Afternoon" to "41%", "Evening" to "31%", "Late night" to "0%").forEach { (time, pct) ->
+                stats.timeOfDayPercentages.forEach { (time, pct) ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(time, fontSize = 12.sp, color = TextColor, fontWeight = FontWeight.Bold)
-                        Text(pct, fontSize = 12.sp, color = MutedColor, fontWeight = FontWeight.Bold)
+                        Text("$pct%", fontSize = 12.sp, color = MutedColor, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // Insights card matching HTML stats insights
+        // Real Insights card
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = CardBg,
@@ -752,12 +1066,49 @@ fun StatsView(tasks: List<TodoTask>, viewModel: TodoViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Insights", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextColor)
-                InsightRow("You completed $completedCount tasks this week.")
-                InsightRow(if (overdueCount > 0) "$overdueCount overdue task(s) need attention." else "No overdue tasks. Nice! $totalCount open in total.")
-                InsightRow("0 tasks with reminders, 0 already sent.")
+                InsightRow("You completed ${stats.completedThisWeek} task(s) this week.")
+                InsightRow(if (stats.overdueCount > 0) "${stats.overdueCount} overdue task(s) need attention." else "No overdue tasks. Great job!")
+                InsightRow("${stats.activeRemindersCount} task(s) have active reminders scheduled.")
             }
         }
     }
+}
+
+private fun groupUpcomingTasksByRange(tasks: List<TodoTask>): List<Pair<String, List<TodoTask>>> {
+    val today = LocalDate.now()
+    val tomorrow = today.plusDays(1)
+
+    val endOfThisWeek = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+    val startOfNextWeek = endOfThisWeek.plusDays(1)
+    val endOfNextWeek = startOfNextWeek.plusDays(6)
+    val endOfThisYear = today.with(TemporalAdjusters.lastDayOfYear())
+
+    val thisWeekTasks = mutableListOf<TodoTask>()
+    val nextWeekTasks = mutableListOf<TodoTask>()
+    val thisYearTasks = mutableListOf<TodoTask>()
+    val nextYearTasks = mutableListOf<TodoTask>()
+
+    tasks.filter { t ->
+        if (t.dueDate.isBlank()) return@filter false
+        val date = runCatching { LocalDate.parse(t.dueDate) }.getOrNull() ?: return@filter false
+        date.isAfter(tomorrow)
+    }.sortedBy { it.dueDate }.forEach { t ->
+        val date = LocalDate.parse(t.dueDate)
+        when {
+            !date.isAfter(endOfThisWeek) -> thisWeekTasks.add(t)
+            !date.isBefore(startOfNextWeek) && !date.isAfter(endOfNextWeek) -> nextWeekTasks.add(t)
+            !date.isAfter(endOfThisYear) -> thisYearTasks.add(t)
+            else -> nextYearTasks.add(t)
+        }
+    }
+
+    val result = mutableListOf<Pair<String, List<TodoTask>>>()
+    if (thisWeekTasks.isNotEmpty()) result.add("This Week" to thisWeekTasks)
+    if (nextWeekTasks.isNotEmpty()) result.add("Next Week" to nextWeekTasks)
+    if (thisYearTasks.isNotEmpty()) result.add("This Year" to thisYearTasks)
+    if (nextYearTasks.isNotEmpty()) result.add("Next Year" to nextYearTasks)
+
+    return result
 }
 
 @Composable

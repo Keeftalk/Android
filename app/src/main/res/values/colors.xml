@@ -12,4 +12,8 @@
     <color name="crop_circle_guide_color">#66FFFFFF</color>
     <color name="crop_area_renderer_edge_color">#FFFFFFFF</color>
     <color name="crop_area_renderer_outer_color">#7F000000</color>
+    <color name="text_primary">#000000</color>
+    <color name="text_secondary">#222222</color>
+    <color name="background_body">#F2F4F8</color>
+    <color name="background_surface">#FFFFFF</color>
 </resources>

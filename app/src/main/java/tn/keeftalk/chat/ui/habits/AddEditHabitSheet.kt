@@ -168,7 +168,22 @@ fun AddEditHabitSheet(
     var showAllIconsDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    val units = listOf("min", "hr", "pages", "km", "mi", "reps", "steps", "glasses", "kcal", "L")
+    val customUnitsStoreKey = "custom_habit_units"
+    val defaultUnits = listOf("min", "hr", "pages", "km", "mi", "reps", "steps", "glasses", "kcal", "L", "sessions", "sets", "cups")
+    
+    var customUnitsList by remember {
+        mutableStateOf(
+            runCatching {
+                val stored = tn.keeftalk.chat.util.KeeftalkStore.getInstance().getString(customUnitsStoreKey, "")
+                if (!stored.isNullOrBlank()) stored.split(",").map { it.trim() }.filter { it.isNotEmpty() } else emptyList()
+            }.getOrDefault(emptyList())
+        )
+    }
+
+    val units = (defaultUnits + customUnitsList).distinct()
+
+    var showAddCustomUnitDialog by remember { mutableStateOf(false) }
+    var customUnitInput by remember { mutableStateOf("") }
     val slots = listOf("Early Morning", "Morning", "Midday", "Afternoon", "Evening", "Late Night")
     val weekdays = listOf(
         DayOfWeek.SUNDAY to "Sun",
@@ -339,6 +354,13 @@ fun AddEditHabitSheet(
                             selected = unit == u,
                             onClick = { unit = u },
                             label = { Text(u) }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = false,
+                            onClick = { showAddCustomUnitDialog = true },
+                            label = { Text("+ Custom") }
                         )
                     }
                 }
@@ -887,5 +909,38 @@ fun AddEditHabitSheet(
                 }
             }
         }
+    }
+
+    if (showAddCustomUnitDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddCustomUnitDialog = false },
+            title = { Text("Add Custom Unit") },
+            text = {
+                OutlinedTextField(
+                    value = customUnitInput,
+                    onValueChange = { customUnitInput = it },
+                    placeholder = { Text("e.g. chapters, bowls") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val trimmed = customUnitInput.trim()
+                    if (trimmed.isNotBlank() && !units.contains(trimmed)) {
+                        val updatedCustom = customUnitsList + trimmed
+                        customUnitsList = updatedCustom
+                        runCatching {
+                            tn.keeftalk.chat.util.KeeftalkStore.getInstance().putString(customUnitsStoreKey, updatedCustom.joinToString(","))
+                        }
+                        unit = trimmed
+                    }
+                    customUnitInput = ""
+                    showAddCustomUnitDialog = false
+                }) { Text("Add") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddCustomUnitDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }

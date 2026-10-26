@@ -114,7 +114,7 @@ class CallLogManager(
                     isVerified = profile?.isVerified ?: false,
                     number = profile?.phone ?: entry.number
                 )
-            } else if (!entry.isKeeftalk && entry.number.isNotEmpty()) {
+            } else if (!entry.isKeeftalk && entry.number.isNotEmpty() && entry.number != "Unknown Number") {
                 // 1. Try matching with Keeftalk Profiles
                 val profile = searchableProfiles.find { it.phone == entry.number }
                 if (profile != null) {
@@ -181,14 +181,21 @@ class CallLogManager(
                         CallLog.Calls.OUTGOING_TYPE -> CallLogType.OUTGOING
                         CallLog.Calls.MISSED_TYPE -> CallLogType.MISSED
                         CallLog.Calls.REJECTED_TYPE -> CallLogType.REJECTED
+                        CallLog.Calls.BLOCKED_TYPE -> CallLogType.REJECTED
+                        CallLog.Calls.VOICEMAIL_TYPE -> CallLogType.INCOMING
+                        CallLog.Calls.ANSWERED_EXTERNALLY_TYPE -> CallLogType.INCOMING
                         else -> CallLogType.INCOMING
                     }
+
+                    val rawNumber = number ?: ""
+                    val displayNumber = if (rawNumber.isBlank() || rawNumber == "-1") "Unknown Number" else rawNumber
+                    val displayName = name?.takeIf { n -> n.isNotBlank() }
 
                     entries.add(
                         CallLogEntry(
                             id = "gsm_$date",
-                            name = name,
-                            number = number ?: "",
+                            name = displayName,
+                            number = displayNumber,
                             timestamp = date,
                             duration = duration,
                             type = logType,

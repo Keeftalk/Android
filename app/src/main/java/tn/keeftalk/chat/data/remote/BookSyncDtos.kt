@@ -270,8 +270,9 @@ data class BookSettingsSyncDto(
     @SerialName("sync_across_devices") val syncAcrossDevices: Boolean = true,
     @SerialName("daily_goal_minutes") val dailyGoalMinutes: Int = 30,
     @SerialName("yearly_goal_books") val yearlyGoalBooks: Int = 24,
-    @SerialName("pdf_dpi_option") val pdfDpiOption: String = "lowest",
-    @SerialName("pdf_custom_dpi") val pdfCustomDpi: Int = 200,
+    @SerialName("pdf_dpi_option") val pdfDpiOption: String = "custom",
+    @SerialName("pdf_custom_dpi") val pdfCustomDpi: Int = 400,
+    @SerialName("show_timer_badge") val showTimerBadge: Boolean = false,
     @SerialName("updated_at") val updatedAt: Long = System.currentTimeMillis()
 ) {
     fun toDomain(): BookSettings {
@@ -289,7 +290,8 @@ data class BookSettingsSyncDto(
             dailyGoalMinutes = dailyGoalMinutes,
             yearlyGoalBooks = yearlyGoalBooks,
             pdfDpiOption = pdfDpiOption,
-            pdfCustomDpi = pdfCustomDpi
+            pdfCustomDpi = pdfCustomDpi,
+            showTimerBadge = showTimerBadge
         )
     }
 
@@ -310,7 +312,8 @@ data class BookSettingsSyncDto(
                 dailyGoalMinutes = domain.dailyGoalMinutes,
                 yearlyGoalBooks = domain.yearlyGoalBooks,
                 pdfDpiOption = domain.pdfDpiOption,
-                pdfCustomDpi = domain.pdfCustomDpi
+                pdfCustomDpi = domain.pdfCustomDpi,
+                showTimerBadge = domain.showTimerBadge
             )
         }
     }

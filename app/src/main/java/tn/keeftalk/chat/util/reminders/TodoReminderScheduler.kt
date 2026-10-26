@@ -90,5 +90,39 @@ object TodoReminderScheduler {
             )
             alarmManager.cancel(pendingIntent)
         }
+        cancelUndatedTaskReminder(context, taskId)
+    }
+
+    fun scheduleUndatedTaskReminder(
+        context: Context,
+        taskId: String,
+        taskTitle: String,
+        createdAtMillis: Long
+    ) {
+        val now = System.currentTimeMillis()
+        var nextTrigger = createdAtMillis + (24 * 3600 * 1000L)
+        if (nextTrigger <= now) {
+            nextTrigger = now + (24 * 3600 * 1000L)
+        }
+        scheduleSingleAlarm(
+            context,
+            taskId,
+            taskTitle,
+            nextTrigger,
+            "UNDATED_REMINDER",
+            ("todo_undated_" + taskId).hashCode()
+        )
+    }
+
+    fun cancelUndatedTaskReminder(context: Context, taskId: String) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val intent = Intent(context, TodoReminderReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            ("todo_undated_" + taskId).hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
     }
 }

@@ -69,6 +69,14 @@ class HabitReminderReceiver : BroadcastReceiver() {
             try {
                 if (habitId != null) {
                     val db = AppModule.provideDatabase(context)
+                    val today = java.time.LocalDate.now()
+                    val checkIns = db.nativeHabitDao().getAllCheckIns().firstOrNull()?.map { it.toDomain() } ?: emptyList()
+                    val isCompletedToday = checkIns.any { it.habitId == habitId && it.date == today && it.completed }
+                    if (isCompletedToday) {
+                        HabitReminderManager.cancelReminder(context, habitId)
+                        return@launch
+                    }
+
                     val habitEntity = db.nativeHabitDao().getAllHabits().firstOrNull()?.find { it.id == habitId }
                     if (habitEntity != null && !habitEntity.deleted) {
                         val habit = habitEntity.toDomain()

@@ -1,7 +1,11 @@
 <resources>
     <style name="Theme.Keeftalk" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">#006684</item>
-        <item name="android:windowBackground">?android:attr/colorBackground</item>
+        <item name="colorSurface">@color/background_surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:windowBackground">@color/background_body</item>
     </style>
 
     <style name="ShapeAppearance.Keeftalk.Circle" parent="">

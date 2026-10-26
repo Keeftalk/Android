@@ -5,6 +5,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.*
 import tn.keeftalk.chat.data.local.dao.TodoDao
 import tn.keeftalk.chat.data.local.entities.TodoListEntity
 import tn.keeftalk.chat.data.local.entities.TodoTaskEntity
@@ -103,12 +104,17 @@ class TodoRepositoryImpl(
             }
             if (triggerTime > 0L) {
                 tn.keeftalk.chat.util.reminders.TodoReminderScheduler.scheduleAllTaskAlarms(context, task.id, task.title, triggerTime)
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelUndatedTaskReminder(context, task.id)
             } else {
                 tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, task.id)
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.scheduleUndatedTaskReminder(context, task.id, task.title, task.createdAt)
             }
         } else {
             tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, task.id)
+            tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelUndatedTaskReminder(context, task.id)
         }
+
+        syncTaskToCalendar(entity)
 
         runCatching {
             remoteDataSource.upsertTask(TodoTaskDto.fromEntity(entity))
@@ -120,6 +126,17 @@ class TodoRepositoryImpl(
         val timestamp = System.currentTimeMillis()
         todoDao.softDeleteTask(taskId, timestamp)
         tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, taskId)
+        tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelUndatedTaskReminder(context, taskId)
+
+        try {
+            val db = AppModule.provideDatabase(context)
+            val itemDetails = db.calendarDao().getItemById(taskId)
+            if (itemDetails != null) {
+                db.calendarDao().deleteItem(itemDetails.item)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("TodoRepositoryImpl", "Error removing calendar item on delete", e)
+        }
     }
 
     override suspend fun clearCompleted() {
@@ -147,7 +164,11 @@ class TodoRepositoryImpl(
         val userId = getUserId()
         runCatching {
             val remoteTasks = remoteDataSource.fetchTasks(userId)
-            remoteTasks.forEach { todoDao.upsertTask(it.toEntity()) }
+            remoteTasks.forEach {
+                val entity = it.toEntity()
+                todoDao.upsertTask(entity)
+                syncTaskToCalendar(entity)
+            }
             val remoteLists = remoteDataSource.fetchLists(userId)
             remoteLists.forEach { todoDao.upsertList(it.toEntity()) }
 
@@ -156,7 +177,124 @@ class TodoRepositoryImpl(
             pending.forEach {
                 remoteDataSource.upsertTask(TodoTaskDto.fromEntity(it))
                 todoDao.updateTaskSyncState(it.id, "SYNCED")
+                syncTaskToCalendar(it)
             }
+        }
+    }
+
+    private fun parseDueDateToMillis(dueDate: String, reminder: String): Long? {
+        if (reminder.isNotBlank()) {
+            return runCatching {
+                java.time.LocalDateTime.parse(reminder).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }.getOrNull()
+        }
+        if (dueDate.isNotBlank()) {
+            return runCatching {
+                java.time.LocalDate.parse(dueDate).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() + (9 * 3600 * 1000)
+            }.getOrNull()
+        }
+        return null
+    }
+
+    private suspend fun syncTaskToCalendar(task: TodoTaskEntity) {
+        try {
+            val db = AppModule.provideDatabase(context)
+            val calendarDao = db.calendarDao()
+            val cryptoManager = AppModule.provideCryptoManager(context)
+
+            val existingItemDetails = calendarDao.getItemById(task.id)
+
+            if (task.deleted) {
+                if (existingItemDetails != null) {
+                    calendarDao.deleteItem(existingItemDetails.item)
+                }
+                return
+            }
+
+            val dueDateMillis = parseDueDateToMillis(task.dueDate, task.reminder)
+            val calPriority = when(task.priority) {
+                0 -> tn.keeftalk.chat.domain.model.calendar.CalendarPriority.LOW
+                1 -> tn.keeftalk.chat.domain.model.calendar.CalendarPriority.MEDIUM
+                2 -> tn.keeftalk.chat.domain.model.calendar.CalendarPriority.HIGH
+                3 -> tn.keeftalk.chat.domain.model.calendar.CalendarPriority.URGENT
+                else -> tn.keeftalk.chat.domain.model.calendar.CalendarPriority.MEDIUM
+            }
+            val calStatus = if (task.completed) tn.keeftalk.chat.domain.model.calendar.CalendarStatus.COMPLETED else tn.keeftalk.chat.domain.model.calendar.CalendarStatus.PENDING
+
+            if (existingItemDetails != null) {
+                var currentTitle = existingItemDetails.item.title
+                if (existingItemDetails.item.encryptedDescription != null && existingItemDetails.item.iv != null) {
+                    runCatching {
+                        val encryptedObj = tn.keeftalk.chat.security.crypto.EncryptedObject(
+                            version = existingItemDetails.item.cryptoVersion,
+                            keyId = "root",
+                            iv = existingItemDetails.item.iv,
+                            ciphertext = existingItemDetails.item.encryptedDescription
+                        )
+                        val decryptedBytes = cryptoManager.decryptFromStorage(encryptedObj, tn.keeftalk.chat.security.crypto.CryptoManager.StoragePurpose.AGENDA)
+                        val json = Json.parseToJsonElement(String(decryptedBytes, Charsets.UTF_8)).jsonObject
+                        currentTitle = json["title"]?.jsonPrimitive?.content ?: task.title
+                    }
+                }
+
+                if (currentTitle == task.title &&
+                    existingItemDetails.item.description == task.notes &&
+                    existingItemDetails.item.startTime == dueDateMillis &&
+                    existingItemDetails.item.priority == calPriority &&
+                    existingItemDetails.item.status == calStatus
+                ) {
+                    return
+                }
+            }
+
+            val sensitiveData = buildJsonObject {
+                put("title", JsonPrimitive(task.title))
+                put("description", JsonPrimitive(task.notes))
+            }
+            val encrypted = cryptoManager.encryptForStorage(
+                sensitiveData.toString().toByteArray(Charsets.UTF_8),
+                tn.keeftalk.chat.security.crypto.CryptoManager.StoragePurpose.AGENDA
+            )
+
+            val calendarEntity = tn.keeftalk.chat.data.local.entities.CalendarItemEntity(
+                id = task.id,
+                type = tn.keeftalk.chat.domain.model.calendar.CalendarItemType.TASK,
+                title = "[Encrypted]",
+                description = "",
+                color = "#6C63FF",
+                icon = null,
+                location = null,
+                startTime = dueDateMillis,
+                endTime = dueDateMillis?.plus(3600000L),
+                isAllDay = task.reminder.isBlank(),
+                timezone = java.util.TimeZone.getDefault().id,
+                recurrenceRule = null,
+                priority = calPriority,
+                status = calStatus,
+                isPrivate = false,
+                ownerId = task.userId,
+                categoryId = null,
+                createdAt = task.createdAt,
+                updatedAt = task.updatedAt,
+                meetingType = null,
+                meetingLink = null,
+                progress = if (task.completed) 100 else 0,
+                pomodoroCount = 0,
+                deadline = dueDateMillis,
+                parentItemId = null,
+                pendingSync = true,
+                encryptedDescription = encrypted.ciphertext,
+                iv = encrypted.iv,
+                cryptoVersion = encrypted.version
+            )
+
+            calendarDao.upsertCalendarItem(
+                calendarEntity,
+                existingItemDetails?.attendees?.map { it.attendee } ?: emptyList(),
+                existingItemDetails?.reminders ?: emptyList()
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("TodoRepositoryImpl", "Error syncing task to calendar", e)
         }
     }
 }

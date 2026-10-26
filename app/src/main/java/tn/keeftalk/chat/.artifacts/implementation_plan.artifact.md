@@ -1,57 +1,49 @@
-# Fix Vault Upload Failure After Cold Restart
+# Implementation Plan - Keeftalk Time, My Calls, and My Habits Fixes
 
-This plan addresses the "StandaloneCoroutine was cancelled" error occurring during Vault uploads after an app cold restart. The root cause is a race condition between authentication/security initialization and the UI lifecycle, leading to transient UI state changes that cancel the upload's coroutine scope.
+Fix issues in Keeftalk Time, My Calls, and My Habits while reusing existing architecture, database models, and UI components.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> The fix involves moving the actual upload orchestration to a repository-level scope. This means uploads will continue in the background even if the user navigates away from the Vault screen. The UI will observe these uploads via a new state flow in the repository.
+> - **Keeftalk Time**: Background ticks and usage accumulation are capped to prevent 25-hour spikes, and zero-usage features are hidden from the time breakdown.
+> - **My Calls**: Outgoing calls default to GSM; Keeftalk audio/video calls use internet calling with graceful fallback/error messages if unavailable. Unknown contacts show the generic user icon instead of a question mark.
+> - **My Habits**: Completed habits suppress reminder notifications. Pending alarms are cancelled upon completion/deletion. Custom targets and units can be added via a "+" action and persist across sessions.
 
 ## Proposed Changes
 
-### 1. Security & Auth Readiness
+### 1. Keeftalk Time
+#### [MODIFY] [TimeTrackingManager.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/data/repository/TimeTrackingManager.kt)
+- Cap `elapsedMillis` per tick to a maximum safe interval (e.g. 15,000ms) to eliminate background sleep/resume spikes (25 hours on Friday bug).
 
-#### [MODIFY] [SecurityManager.kt](file:///home/m-abidi/keeftalk/app/src/main/java/com/keeftalk/chat/security/crypto/SecurityManager.kt)
-- Make `initializeForUser` idempotent by checking if the context is already `READY` for the same user.
-- Ensure concurrent calls to `getEncryptionContext` wait on the same state flow.
+#### [MODIFY] [TimeOnKeeftalkViewModel.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/ui/settings/TimeOnKeeftalkViewModel.kt)
+- Filter `featureDistribution` to hide features with zero recorded usage time (`minutes <= 0f`). Ensure My Din (`MY_DIN`) is properly tracked and displayed.
 
-#### [MODIFY] [AuthRepositoryImpl.kt](file:///home/m-abidi/keeftalk/app/src/main/java/com/keeftalk/chat/data/repository/AuthRepositoryImpl.kt)
-- Dampen the `NotAuthenticated` session status during startup. Avoid immediate `isLogged = false` emissions if a session might be restoring.
-- Add an `awaitReady()` function that suspends until both Auth and Security are fully initialized.
+### 2. My Calls & Unknown Contacts
+#### [MODIFY] [AvatarUtils.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/util/AvatarUtils.kt) & [KeeftalkAvatar.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/ui/components/KeeftalkAvatar.kt)
+- Replace question mark (`?`) initials for unknown contacts with generic user icon (`icons.user`).
 
-### 2. Upload Pipeline Robustness
+#### [MODIFY] [CallListScreen.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/ui/screens/CallListScreen.kt) & [CallListViewModel.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/ui/screens/CallListViewModel.kt)
+- Use GSM calling by default for dialer calls.
+- Show message-circle icon (`icons.messageCircle`) for Keeftalk accounts to open chats.
+- Slightly reduce GSM call icon size and add separate Keeftalk Audio-Call and Video-Call buttons using internet calling infrastructure. Display appropriate error messages if internet calling is unavailable.
 
-#### [MODIFY] [FileUploadManager.kt](file:///home/m-abidi/keeftalk/app/src/main/java/com/keeftalk/chat/util/FileUploadManager.kt)
-- Properly handle `CancellationException` in the upload pipeline to ensure structured concurrency is respected while providing meaningful failure logs for non-cancellation errors.
-- Ensure the `channel` writer is tied to the parent coroutine's lifecycle correctly.
+### 3. My Habits
+#### [MODIFY] [HabitReminderReceiver.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/util/reminders/HabitReminderReceiver.kt) & [HabitsRepositoryImpl.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/data/repository/HabitsRepositoryImpl.kt)
+- Check completion status before firing reminders; do not notify for completed habits.
+- Cancel pending alarms via `HabitReminderManager.cancelReminder` when a habit is completed, rescheduled, or deleted.
 
-#### [MODIFY] [VaultRepositoryImpl.kt](file:///home/m-abidi/keeftalk/app/src/main/java/com/keeftalk/chat/data/repository/VaultRepositoryImpl.kt)
-- Implement an `activeUploads` flow to track long-running uploads.
-- Move the core upload logic into the repository's `scope` (SupervisorJob + IO) so it survives transient UI changes.
-- Ensure `uploadFile` waits for system readiness before proceeding.
-
-### 3. UI Synchronization
-
-#### [MODIFY] [VaultViewModel.kt](file:///home/m-abidi/keeftalk/app/src/main/java/com/keeftalk/chat/ui/vault/VaultViewModel.kt)
-- Observe the `activeUploads` flow from `VaultRepository` instead of managing local `uploadJobs`.
-- Delegate upload start/cancel to the repository.
+#### [MODIFY] [AddEditHabitSheet.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/ui/habits/AddEditHabitSheet.kt) & [HabitsViewModel.kt](file:///home/m/StudioProjects/Android/app/src/main/java/tn/keeftalk/chat/ui/habits/HabitsViewModel.kt)
+- Expand available target types and units. Add a "+" action to create custom targets/units and persist them in `KeeftalkStore`.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `VaultRepositoryImplTest.kt` (if it exists) to verify upload logic.
-- Run `SecurityManagerTest.kt` to ensure idempotency and readiness waiting.
+- Run `./gradlew test` (unit tests for habits, time tracking, etc.).
+- Build the app via `./gradlew assembleDebug`.
 
 ### Manual Verification
-1. **Fresh Login:** Verify uploads work after initial login.
-2. **Cold Restart Reproduction:**
-   - Force-stop the app.
-   - Launch and wait for UI.
-   - Immediately upload a file.
-   - Verify it no longer fails with `StandaloneCoroutine was cancelled` and eventually succeeds.
-3. **Navigation during Upload:**
-   - Start a large upload.
-   - Navigate to Chat and back.
-   - Verify upload progress is preserved and continues.
-4. **Auth Bounce Simulation:**
-   - Verify that transient "NotAuthenticated" states during startup do not cause the UI to flip to the Auth screen.
+- Verify time breakdown hides zero-usage features and time calculation is correct.
+- Verify dialer default to GSM, message-circle icon for Keeftalk users, and separate voice/video call buttons.
+- Verify unknown contacts show user icon instead of question mark.
+- Verify completed habits do not receive repeat notifications.
+- Verify custom habit targets/units persistence.

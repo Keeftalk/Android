@@ -67,7 +67,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@color/text_primary"
             android:textSize="17sp"
             android:textStyle="bold"
             tools:text="John Doe" />
@@ -97,7 +97,7 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="?android:attr/textColorSecondary"
+                android:textColor="@color/text_secondary"
                 android:textSize="14sp"
                 tools:text="Hey, how is it going? This is a long message to test ellipsize." />
         </LinearLayout>
@@ -125,7 +125,7 @@
             android:id="@+id/time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:textSize="11sp"
             tools:text="17:45" />
 

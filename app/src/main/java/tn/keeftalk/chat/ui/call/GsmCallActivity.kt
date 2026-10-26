@@ -102,6 +102,12 @@ fun GsmCallScreen(onDismiss: () -> Unit) {
     }
 
     val number = call?.details?.handle?.schemeSpecificPart ?: "Unknown"
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val contactName = remember(number) {
+        runCatching {
+            tn.keeftalk.chat.data.local.PhoneContactManager(context).getContactName(context, number)
+        }.getOrNull()
+    }
 
     Box(
         modifier = Modifier
@@ -148,11 +154,19 @@ fun GsmCallScreen(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = number,
+                text = contactName ?: number,
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 fontWeight = FontWeight.Medium
             )
+            if (contactName != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = number,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 

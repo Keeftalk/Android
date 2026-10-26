@@ -11,7 +11,7 @@ enum class CalendarItemType : Parcelable {
 }
 
 enum class CalendarPriority {
-    LOW, MEDIUM, HIGH
+    LOW, MEDIUM, HIGH, URGENT
 }
 
 enum class CalendarStatus {

@@ -60,7 +60,7 @@ class TimeTrackingManager private constructor(context: Context) {
             return
         }
         val now = System.currentTimeMillis()
-        val elapsedMillis = now - lastTickTimestamp
+        val elapsedMillis = (now - lastTickTimestamp).coerceAtMost(15_000L) // Cap at 15s to prevent sleep/resume spikes (e.g. 25h Friday bug)
         lastTickTimestamp = now
         if (elapsedMillis <= 0) return
 

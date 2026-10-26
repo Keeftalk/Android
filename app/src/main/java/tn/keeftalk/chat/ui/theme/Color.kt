@@ -13,8 +13,8 @@ val BackgroundSurface = Color(0xFFFFFFFF)
 val BackgroundSurfaceAlt = Color(0xFFF8F9FC)
 val BackgroundSidebar = Color(0xFF1A1A2E)
 
-val TextPrimary = Color(0xFF1E1E2F)
-val TextSecondary = Color(0xFF5A5A72)
+val TextPrimary = Color(0xFF000000)
+val TextSecondary = Color(0xFF222222)
 val TextMuted = Color(0xFF8E8EA3)
 
 val BorderColor = Color(0xFFE9EAF0)

@@ -2413,7 +2413,8 @@ fun MainScaffold(
                                         AppModule.provideGoogleDriveService(context),
                                         AppModule.provideDropboxService(),
                                         AppModule.provideAuthRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideConnectivityObserver(context)
                                     )
                                 }
                                 VaultScreen(

@@ -96,6 +96,9 @@ class CalendarRepositoryImpl(
         
         val payload = Json.encodeToString(encryptedDto)
         calendarSyncQueueDao.insert(CalendarSyncQueueEntity(itemId = item.id, operation = "SAVE_CALENDAR_ITEM", payload = payload))
+        
+        syncCalendarItemToTodo(item)
+
         scope.launch { processSyncQueue() }
     }
 
@@ -104,6 +107,14 @@ class CalendarRepositoryImpl(
         calendarDao.deleteItem(item.toEntity())
         calendarSyncQueueDao.insert(CalendarSyncQueueEntity(itemId = item.id, operation = "DELETE_CALENDAR_ITEM", payload = null))
         
+        if (item.type == CalendarItemType.TASK) {
+            runCatching {
+                val db = AppModule.provideDatabase(context)
+                db.todoDao().softDeleteTask(item.id, System.currentTimeMillis())
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, item.id)
+            }
+        }
+
         val referenceManager = AppModule.provideFileReferenceManager(context)
         attachments.forEach { file ->
             referenceManager.removeReference(file.id)
@@ -551,4 +562,85 @@ class CalendarRepositoryImpl(
         role = role.name,
         status = status.name
     )
+
+    private suspend fun syncCalendarItemToTodo(item: CalendarItem) {
+        if (item.type != CalendarItemType.TASK) return
+        try {
+            val db = AppModule.provideDatabase(context)
+            val todoDao = db.todoDao()
+
+            val allTasks = todoDao.getAllTasks().firstOrNull() ?: emptyList()
+            val existingTask = allTasks.find { it.id == item.id }
+
+            val dateStr = if (item.startTime != null && item.startTime > 0L) {
+                java.time.Instant.ofEpochMilli(item.startTime)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate().toString()
+            } else ""
+
+            val reminderStr = if (!item.isAllDay && item.startTime != null && item.startTime > 0L) {
+                java.time.Instant.ofEpochMilli(item.startTime)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDateTime().toString()
+            } else ""
+
+            val todoPriority = when (item.priority) {
+                CalendarPriority.LOW -> 0
+                CalendarPriority.MEDIUM -> 1
+                CalendarPriority.HIGH -> 2
+                CalendarPriority.URGENT -> 3
+            }
+
+            val isCompleted = item.status == CalendarStatus.COMPLETED
+
+            if (existingTask != null) {
+                if (existingTask.title == item.title &&
+                    existingTask.notes == item.description &&
+                    existingTask.dueDate == dateStr &&
+                    existingTask.priority == todoPriority &&
+                    existingTask.completed == isCompleted &&
+                    existingTask.reminder == reminderStr &&
+                    !existingTask.deleted
+                ) {
+                    return
+                }
+            }
+
+            val todoEntity = tn.keeftalk.chat.data.local.entities.TodoTaskEntity(
+                id = item.id,
+                userId = item.ownerId.ifBlank { "user" },
+                title = item.title,
+                notes = item.description,
+                dueDate = dateStr,
+                priority = todoPriority,
+                listId = existingTask?.listId ?: "personal",
+                completed = isCompleted,
+                createdAt = item.createdAt,
+                completedAt = if (isCompleted) (existingTask?.completedAt?.takeIf { it > 0L } ?: item.updatedAt) else 0L,
+                reminder = reminderStr,
+                reminderFired = existingTask?.reminderFired ?: false,
+                updatedAt = item.updatedAt,
+                deleted = false,
+                syncState = "PENDING"
+            )
+
+            todoDao.upsertTask(todoEntity)
+
+            if (isCompleted) {
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelTaskReminder(context, item.id)
+                tn.keeftalk.chat.util.reminders.TodoReminderScheduler.cancelUndatedTaskReminder(context, item.id)
+            } else if (reminderStr.isNotBlank() || dateStr.isNotBlank()) {
+                val triggerTime = if (reminderStr.isNotBlank()) {
+                    runCatching { java.time.LocalDateTime.parse(reminderStr).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() }.getOrDefault(0L)
+                } else {
+                    runCatching { java.time.LocalDate.parse(dateStr).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() + (9 * 3600 * 1000) }.getOrDefault(0L)
+                }
+                if (triggerTime > System.currentTimeMillis()) {
+                    tn.keeftalk.chat.util.reminders.TodoReminderScheduler.scheduleAllTaskAlarms(context, item.id, item.title, triggerTime)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CalendarRepositoryImpl", "Error syncing calendar item to todo", e)
+        }
+    }
 }

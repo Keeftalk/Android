@@ -1027,81 +1027,125 @@ fun DialerBottomSheet(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Actions
+            val isKeeftalkUser = decision is DialerDecision.KeeftalkCall
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Message Action (Left)
-                IconButton(
-                    onClick = { viewModel.onMessageClick() },
-                    modifier = Modifier.size(64.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                    enabled = dialerInput.isNotEmpty()
-                ) {
-                    Icon(
-                        imageVector = icons.chat,
-                        contentDescription = "Message", 
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                // 1. SMS (Square Message)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(
+                        onClick = { viewModel.onMessageClick() },
+                        modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                        enabled = dialerInput.isNotEmpty()
+                    ) {
+                        Icon(
+                            imageVector = icons.messageSquare,
+                            contentDescription = "SMS", 
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("SMS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
-                var showCallMenu by remember { mutableStateOf(false) }
-
-                // Call Action (Center)
+                // 2. GSM Call
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    KeeftalkFab(
-                        icon = icons.phone,
-                        onClick = { viewModel.onCallClick() },
-                        enabled = dialerInput.isNotEmpty(),
-                        size = 80.dp,
-                        showPulse = false,
-                        onLongClick = {
-                            if (decision is DialerDecision.KeeftalkCall) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showCallMenu = true
-                            }
-                        }
-                    )
-
-                    DropdownMenu(
-                        expanded = showCallMenu,
-                        onDismissRequest = { showCallMenu = false }
+                    IconButton(
+                        onClick = { viewModel.launchGsmCall(dialerInput) },
+                        modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                        enabled = dialerInput.isNotEmpty()
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Keeftalk Voice") },
-                            leadingIcon = { Icon(icons.phone, null) },
-                            onClick = {
-                                showCallMenu = false
-                                viewModel.onCallClick(false)
-                            }
+                        Icon(
+                            imageVector = icons.phone,
+                            contentDescription = "GSM Call",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(24.dp)
                         )
-                        DropdownMenuItem(
-                            text = { Text("Keeftalk Video") },
-                            leadingIcon = { Icon(icons.camera, null) },
-                            onClick = {
-                                showCallMenu = false
-                                viewModel.onCallClick(true)
-                            }
-                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("GSM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                if (isKeeftalkUser) {
+                    // 3. Keeftalk Chat (Circle Message)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(
+                            onClick = { viewModel.onMessageClick() },
+                            modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
+                            enabled = dialerInput.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = icons.messageCircle,
+                                contentDescription = "Keeftalk Chat",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Chat", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    // 4. Keeftalk Audio Call
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(
+                            onClick = { viewModel.startKeeftalkCall(false) },
+                            modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
+                            enabled = dialerInput.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = icons.phone,
+                                contentDescription = "Keeftalk Audio",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Audio", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    // 5. Keeftalk Video Call
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(
+                            onClick = { viewModel.startKeeftalkCall(true) },
+                            modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
+                            enabled = dialerInput.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = icons.camera,
+                                contentDescription = "Keeftalk Video",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Video", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 // Clear All / Trash (Right)
-                IconButton(
-                    onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.clearDialer() 
-                    },
-                    modifier = Modifier
-                        .size(64.dp)
-                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), CircleShape),
-                    enabled = dialerInput.isNotEmpty()
-                ) {
-                    Icon(
-                        imageVector = icons.delete,
-                        contentDescription = "Clear All",
-                        tint = if (dialerInput.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.38f)
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.clearDialer() 
+                        },
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), CircleShape),
+                        enabled = dialerInput.isNotEmpty()
+                    ) {
+                        Icon(
+                            imageVector = icons.delete,
+                            contentDescription = "Clear All",
+                            tint = if (dialerInput.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.38f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Clear", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

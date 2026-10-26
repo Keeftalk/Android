@@ -153,8 +153,9 @@ CREATE TABLE IF NOT EXISTS public.user_book_settings (
     sync_across_devices BOOLEAN NOT NULL DEFAULT TRUE,
     daily_goal_minutes INT NOT NULL DEFAULT 30,
     yearly_goal_books INT NOT NULL DEFAULT 24,
-    pdf_dpi_option TEXT NOT NULL DEFAULT 'lowest',
-    pdf_custom_dpi INT NOT NULL DEFAULT 200,
+    pdf_dpi_option TEXT NOT NULL DEFAULT 'custom',
+    pdf_custom_dpi INT NOT NULL DEFAULT 400,
+    show_timer_badge BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

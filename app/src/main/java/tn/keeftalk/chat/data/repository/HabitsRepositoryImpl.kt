@@ -104,6 +104,9 @@ class HabitsRepositoryImpl(
         )
         if (completed) {
             nativeHabitDao.upsertCheckIn(checkIn.toEntity(syncState = "PENDING"))
+            context?.let { ctx ->
+                HabitReminderManager.cancelReminder(ctx, habitId)
+            }
         } else {
             nativeHabitDao.deleteCheckIn(habitId, date.toEpochDay())
         }

@@ -232,7 +232,7 @@ class TimeOnKeeftalkViewModel(application: Application) : AndroidViewModel(appli
                 minutes = mins,
                 percentage = pct
             )
-        }.sortedByDescending { it.minutes }
+        }.filter { it.minutes > 0f }.sortedByDescending { it.minutes }
 
         val topFeature = if (sumFeatureMins > 0f) (featureModels.firstOrNull { it.minutes > 0f }?.name ?: "None") else "None"
 

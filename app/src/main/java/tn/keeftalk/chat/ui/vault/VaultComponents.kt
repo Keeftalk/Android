@@ -1471,7 +1471,7 @@ fun EmptyFolderState(
 }
 
 @Composable
-fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null) {
+fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null, isOffline: Boolean = false) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1486,6 +1486,7 @@ fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = when {
+                        isOffline -> Icons.Default.CloudOff
                         tab == VaultTab.TRASH -> Icons.Default.Delete
                         selectedCategory == FileType.IMAGE -> Icons.Default.PhotoLibrary
                         selectedCategory == FileType.VIDEO -> Icons.Default.VideoLibrary
@@ -1502,6 +1503,7 @@ fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null) {
         Spacer(modifier = Modifier.height(24.dp))
         
         val title = when {
+            isOffline -> "You're offline"
             tab == VaultTab.TRASH -> "Trash is empty"
             selectedCategory != null -> "No ${selectedCategory.name.lowercase()}s found"
             tab == VaultTab.HOME -> "No recent files"
@@ -1515,6 +1517,7 @@ fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null) {
         )
         
         val description = when {
+            isOffline -> "No local cache is available for this view. Connect to the internet to sync and access your vault content."
             tab == VaultTab.TRASH -> "Deleted items will appear here for 30 days."
             selectedCategory != null -> "Try clearing the category filter to see all files."
             tab == VaultTab.HOME -> "Your recently uploaded files will appear here."
@@ -1525,7 +1528,8 @@ fun VaultEmptyState(tab: VaultTab, selectedCategory: FileType? = null) {
             text = description,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.padding(top = 4.dp)
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp).padding(top = 4.dp)
         )
     }
 }

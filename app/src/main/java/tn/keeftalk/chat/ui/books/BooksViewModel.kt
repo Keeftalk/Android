@@ -294,11 +294,12 @@ class BooksViewModel(
                     val percent = if (book.totalPages > 0) {
                         ((readPagesCount.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
                     } else 0
-                    if (percent != book.percentProgress) {
-                        val isNowDone = percent >= 100
+                    val finalPercent = maxOf(book.percentProgress, percent)
+                    if (finalPercent != book.percentProgress) {
+                        val isNowDone = finalPercent >= 100 || (readPagesCount >= book.totalPages && book.totalPages > 0)
                         val finishedAtVal = if (isNowDone && book.finishedAt == null) System.currentTimeMillis() else book.finishedAt
                         val updated = book.copy(
-                            percentProgress = percent,
+                            percentProgress = finalPercent,
                             markedDone = if (isNowDone) true else book.markedDone,
                             finishedAt = finishedAtVal,
                             updatedAt = System.currentTimeMillis()
@@ -1380,15 +1381,8 @@ class BooksViewModel(
     fun updatePagePosition(bookId: String, pageNumber: Int) {
         viewModelScope.launch {
             val book = bookRepository.getBookById(bookId) ?: return@launch
-            val percent = if (book.totalPages > 0) {
-                ((pageNumber.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
-            } else 0
-            val isNowDone = percent >= 100
             val updated = book.copy(
                 lastReadPage = pageNumber,
-                percentProgress = maxOf(book.percentProgress, percent),
-                markedDone = if (isNowDone) true else book.markedDone,
-                finishedAt = if (isNowDone && book.finishedAt == null) System.currentTimeMillis() else book.finishedAt,
                 updatedAt = System.currentTimeMillis()
             )
             bookRepository.saveBook(updated)
@@ -1448,15 +1442,11 @@ class BooksViewModel(
             val pageProgresses = bookRepository.getPageProgressForBook(progress.bookId)
             val readPagesCount = pageProgresses.count { it.isRead }
 
-            val posPercent = if (book.totalPages > 0) {
-                ((book.lastReadPage.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
-            } else 0
-
             val pageReadPercent = if (book.totalPages > 0) {
                 ((readPagesCount.toFloat() / book.totalPages.toFloat()) * 100).toInt().coerceIn(0, 100)
             } else 0
 
-            val percent = maxOf(book.percentProgress, posPercent, pageReadPercent)
+            val percent = maxOf(book.percentProgress, pageReadPercent)
 
             val isNowDone = percent >= 100 || (readPagesCount >= book.totalPages && book.totalPages > 0)
             val finishedAtVal = if (isNowDone && book.finishedAt == null) System.currentTimeMillis() else book.finishedAt

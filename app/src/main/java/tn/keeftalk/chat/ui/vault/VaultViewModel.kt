@@ -52,6 +52,7 @@ data class VaultUiState(
     val isDropboxLoading: Boolean = false,
     val showUpgradeDialog: Boolean = false,
     val pendingLargeFiles: List<File> = emptyList(),
+    val isOffline: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -80,7 +81,8 @@ class VaultViewModel(
     private val googleDriveService: GoogleDriveService,
     private val dropboxService: DropboxService,
     private val authRepository: tn.keeftalk.chat.domain.repository.AuthRepository,
-    val prefs: tn.keeftalk.chat.data.prefs.UserPreferencesRepository
+    val prefs: tn.keeftalk.chat.data.prefs.UserPreferencesRepository,
+    private val connectivityObserver: tn.keeftalk.chat.util.ConnectivityObserver? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VaultUiState())
@@ -101,8 +103,21 @@ class VaultViewModel(
         observeChatsAndContacts()
         observeImportState()
         observeCloudImportResults()
+        observeConnectivity()
         startPeriodicSync()
         startAutoLockObserver()
+    }
+
+    private fun observeConnectivity() {
+        connectivityObserver?.let { observer ->
+            viewModelScope.launch {
+                observer.observe().collect { status ->
+                    val offline = status == tn.keeftalk.chat.util.ConnectivityObserver.Status.Unavailable ||
+                                  status == tn.keeftalk.chat.util.ConnectivityObserver.Status.Lost
+                    _uiState.update { it.copy(isOffline = offline) }
+                }
+            }
+        }
     }
 
     private var autoLockJob: Job? = null
