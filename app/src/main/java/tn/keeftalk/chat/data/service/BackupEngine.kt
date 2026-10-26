@@ -43,10 +43,18 @@ class BackupEngine(
      */
     val publicBackupDirectory: File
         get() {
-            val rootStorage = Environment.getExternalStorageDirectory()
-            return File(rootStorage, "Keeftalk/backups").apply {
-                if (!exists()) {
-                    mkdirs()
+            return try {
+                val rootStorage = Environment.getExternalStorageDirectory()
+                File(rootStorage, "Keeftalk/backups").apply {
+                    if (!exists()) {
+                        mkdirs()
+                    }
+                }
+            } catch (e: Exception) {
+                File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: context.filesDir, "Keeftalk/backups").apply {
+                    if (!exists()) {
+                        mkdirs()
+                    }
                 }
             }
         }
@@ -192,15 +200,19 @@ class BackupEngine(
             }
             tempOutput.renameTo(currentBackupFile)
 
-            // 6. Save a copy to Public Ordinary Storage: Storage/Keeftalk/backups/
-            val publicDir = publicBackupDirectory
-            val publicFile = File(publicDir, "current_backup.ktb")
-            if (publicFile.exists()) publicFile.delete()
-            currentBackupFile.copyTo(publicFile, overwrite = true)
+            // 6. Save a copy to Public Ordinary Storage (optional, fail-safe)
+            try {
+                val publicDir = publicBackupDirectory
+                val publicFile = File(publicDir, "current_backup.ktb")
+                if (publicFile.exists()) publicFile.delete()
+                currentBackupFile.copyTo(publicFile, overwrite = true)
 
-            val timeStampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val timestampedFile = File(publicDir, "Keeftalk_Backup_$timeStampStr.ktb")
-            currentBackupFile.copyTo(timestampedFile, overwrite = true)
+                val timeStampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                val timestampedFile = File(publicDir, "Keeftalk_Backup_$timeStampStr.ktb")
+                currentBackupFile.copyTo(timestampedFile, overwrite = true)
+            } catch (e: Exception) {
+                android.util.Log.e("BackupEngine", "Failed to save copy to public storage: ${e.message}", e)
+            }
 
             Result.success(currentBackupFile)
         } catch (e: Exception) {

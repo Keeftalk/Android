@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#-version"><img src="https://img.shields.io/badge/Version-1.0-00C853?style=for-the-badge&logo=android&logoColor=white" alt="Version 1.0"></a>
+  <a href="#-version"><img src="https://img.shields.io/badge/Version-1.1-00C853?style=for-the-badge&logo=android&logoColor=white" alt="Version 1.1"></a>
   <a href="#-tech-stack--architecture"><img src="https://img.shields.io/badge/Target%20SDK-37%20%28Android%2016%29-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Target SDK"></a>
   <a href="#-tech-stack--architecture"><img src="https://img.shields.io/badge/Min%20SDK-26%20%28Android%208.0%29-FF6D00?style=for-the-badge&logo=android&logoColor=white" alt="Min SDK"></a>
   <a href="#-cryptographic-architecture"><img src="https://img.shields.io/badge/Security-AEK%20%2B%20AES--256--GCM-D50000?style=for-the-badge&logo=1password&logoColor=white" alt="Security"></a>
@@ -24,15 +24,15 @@
 ## 📑 Table of Contents
 - [📖 Concept & Core Philosophy](#-concept--core-philosophy)
 - [➕ The 19 FAB Quick-Access Features (`+` Menu)](#-the-19-fab-quick-access-features--menu)
-- [✨ Version 1.0 Features Breakdown](#-version-1-0-features-breakdown)
+- [✨ Version 1.1 Features Breakdown](#-version-1-1-features-breakdown)
 - [📐 System Architecture & Diagrams](#-system-architecture--diagrams)
   - [Ecosystem Feature Matrix](#ecosystem-feature-matrix)
   - [Layered Technical Architecture](#layered-technical-architecture)
   - [Zero-Knowledge Key Derivation & Cryptographic Flow](#zero-knowledge-key-derivation--cryptographic-flow)
   - [End-to-End Encrypted Message Delivery Pipeline](#end-to-end-encrypted-message-delivery-pipeline)
   - [Zero-Knowledge Data Privacy Model](#zero-knowledge-data-privacy-model)
-- [🛡️ Privacy Policy (v1.0)](#️-privacy-policy-v10)
-- [📜 Terms of Service (v1.0)](#-terms-of-service-v10)
+- [🛡️ Privacy Policy (v1.1)](#️-privacy-policy-v11)
+- [📜 Terms of Service (v1.1)](#-terms-of-service-v11)
 - [🏗 Tech Stack & Dependencies](#-tech-stack--dependencies)
 - [📦 Project Structure](#-project-structure)
 - [🛠️ Building & Installation](#️-building--installation)
@@ -43,7 +43,7 @@
 
 ## 📖 Concept & Core Philosophy
 
-In an era dominated by corporate data harvest, pervasive advertising tracking, and fragmented single-purpose applications, **Keeftalk v1.0** introduces a revolutionary paradigm: **The Zero-Knowledge Super App**.
+In an era dominated by corporate data harvest, pervasive advertising tracking, and fragmented single-purpose applications, **Keeftalk v1.1** introduces a revolutionary paradigm: **The Zero-Knowledge Super App**.
 
 Keeftalk merges your communications, confidential files, productivity tools, web browsing, financial tracking, and social interactions into a single, unified Android experience—without sacrificing an ounce of privacy. 
 
@@ -82,7 +82,7 @@ At the heart of Keeftalk's intuitive navigation is the adaptive **Floating Actio
 
 ---
 
-## ✨ Version 1.0 Features Breakdown
+## ✨ Version 1.1 Features Breakdown
 
 ### 1. Unified E2EE Communications & Carrier SMS/MMS
 - **Signal-Inspired E2EE Messaging:** Utilizes Account Encryption Keys (AEK) and Per-Conversation Keys (PCK) derived via Argon2id + AES-256-GCM.
@@ -271,7 +271,7 @@ flowchart TD
 
 ---
 
-## 🛡️ Privacy Policy (v1.0)
+## 🛡️ Privacy Policy (v1.1)
 
 **Effective Date:** January 1, 2026  
 **Publisher:** Keeftalk LLC  
@@ -307,10 +307,10 @@ You retain complete ownership over your data:
 
 ---
 
-## 📜 Terms of Service (v1.0)
+## 📜 Terms of Service (v1.1)
 
 **Effective Date:** January 1, 2026  
-**Version:** 1.0 Release  
+**Version:** 1.1 Release  
 
 Please read these Terms of Service ("Terms") carefully before using the Keeftalk mobile application ("Application" or "Service") operated by Keeftalk LLC ("us", "we", or "our").
 

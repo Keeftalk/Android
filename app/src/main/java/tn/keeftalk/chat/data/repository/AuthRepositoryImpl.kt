@@ -601,43 +601,52 @@ class AuthRepositoryImpl(
         Result.failure(e)
     }
 
+    private val r2StorageClient: tn.keeftalk.chat.util.R2StorageClient
+        get() = tn.keeftalk.chat.util.R2StorageClient({ getSupabase() })
+
     override suspend fun uploadAvatar(byteArray: ByteArray): Result<String> = try {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
-        val storageConfig = prefs.getAssignedStorageConfig()
-        val countryCode = storageConfig.countryCode
-        val publicBucket = storageConfig.buckets.public
-        val fileName = tn.keeftalk.chat.util.StorageConfig.buildUserKey(countryCode, userId, "avatars", "avatar_${UUID.randomUUID()}.jpg")
-        Log.d(TAG, "ENDPOINT: storage/avatars/upload | PATH: $fileName | Bucket: $publicBucket")
-        val bucket = supabase.storage[publicBucket]
-        bucket.upload(fileName, byteArray) {
-            upsert = true
-        }
-        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(fileName)
+        val fileId = UUID.randomUUID().toString()
+
+        val uploadTarget = r2StorageClient.getUploadUrl(
+            fileId = fileId,
+            category = "avatars",
+            subpath = "original",
+            contentType = "image/jpeg"
+        ).getOrThrow()
+
+        r2StorageClient.uploadByteArray(uploadTarget.url, byteArray, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(fileId, uploadTarget.objectKey)
+
+        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(uploadTarget.objectKey)
         PersistentAvatarManager.saveAvatar(context, userId, byteArray)
         Result.success(url)
     } catch (e: Exception) {
-        Log.e(TAG, "ENDPOINT: storage/avatars/upload | ERROR: ${e.message}")
+        Log.e(TAG, "ENDPOINT: storage/avatars/upload | ERROR: ${e.message}", e)
         Result.failure(e)
     }
 
     override suspend fun uploadCover(byteArray: ByteArray): Result<String> = try {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
-        val storageConfig = prefs.getAssignedStorageConfig()
-        val countryCode = storageConfig.countryCode
-        val publicBucket = storageConfig.buckets.public
-        val fileName = tn.keeftalk.chat.util.StorageConfig.buildUserKey(countryCode, userId, "covers", "cover_${UUID.randomUUID()}.jpg")
-        Log.d(TAG, "ENDPOINT: storage/covers/upload | PATH: $fileName | Bucket: $publicBucket")
-        val bucket = supabase.storage[publicBucket]
-        bucket.upload(fileName, byteArray) {
-            upsert = true
-        }
-        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(fileName)
+        val fileId = UUID.randomUUID().toString()
+
+        val uploadTarget = r2StorageClient.getUploadUrl(
+            fileId = fileId,
+            category = "covers",
+            subpath = "original",
+            contentType = "image/jpeg"
+        ).getOrThrow()
+
+        r2StorageClient.uploadByteArray(uploadTarget.url, byteArray, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(fileId, uploadTarget.objectKey)
+
+        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(uploadTarget.objectKey)
         PersistentAvatarManager.saveAvatar(context, userId, byteArray)
         Result.success(url)
     } catch (e: Exception) {
-        Log.e(TAG, "ENDPOINT: storage/covers/upload | ERROR: ${e.message}")
+        Log.e(TAG, "ENDPOINT: storage/covers/upload | ERROR: ${e.message}", e)
         Result.failure(e)
     }
 

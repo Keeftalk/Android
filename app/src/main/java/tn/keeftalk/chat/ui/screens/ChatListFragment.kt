@@ -102,6 +102,13 @@ class ChatListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val currentUserId = mainViewModel.userPreferences.value.userId
+        val themeMode = mainViewModel.userPreferences.value.themeMode
+        val isSystemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val isDark = when (themeMode) {
+            "DARK" -> true
+            "LIGHT" -> false
+            else -> isSystemDark
+        }
         
         // Phase 0: Use standard adapter for the very first frame (Lightweight)
         val skeletonAdapter = ChatListAdapter(
@@ -112,7 +119,8 @@ class ChatListFragment : Fragment() {
             }, 
             { onChatLongClick?.invoke(it) }, 
             currentUserId,
-            mainViewModel.userPreferences.value.appCustomization.chatSpacingMultiplier
+            mainViewModel.userPreferences.value.appCustomization.chatSpacingMultiplier,
+            isDark
         )
         recyclerView.adapter = skeletonAdapter
 
@@ -172,6 +180,13 @@ class ChatListFragment : Fragment() {
                     // Switch to paging adapter on first real data arrival
                     if (recyclerView.adapter !is ChatPagingAdapter) {
                         val currentUserId = mainViewModel.userPreferences.value.userId
+                        val themeMode = mainViewModel.userPreferences.value.themeMode
+                        val isSystemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                        val isDark = when (themeMode) {
+                            "DARK" -> true
+                            "LIGHT" -> false
+                            else -> isSystemDark
+                        }
                         adapter = ChatPagingAdapter(
                             { 
                                 PerformanceProfiler.startSession("CHAT_OPEN", PerformanceProfiler.Category.UI)
@@ -180,7 +195,8 @@ class ChatListFragment : Fragment() {
                             }, 
                             { onChatLongClick?.invoke(it) }, 
                             currentUserId,
-                            mainViewModel.userPreferences.value.appCustomization.chatSpacingMultiplier
+                            mainViewModel.userPreferences.value.appCustomization.chatSpacingMultiplier,
+                            isDark
                         )
                         recyclerView.adapter = adapter
                         PerformanceProfiler.logEvent("Switched to ChatPagingAdapter", category = PerformanceProfiler.Category.UI)
@@ -234,7 +250,8 @@ class ChatListFragment : Fragment() {
         private val onClick: (String) -> Unit, 
         private val onLongClick: (ChatListItemUiModel) -> Unit, 
         private val currentUserId: String,
-        private val spacingMultiplier: Float = 0.5f
+        private val spacingMultiplier: Float = 0.5f,
+        private val isDark: Boolean = false
     ) : PagingDataAdapter<ChatListItemUiModel, ChatViewHolder>(ChatDiffCallback()) {
 
         private var typingMap: Map<String, Set<String>> = emptyMap()
@@ -261,7 +278,7 @@ class ChatListFragment : Fragment() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
             val view = CachedInflater.inflate(LayoutInflater.from(parent.context), parent)
-            return ChatViewHolder(view, onClick, onLongClick, currentUserId, spacingMultiplier)
+            return ChatViewHolder(view, onClick, onLongClick, currentUserId, spacingMultiplier, isDark)
         }
 
         override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
@@ -287,12 +304,13 @@ class ChatListFragment : Fragment() {
         private val onClick: (String) -> Unit, 
         private val onLongClick: (ChatListItemUiModel) -> Unit, 
         private val currentUserId: String,
-        private val spacingMultiplier: Float = 0.5f
+        private val spacingMultiplier: Float = 0.5f,
+        private val isDark: Boolean = false
     ) : ListAdapter<ChatListItemUiModel, ChatViewHolder>(ChatDiffCallback()) {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
             val view = CachedInflater.inflate(LayoutInflater.from(parent.context), parent)
-            return ChatViewHolder(view, onClick, onLongClick, currentUserId, spacingMultiplier)
+            return ChatViewHolder(view, onClick, onLongClick, currentUserId, spacingMultiplier, isDark)
         }
 
         override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
@@ -305,7 +323,8 @@ class ChatListFragment : Fragment() {
         private val onClick: (String) -> Unit, 
         private val onLongClick: (ChatListItemUiModel) -> Unit, 
         private val currentUserId: String,
-        private val spacingMultiplier: Float = 0.5f
+        private val spacingMultiplier: Float = 0.5f,
+        private val isDark: Boolean = false
     ) : RecyclerView.ViewHolder(view) {
         private val avatar = view.findViewById<ImageView>(R.id.avatar)
         private val avatarInitials = view.findViewById<TextView>(R.id.avatar_initials)
@@ -320,6 +339,15 @@ class ChatListFragment : Fragment() {
         private val mediaPreview = view.findViewById<ImageView>(R.id.media_preview)
 
         fun bind(chat: ChatListItemUiModel) {
+            if (!isDark) {
+                name.setTextColor(android.graphics.Color.BLACK)
+                snippet.setTextColor(android.graphics.Color.BLACK)
+                time.setTextColor(android.graphics.Color.BLACK)
+            } else {
+                name.setTextColor(android.graphics.Color.parseColor("#ECECF0"))
+                snippet.setTextColor(android.graphics.Color.parseColor("#B0B0C8"))
+                time.setTextColor(android.graphics.Color.parseColor("#B0B0C8"))
+            }
             // Apply Spacing
             val density = itemView.resources.displayMetrics.density
             val baseHeight = (80 * density).toInt()

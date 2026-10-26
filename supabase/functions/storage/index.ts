@@ -44,7 +44,7 @@ export const getR2Url = (bkt: string, pth: string) => {
 
 export function validateCategory(category?: string): string {
   const cleanCat = (category || 'files').toLowerCase().trim()
-  if (['files', 'archives', 'exports', 'taging'].includes(cleanCat)) {
+  if (['files', 'archives', 'exports', 'taging', 'avatars', 'covers', 'market'].includes(cleanCat)) {
     return cleanCat
   }
   return 'files'
@@ -125,7 +125,12 @@ Deno.serve(async (req) => {
     }
 
     const countryCode = storageAssignment.country_code.toUpperCase()
-    const targetBucket = storageAssignment.private_bucket
+
+    const body = await req.json().catch(() => ({}))
+    const { action, fileId, category, subpath, path, contentType, chatId } = body
+
+    const isPublicCategory = ['avatars', 'covers', 'market', 'public'].includes((category || '').toLowerCase())
+    const targetBucket = isPublicCategory ? storageAssignment.public_bucket : storageAssignment.private_bucket
 
     // 2. Validate that the target regional bucket is provisioned ahead of time
     if (!isBucketProvisioned(targetBucket)) {
@@ -136,9 +141,6 @@ Deno.serve(async (req) => {
         bucket: targetBucket
       }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
-
-    const body = await req.json().catch(() => ({}))
-    const { action, fileId, category, subpath, path, contentType, chatId } = body
 
     // Server-side object key construction
     let objectKey = path

@@ -676,7 +676,7 @@ fun MainScaffold(
     var showReleaseNotesDialog by remember {
         mutableStateOf(
             context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
-                .getBoolean("has_shown_v1_release_notes", false).not()
+                .getBoolean("has_shown_v1_1_release_notes", false).not()
         )
     }
 
@@ -687,7 +687,7 @@ fun MainScaffold(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.RocketLaunch, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Welcome to Keeftalk v1.0", fontWeight = FontWeight.Bold)
+                    Text("Welcome to Keeftalk v1.1", fontWeight = FontWeight.Bold)
                 }
             },
             text = {
@@ -695,28 +695,40 @@ fun MainScaffold(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("The Zero-Knowledge Privacy-First Super App is officially here v1.0!", style = MaterialTheme.typography.bodyMedium)
+                    Text("Keeftalk v1.1 brings stability, accessibility, theme consistency, and productivity enhancements!", style = MaterialTheme.typography.bodyMedium)
                     
                     HorizontalDivider()
                     
-                    Text("✨ What's New in Version 1.0:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("✨ What's New in Version 1.1:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     
                     ReleaseNoteItem(
-                        icon = Icons.Default.NotificationsActive,
-                        title = "New Notification System",
-                        description = "Realtime unread badges, sound & vibration alerts, and an integrated notification center accessible directly from the FAB menu."
+                        icon = Icons.Default.Palette,
+                        title = "Themes, Light Mode & Accessibility",
+                        description = "Fixes invisible white text in chat lists, standardizes navigation around Keeftalk Minimal, improves manual theme overrides, and refines FAB scroll visibility and long-press opacity."
                     )
                     
                     ReleaseNoteItem(
-                        icon = Icons.Default.Apps,
-                        title = "19 Integrated Super App Modules",
-                        description = "Access all 19 productivity, messaging, vault, and security features (My Chats, Calls, SMS/MMS, Notes, Vault, Secrets, Calendar, Wallet, Finances, E-Mail, Feed, Books, Docs, Market, Habits, Todo, Browser, Maps, and My Din) instantly via the FAB '+' menu."
+                        icon = Icons.Default.Chat,
+                        title = "Chats, SMS/MMS & Profiles",
+                        description = "Adds SMS/MMS message copying, corrects profile verification display for other users, and enhances chat title, preview, and timestamp contrast."
                     )
                     
                     ReleaseNoteItem(
-                        icon = Icons.Default.Security,
-                        title = "Privacy-First Architecture",
-                        description = "Zero-knowledge end-to-end encryption (AES-256-GCM + Argon2id), hardware-backed Android Keystore, zero ad-tracking, and complete user data sovereignty."
+                        icon = Icons.Default.Lock,
+                        title = "Vault, Notes & Call History",
+                        description = "Improves offline Vault caching and access, fixes My Notes, displays complete recent call history (saved & unsaved numbers), and adds messaging/calling shortcuts."
+                    )
+                    
+                    ReleaseNoteItem(
+                        icon = Icons.Default.Timer,
+                        title = "Time, Habits & Books",
+                        description = "Integrates My Din in usage statistics, fixes habit completion notification repetition and custom targets, and sets reading timer OFF and default DPI to 400 for My Books."
+                    )
+                    
+                    ReleaseNoteItem(
+                        icon = Icons.Default.CheckCircle,
+                        title = "Todo & Calendar Integration",
+                        description = "Introduces Urgent priority with red pulsing indicators, reminder syntax (reminder@HH:MM, #Tomorrow), task creation sound feedback, and bidirectional calendar synchronization."
                     )
                 }
             },
@@ -725,7 +737,7 @@ fun MainScaffold(
                     onClick = {
                         context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
                             .edit()
-                            .putBoolean("has_shown_v1_release_notes", true)
+                            .putBoolean("has_shown_v1_1_release_notes", true)
                             .apply()
                         showReleaseNotesDialog = false
                     }

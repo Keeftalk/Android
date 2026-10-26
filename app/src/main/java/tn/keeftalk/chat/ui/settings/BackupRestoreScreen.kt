@@ -138,12 +138,8 @@ fun BackupRestoreScreen(
                 ) {
                     Button(
                         onClick = {
-                            if (!hasStoragePermission()) {
-                                showPermissionExplanationDialog = true
-                            } else {
-                                isRestoreMode = false
-                                showPasswordDialog = true
-                            }
+                            isRestoreMode = false
+                            showPasswordDialog = true
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -154,11 +150,7 @@ fun BackupRestoreScreen(
 
                     OutlinedButton(
                         onClick = {
-                            if (!hasStoragePermission()) {
-                                showPermissionExplanationDialog = true
-                            } else {
-                                filePickerLauncher.launch(arrayOf("*/*"))
-                            }
+                            filePickerLauncher.launch(arrayOf("*/*"))
                         },
                         modifier = Modifier.weight(1f)
                     ) {
