@@ -302,16 +302,11 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
             val userPrefs by mainViewModel.userPreferences.collectAsState()
             val environmentalState by mainViewModel.environmentalState.collectAsState()
 
-            val appTheme = remember(userPrefs.themeMode, userPrefs.appCustomization.isMinimalMode) {
-                if (userPrefs.appCustomization.isMinimalMode) {
-                    AppTheme.SYSTEM
-                } else {
-                    when (userPrefs.themeMode) {
-                        "LIGHT" -> AppTheme.LIGHT
-                        "DARK" -> AppTheme.DARK
-                        "KEEF" -> AppTheme.KEEF
-                        else -> AppTheme.SYSTEM
-                    }
+            val appTheme = remember(userPrefs.themeMode) {
+                when (userPrefs.themeMode) {
+                    "LIGHT" -> AppTheme.LIGHT
+                    "DARK" -> AppTheme.DARK
+                    else -> AppTheme.SYSTEM
                 }
             }
 
@@ -340,15 +335,9 @@ class MainActivity : FragmentActivity(), ChatListFragment.OnChatListReadyListene
                 isSkeleton = !isDataReady
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (appTheme == AppTheme.KEEF) {
-                        KeefThemeBackground(
-                            environmentalState = environmentalState
-                        )
-                    }
-
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        color = if (appTheme == AppTheme.KEEF || isDataReady) Color.Transparent else MaterialTheme.colorScheme.background
+                        color = if (isDataReady) Color.Transparent else MaterialTheme.colorScheme.background
                     ) {
                         if (!isDataReady) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

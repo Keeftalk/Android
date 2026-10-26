@@ -65,7 +65,7 @@ fun ArticleReaderModal(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    val isKeef = LocalAppTheme.current == AppTheme.KEEF
+    val isKeef = false
     val keefTokens = LocalKeefThemeTokens.current
 
     val isRtl = remember(article.title, article.description, article.content) {
@@ -454,7 +454,7 @@ fun ReaderHtmlContent(
     description: String? = null,
     onImageClick: (String) -> Unit
 ) {
-    val isKeef = LocalAppTheme.current == AppTheme.KEEF
+    val isKeef = false
     val keefTokens = LocalKeefThemeTokens.current
 
     val primaryTextColor = if (isKeef) keefTokens.ink else MaterialTheme.colorScheme.onBackground

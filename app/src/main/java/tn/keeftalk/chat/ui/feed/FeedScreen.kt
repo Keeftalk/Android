@@ -122,8 +122,8 @@ fun FeedScreen(
         else isSystemDark
     }
 
-    val containerBg = if (userPrefs.themeMode == "KEEF") Color.Transparent else if (isDark) Color(0xFF080A10) else MaterialTheme.colorScheme.background
-    val sheetBg = if (userPrefs.themeMode == "KEEF") Color.Transparent else if (isDark) Color(0xFF131722) else Color(0xFFEEF0F7)
+    val containerBg = if (isDark) Color(0xFF080A10) else MaterialTheme.colorScheme.background
+    val sheetBg = if (isDark) Color(0xFF131722) else Color(0xFFEEF0F7)
 
     val declarativeCardsFlow = remember(context) {
         try {

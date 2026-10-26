@@ -87,24 +87,7 @@ fun AppCustomizationScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            item {
-                Text(
-                    text = "KEEFTALK MINIMAL",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-                )
-            }
 
-            item {
-                SettingsToggleItem(
-                    icon = icons.palette,
-                    title = "Keeftalk minimal",
-                    subtitle = "Show only chat items and top-left 'Keeftalk' title. Hide top & bottom bars. Access all features from FAB +.",
-                    checked = customization.isMinimalMode,
-                    onCheckedChange = { viewModel.toggleMinimalMode() }
-                )
-            }
 
             item {
                 Text(

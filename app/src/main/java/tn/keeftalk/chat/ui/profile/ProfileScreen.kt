@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import tn.keeftalk.chat.ui.theme.AppTheme
 import tn.keeftalk.chat.ui.theme.LocalAppTheme
 import coil.compose.AsyncImage
 import tn.keeftalk.chat.domain.model.Profile
@@ -142,7 +141,7 @@ fun ViewProfileContent(
 ) {
     val icons = LocalAppIcons.current
     val scrollState = rememberScrollState()
-    val isKeef = LocalAppTheme.current == AppTheme.KEEF
+    val isKeef = false
     val bgBaseColor = if (isKeef) Color.Transparent else MaterialTheme.colorScheme.background
     val surfaceBgColor = if (isKeef) MaterialTheme.colorScheme.surface.copy(alpha = 0.82f) else MaterialTheme.colorScheme.surface
     
@@ -699,7 +698,7 @@ fun EditProfileContent(
     val currentCountry by viewModel.currentCountry.collectAsState()
     val usernameAvailable by viewModel.usernameAvailable.collectAsState()
 
-    val isKeef = LocalAppTheme.current == AppTheme.KEEF
+    val isKeef = false
     val bgBaseColor = if (isKeef) Color.Transparent else MaterialTheme.colorScheme.background
 
     Column(modifier = modifier.fillMaxSize().background(bgBaseColor)) {

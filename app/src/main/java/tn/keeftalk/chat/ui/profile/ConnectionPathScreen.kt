@@ -54,7 +54,7 @@ fun ConnectionPathScreen(
     var selectedNode by remember { mutableStateOf<GraphNode?>(null) }
     var showFullNetwork by remember { mutableStateOf(true) }
 
-    val isKeef = tn.keeftalk.chat.ui.theme.LocalAppTheme.current == tn.keeftalk.chat.ui.theme.AppTheme.KEEF
+    val isKeef = false
     val bgBaseColor = if (isKeef) Color.Transparent else Color.Black
 
     Scaffold(

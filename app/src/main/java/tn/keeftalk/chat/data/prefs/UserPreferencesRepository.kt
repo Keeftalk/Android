@@ -158,7 +158,10 @@ class UserPreferencesRepository(private val context: Context) {
             UserPreferences(
                 userId = preferences[PreferencesKeys.USER_ID] ?: "",
                 userName = preferences[PreferencesKeys.USER_NAME] ?: "",
-                themeMode = preferences[PreferencesKeys.THEME_MODE] ?: "KEEF",
+                themeMode = run {
+                    val raw = preferences[PreferencesKeys.THEME_MODE] ?: "SYSTEM"
+                    if (raw == "LIGHT" || raw == "DARK" || raw == "SYSTEM") raw else "SYSTEM"
+                },
                 isDynamicColorEnabled = preferences[PreferencesKeys.DYNAMIC_COLOR] ?: true,
                 isLogged = preferences[PreferencesKeys.IS_LOGGED] ?: false,
                 sessionData = preferences[PreferencesKeys.SESSION_DATA],

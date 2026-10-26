@@ -25,8 +25,7 @@ import tn.keeftalk.chat.ui.theme.keef.LocalKeefThemeTokens
 enum class AppTheme {
     SYSTEM,
     LIGHT,
-    DARK,
-    KEEF
+    DARK
 }
 
 data class ChatThemeExtra(
@@ -100,7 +99,6 @@ fun KeeftalkTheme(
         AppTheme.SYSTEM -> isSystemDark
         AppTheme.DARK -> true
         AppTheme.LIGHT -> false
-        AppTheme.KEEF -> environmentalState.period == PeriodOfDay.NIGHT
     }
 
     val context = LocalContext.current
@@ -181,21 +179,6 @@ fun KeeftalkTheme(
         if (isDark) DarkColorScheme else LightColorScheme
     } else {
         when {
-            appTheme == AppTheme.KEEF -> {
-                darkColorScheme(
-                    primary = keefTokens.accent,
-                    onPrimary = keefTokens.onAccent,
-                    primaryContainer = keefTokens.soft,
-                    onPrimaryContainer = keefTokens.ink,
-                    background = Color.Transparent,
-                    onBackground = keefTokens.ink,
-                    surface = keefTokens.card,
-                    onSurface = keefTokens.ink,
-                    surfaceVariant = keefTokens.soft,
-                    onSurfaceVariant = keefTokens.ink2,
-                    outline = keefTokens.cardLine
-                )
-            }
             dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                 if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             }
@@ -243,11 +226,6 @@ fun KeeftalkTheme(
                 AppTheme.SYSTEM -> if (isSystemDark) ChatThemeExtra(Primary, DarkMsgThem) else ChatThemeExtra(MsgMe, MsgThem)
                 AppTheme.LIGHT -> ChatThemeExtra(MsgMe, MsgThem)
                 AppTheme.DARK -> ChatThemeExtra(Primary, DarkMsgThem)
-                AppTheme.KEEF -> ChatThemeExtra(
-                    msgMe = keefTokens.accent,
-                    msgThem = keefTokens.card,
-                    useGlassmorphism = true
-                )
             }
         }
     }

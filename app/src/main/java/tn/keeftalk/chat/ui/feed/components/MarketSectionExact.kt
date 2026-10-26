@@ -32,7 +32,7 @@ fun MarketSectionExact(
     onSelectAsset: (MarketAsset) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isKeef = tn.keeftalk.chat.ui.theme.LocalAppTheme.current == tn.keeftalk.chat.ui.theme.AppTheme.KEEF
+    val isKeef = false
     val headerTextColor = if (isKeef) MaterialTheme.colorScheme.onBackground else Color(0xFF0D1020)
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -86,7 +86,7 @@ fun MarketTickCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isKeef = tn.keeftalk.chat.ui.theme.LocalAppTheme.current == tn.keeftalk.chat.ui.theme.AppTheme.KEEF
+    val isKeef = false
     val isUp = asset.change24h >= 0
     val changeColor = if (isUp) Color(0xFF12B76A) else Color(0xFFF04438)
 
