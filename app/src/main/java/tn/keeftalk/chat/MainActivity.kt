@@ -673,10 +673,11 @@ fun MainScaffold(
     var showFabSearchDialog by remember { mutableStateOf(false) }
     var fabSearchQuery by remember { mutableStateOf("") }
 
+    val currentVersion = "1.12"
     var showReleaseNotesDialog by remember {
         mutableStateOf(
             context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
-                .getBoolean("has_shown_v1_1_release_notes", false).not()
+                .getString("last_announced_version", "") != currentVersion
         )
     }
 
@@ -687,7 +688,7 @@ fun MainScaffold(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.RocketLaunch, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Welcome to Keeftalk v1.1", fontWeight = FontWeight.Bold)
+                    Text("Keeftalk 1.12 is here!", fontWeight = FontWeight.Bold)
                 }
             },
             text = {
@@ -695,41 +696,9 @@ fun MainScaffold(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Keeftalk v1.1 brings stability, accessibility, theme consistency, and productivity enhancements!", style = MaterialTheme.typography.bodyMedium)
-                    
-                    HorizontalDivider()
-                    
-                    Text("✨ What's New in Version 1.1:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    
-                    ReleaseNoteItem(
-                        icon = Icons.Default.Palette,
-                        title = "Themes, Light Mode & Accessibility",
-                        description = "Fixes invisible white text in chat lists, standardizes navigation around Keeftalk Minimal, improves manual theme overrides, and refines FAB scroll visibility and long-press opacity."
-                    )
-                    
-                    ReleaseNoteItem(
-                        icon = Icons.Default.Chat,
-                        title = "Chats, SMS/MMS & Profiles",
-                        description = "Adds SMS/MMS message copying, corrects profile verification display for other users, and enhances chat title, preview, and timestamp contrast."
-                    )
-                    
-                    ReleaseNoteItem(
-                        icon = Icons.Default.Lock,
-                        title = "Vault, Notes & Call History",
-                        description = "Improves offline Vault caching and access, fixes My Notes, displays complete recent call history (saved & unsaved numbers), and adds messaging/calling shortcuts."
-                    )
-                    
-                    ReleaseNoteItem(
-                        icon = Icons.Default.Timer,
-                        title = "Time, Habits & Books",
-                        description = "Integrates My Din in usage statistics, fixes habit completion notification repetition and custom targets, and sets reading timer OFF and default DPI to 400 for My Books."
-                    )
-                    
-                    ReleaseNoteItem(
-                        icon = Icons.Default.CheckCircle,
-                        title = "Todo & Calendar Integration",
-                        description = "Introduces Urgent priority with red pulsing indicators, reminder syntax (reminder@HH:MM, #Tomorrow), task creation sound feedback, and bidirectional calendar synchronization."
-                    )
+                    Text("We've improved Keeftalk's interface and readability, including a fix for chat text visibility in dark mode.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Enjoy a better Keeftalk experience!", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
                 }
             },
             confirmButton = {
@@ -737,12 +706,12 @@ fun MainScaffold(
                     onClick = {
                         context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
                             .edit()
-                            .putBoolean("has_shown_v1_1_release_notes", true)
+                            .putString("last_announced_version", currentVersion)
                             .apply()
                         showReleaseNotesDialog = false
                     }
                 ) {
-                    Text("Get Started")
+                    Text("Got it")
                 }
             }
         )

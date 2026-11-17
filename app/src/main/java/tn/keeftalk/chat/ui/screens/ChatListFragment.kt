@@ -339,15 +339,6 @@ class ChatListFragment : Fragment() {
         private val mediaPreview = view.findViewById<ImageView>(R.id.media_preview)
 
         fun bind(chat: ChatListItemUiModel) {
-            if (!isDark) {
-                name.setTextColor(android.graphics.Color.BLACK)
-                snippet.setTextColor(android.graphics.Color.BLACK)
-                time.setTextColor(android.graphics.Color.BLACK)
-            } else {
-                name.setTextColor(android.graphics.Color.parseColor("#ECECF0"))
-                snippet.setTextColor(android.graphics.Color.parseColor("#B0B0C8"))
-                time.setTextColor(android.graphics.Color.parseColor("#B0B0C8"))
-            }
             // Apply Spacing
             val density = itemView.resources.displayMetrics.density
             val baseHeight = (80 * density).toInt()
