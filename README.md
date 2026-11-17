@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Keeftalk/Releases/releases/tag/ProductionV1_1"><img src="https://img.shields.io/badge/Version-1.1-00C853?style=for-the-badge&logo=android&logoColor=white" alt="Version 1.1"></a>
+  <a href="https://github.com/Keeftalk/Releases/releases/tag/ProductionV1_1"><img src="https://img.shields.io/badge/Version-1.12-00C853?style=for-the-badge&logo=android&logoColor=white" alt="Version 1.12"></a>
   <a href="https://github.com/Keeftalk/Releases/releases/tag/ProductionV1_1"><img src="https://img.shields.io/github/downloads/Keeftalk/Releases/total?label=Downloads&style=for-the-badge&logo=android&logoColor=white&color=00C853" alt="Downloads"></a>
   <a href="#-tech-stack--architecture"><img src="https://img.shields.io/badge/Target%20SDK-37%20%28Android%2016%29-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Target SDK"></a>
   <a href="#-tech-stack--architecture"><img src="https://img.shields.io/badge/Min%20SDK-26%20%28Android%208.0%29-FF6D00?style=for-the-badge&logo=android&logoColor=white" alt="Min SDK"></a>
