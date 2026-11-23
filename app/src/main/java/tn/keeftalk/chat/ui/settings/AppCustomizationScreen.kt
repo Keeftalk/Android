@@ -336,6 +336,7 @@ private fun getModuleName(module: KeeftalkModule) = when(module) {
     KeeftalkModule.TODO -> "My Todo"
     KeeftalkModule.MAPS -> "My Maps"
     KeeftalkModule.MY_DIN -> "My Din"
+    KeeftalkModule.DRAWINGS -> "My Drawings"
 }
 
 private fun getFabActionName(action: FabAction) = when(action) {
@@ -366,6 +367,7 @@ private fun getModuleIcon(module: KeeftalkModule, icons: tn.keeftalk.chat.ui.the
     KeeftalkModule.TODO -> tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo
     KeeftalkModule.MAPS -> tn.keeftalk.chat.ui.theme.LucideIcons.MapPinned
     KeeftalkModule.MY_DIN -> Icons.Default.Mosque
+    KeeftalkModule.DRAWINGS -> Icons.Default.Brush
 }
 
 private fun getFabActionIcon(action: FabAction, icons: tn.keeftalk.chat.ui.theme.AppIcons) = when(action) {

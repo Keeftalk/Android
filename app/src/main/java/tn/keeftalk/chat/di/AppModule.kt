@@ -118,6 +118,9 @@ object AppModule {
     private var docRepository: tn.keeftalk.chat.domain.repository.DocRepository? = null
 
     @Volatile
+    private var drawingRepository: tn.keeftalk.chat.domain.repository.DrawingRepository? = null
+
+    @Volatile
     private var habitsRepository: tn.keeftalk.chat.domain.repository.HabitsRepository? = null
 
     @Volatile
@@ -540,7 +543,8 @@ object AppModule {
                             KeeftalkDatabase.MIGRATION_116_117,
                             KeeftalkDatabase.MIGRATION_117_118,
                             KeeftalkDatabase.MIGRATION_118_119,
-                            KeeftalkDatabase.MIGRATION_119_120
+                            KeeftalkDatabase.MIGRATION_119_120,
+                            KeeftalkDatabase.MIGRATION_120_121
                         )
                         .openHelperFactory(factory)
                         .addCallback(object : RoomDatabase.Callback() {
@@ -1059,6 +1063,20 @@ object AppModule {
                 db.docDao(),
                 context.applicationContext
             ).also { docRepository = it }
+        }
+    }
+
+    fun provideDrawingDao(context: Context): tn.keeftalk.chat.data.local.dao.DrawingDao {
+        return provideDatabase(context).drawingDao()
+    }
+
+    fun provideDrawingRepository(context: Context): tn.keeftalk.chat.domain.repository.DrawingRepository {
+        return drawingRepository ?: synchronized(this) {
+            val db = provideDatabase(context)
+            drawingRepository ?: tn.keeftalk.chat.data.repository.DrawingRepositoryImpl(
+                db.drawingDao(),
+                context.applicationContext
+            ).also { drawingRepository = it }
         }
     }
 
