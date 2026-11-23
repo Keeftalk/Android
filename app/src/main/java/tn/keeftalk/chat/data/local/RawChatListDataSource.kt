@@ -36,6 +36,7 @@ class RawChatListDataSource(
             val avatarIdx = c.getColumnIndex("avatarUrl")
             val typeIdx = c.getColumnIndex("type")
             val lastMsgIdx = c.getColumnIndex("lastMessage")
+            val lastDecryptedMsgIdx = c.getColumnIndex("lastDecryptedMessage")
             val lastTsIdx = c.getColumnIndex("lastTimestamp")
             val unreadIdx = c.getColumnIndex("unreadCount")
             val isPinnedIdx = c.getColumnIndex("isPinned")
@@ -61,7 +62,7 @@ class RawChatListDataSource(
                     rawName
                 }
                 
-                var lastMessage = c.getString(lastMsgIdx)
+                var lastMessage = (if (lastDecryptedMsgIdx >= 0) c.getString(lastDecryptedMsgIdx) else null) ?: c.getString(lastMsgIdx)
                 val senderId = c.getString(senderIdIdx)
                 val isFromMe = (senderId != null) && (senderId == currentUserId)
                 val isGroup = c.getString(typeIdx) == "GROUP"

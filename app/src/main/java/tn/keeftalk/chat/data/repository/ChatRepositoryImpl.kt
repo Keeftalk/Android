@@ -128,62 +128,8 @@ class ChatRepositoryImpl(
             observeTypingStatus()
             flushReceiptSyncQueue() // Initial flush
 
-            // Maintenance: Fix snippets for existing chats
-            // OPTIMIZATION: Move to low-priority background task with LIMIT to avoid startup lag
             try {
-                withContext(databaseWriteDispatcher) {
-                    val db = AppModule.provideDatabase(context)
-                    
-                    // Only fix a small batch at a time to prevent blocking the DB
-                    db.openHelper.writableDatabase.execSQL(
-                        """
-                        UPDATE chats 
-                        SET lastMessage = CASE 
-                                WHEN snippetType = 'IMAGE' THEN 'Sent a picture'
-                                WHEN snippetType = 'VIDEO' THEN 'Sent a video'
-                                WHEN snippetType = 'VOICE' THEN 'Sent a voice message'
-                                WHEN snippetType = 'FILE' THEN 'Sent a document'
-                                ELSE lastMessage 
-                            END
-                        WHERE id IN (
-                            SELECT id FROM chats 
-                            WHERE lastMessage LIKE '[%]' AND snippetType IS NOT NULL
-                            LIMIT 50
-                        )
-                        """.trimIndent()
-                    )
-
-                    // Optimization: Only run heavy snippet repair if really needed
-                    db.openHelper.writableDatabase.execSQL(
-                        """
-                        UPDATE chats 
-                        SET lastMessage = (
-                            SELECT content FROM messages 
-                            WHERE chatId = chats.id 
-                            AND decryptionState = 'SUCCESS'
-                            AND content != ''
-                            ORDER BY timestamp DESC LIMIT 1
-                        ),
-                        lastDecryptedMessage = (
-                            SELECT content FROM messages 
-                            WHERE chatId = chats.id 
-                            AND decryptionState = 'SUCCESS'
-                            AND content != ''
-                            ORDER BY timestamp DESC LIMIT 1
-                        )
-                        WHERE id IN (
-                            SELECT id FROM chats
-                            WHERE (lastMessage LIKE '[Encrypted%' 
-                               OR lastMessage LIKE '[Unable to decrypt%' 
-                               OR lastMessage LIKE '[Decryption Pending%'
-                               OR lastMessage = 'New message'
-                               OR lastDecryptedMessage IS NULL)
-                            LIMIT 20
-                        );
-                        """.trimIndent()
-                    )
-                }
-
+                repairChatSnippetsFromLocalMessages()
                 val initialChats = chatDao.getActiveChatsOnce(15, 0)
                 if (initialChats.isNotEmpty()) {
                     updateChatListCache(initialChats)
@@ -898,12 +844,12 @@ class ChatRepositoryImpl(
 
         // Relaxed Guard: Update snippet if it's a newer message OR if we are replacing an encrypted/placeholder snippet with a decrypted one
         val isNewer = timestamp > current.lastTimestamp
-        val currentIsPlaceholder = current.lastMessage == null || 
+        val currentIsPlaceholder = current.lastDecryptedMessage == null || 
+                current.lastMessage == null || 
                 current.lastMessage.startsWith("[") || 
-                current.lastMessage == "New message" ||
-                current.lastDecryptedMessage == null
+                current.lastMessage == "New message"
         
-        val isReplacingPlaceholder = timestamp >= current.lastTimestamp && currentIsPlaceholder
+        val isReplacingPlaceholder = currentIsPlaceholder
         
         if (!isNewer && !isReplacingPlaceholder) {
             Log.d(TAG, "[METADATA_GUARD] Skipping update for message ${dto.id} as it is older/duplicate. timestamp=$timestamp lastTimestamp=${current.lastTimestamp}")
@@ -1021,15 +967,18 @@ class ChatRepositoryImpl(
             val lastMessageRemote = supabaseChat["last_message_text"]?.jsonPrimitive?.contentOrNull
 
             val existing = chatDao.getChatById(chatId)
-            val isRemoteEncrypted = lastMessageRemote?.startsWith("[Encrypted]") == true
+            val isRemoteEncrypted = lastMessageRemote == null || 
+                                   lastMessageRemote.startsWith("[Encrypted]") || 
+                                   lastMessageRemote.startsWith("[Decryption Pending") || 
+                                   lastMessageRemote.startsWith("[Unable to decrypt")
             
-            val (finalLastMessage, finalLastDecrypted) = if (isRemoteEncrypted && existing != null && existing.lastDecryptedMessage != null) {
-                existing.lastDecryptedMessage to existing.lastDecryptedMessage
-            } else if (!isRemoteEncrypted) {
-                lastMessageRemote to lastMessageRemote
-            } else {
-                // NEVER display [Encrypted] or placeholders
-                null to null
+            val localSnippet = getLatestDecryptedSnippetForChat(chatId)
+            
+            val (finalLastMessage, finalLastDecrypted) = when {
+                localSnippet != null -> localSnippet.lastMessage to localSnippet.lastDecryptedMessage
+                existing?.lastDecryptedMessage != null -> existing.lastDecryptedMessage to existing.lastDecryptedMessage
+                !isRemoteEncrypted -> lastMessageRemote to lastMessageRemote
+                else -> existing?.lastMessage to null
             }
 
             chatDao.insertChat(ChatEntity(
@@ -1704,47 +1653,205 @@ class ChatRepositoryImpl(
             // to avoid overwriting them with "[Encrypted]" from the server.
             val chatsToInsert = chatEntities.map { newChat ->
                 val existing = chatDao.getChatById(newChat.id)
-                if (existing != null) {
-                    val isRemoteEncrypted = newChat.lastMessage?.startsWith("[Encrypted]") == true
-                    
-                    if (isRemoteEncrypted) {
-                        if (existing.lastDecryptedMessage != null && existing.lastTimestamp >= newChat.lastTimestamp) {
-                            newChat.copy(
-                                lastMessage = existing.lastDecryptedMessage,
-                                lastDecryptedMessage = existing.lastDecryptedMessage,
-                                snippetType = existing.snippetType,
-                                snippetUri = existing.snippetUri
-                            )
-                        } else {
-                            // Remote is encrypted and we don't have a decrypted version
-                            newChat.copy(lastMessage = null, lastDecryptedMessage = null)
-                        }
-                    } else if (!isRemoteEncrypted) {
-                        newChat.copy(lastDecryptedMessage = newChat.lastMessage)
-                    } else {
-                        newChat
-                    }
+                val isRemoteEncrypted = newChat.lastMessage == null || 
+                                       newChat.lastMessage.startsWith("[Encrypted]") || 
+                                       newChat.lastMessage.startsWith("[Decryption Pending") || 
+                                       newChat.lastMessage.startsWith("[Unable to decrypt")
+                
+                val localSnippet = getLatestDecryptedSnippetForChat(newChat.id)
+
+                val finalLastMessage: String?
+                val finalLastDecrypted: String?
+                val finalSenderId: String?
+                val finalStatus: String?
+                val finalSnippetType: String?
+                val finalSnippetUri: String?
+
+                if (localSnippet != null) {
+                    finalLastMessage = localSnippet.lastMessage
+                    finalLastDecrypted = localSnippet.lastDecryptedMessage
+                    finalSenderId = if (newChat.lastTimestamp > localSnippet.timestamp && newChat.lastMessageSenderId != null) newChat.lastMessageSenderId else localSnippet.senderId
+                    finalStatus = if (newChat.lastTimestamp > localSnippet.timestamp && newChat.lastMessageStatus != null) newChat.lastMessageStatus else localSnippet.status
+                    finalSnippetType = localSnippet.snippetType
+                    finalSnippetUri = localSnippet.snippetUri ?: newChat.snippetUri
+                } else if (existing?.lastDecryptedMessage != null) {
+                    finalLastMessage = existing.lastDecryptedMessage
+                    finalLastDecrypted = existing.lastDecryptedMessage
+                    finalSenderId = existing.lastMessageSenderId ?: newChat.lastMessageSenderId
+                    finalStatus = existing.lastMessageStatus ?: newChat.lastMessageStatus
+                    finalSnippetType = existing.snippetType ?: newChat.snippetType
+                    finalSnippetUri = existing.snippetUri ?: newChat.snippetUri
+                } else if (!isRemoteEncrypted) {
+                    finalLastMessage = newChat.lastMessage
+                    finalLastDecrypted = newChat.lastMessage
+                    finalSenderId = newChat.lastMessageSenderId
+                    finalStatus = newChat.lastMessageStatus
+                    finalSnippetType = newChat.snippetType
+                    finalSnippetUri = newChat.snippetUri
                 } else {
-                    newChat
+                    finalLastMessage = existing?.lastMessage ?: newChat.lastMessage
+                    finalLastDecrypted = null
+                    finalSenderId = newChat.lastMessageSenderId
+                    finalStatus = newChat.lastMessageStatus
+                    finalSnippetType = newChat.snippetType
+                    finalSnippetUri = newChat.snippetUri
                 }
+
+                newChat.copy(
+                    lastMessage = finalLastMessage,
+                    lastDecryptedMessage = finalLastDecrypted,
+                    lastMessageSenderId = finalSenderId,
+                    lastMessageStatus = finalStatus,
+                    snippetType = finalSnippetType,
+                    snippetUri = finalSnippetUri
+                )
             }
 
             chatDao.insertChats(chatsToInsert)
             chatDao.insertChatMembers(memberEntities)
+
+            val chatsNeedingMessageSync = chatsToInsert.filter { it.lastDecryptedMessage == null && !it.isArchived }
+            if (chatsNeedingMessageSync.isNotEmpty()) {
+                repositoryScope.launch {
+                    chatsNeedingMessageSync.take(10).forEach { chat ->
+                        try {
+                            syncChatMessages(chat.id)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Background sync messages failed for ${chat.id}", e)
+                        }
+                    }
+                }
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "syncChats failed", e)
         }
     }
 
+    private data class DecryptedSnippetInfo(
+        val lastMessage: String,
+        val lastDecryptedMessage: String,
+        val timestamp: Long,
+        val senderId: String,
+        val status: String,
+        val snippetType: String,
+        val snippetUri: String?
+    )
+
+    private suspend fun getLatestDecryptedSnippetForChat(chatId: String): DecryptedSnippetInfo? {
+        val currentUserId = getCurrentUserId() ?: return null
+        val latestMsgWithReactions = messageDao.getLatestMessagesWithReactionsOnce(chatId, 1).firstOrNull() ?: return null
+        val msg = latestMsgWithReactions.message
+        if (msg.decryptionState != DecryptionState.SUCCESS) return null
+        
+        val isFromMe = msg.senderId == currentUserId
+        val authorName = tn.keeftalk.chat.util.LiveRecipientCache.get(msg.senderId)?.name
+        
+        val rawContent = msg.content
+        if (rawContent.isBlank() || rawContent == "[Encrypted]" || rawContent.startsWith("[Encrypted Message")) return null
+        
+        val normalizedType = msg.type
+        val effectiveType = if (normalizedType == "FILE" && latestMsgWithReactions.attachments.firstOrNull()?.fileName?.lowercase()?.endsWith(".pdf") == true) "PDF" else normalizedType
+
+        val snippetText = when (effectiveType) {
+            "TEXT" -> rawContent
+            "IMAGE" -> when {
+                isFromMe -> "You sent a picture"
+                authorName != null -> "$authorName sent a picture"
+                else -> "You received a picture"
+            }
+            "VIDEO" -> when {
+                isFromMe -> "You sent a video"
+                authorName != null -> "$authorName sent a video"
+                else -> "You received a video"
+            }
+            "VOICE" -> when {
+                isFromMe -> "You sent a voice message"
+                authorName != null -> "$authorName sent a voice message"
+                else -> "You received a voice message"
+            }
+            "FILE" -> {
+                val fileName = latestMsgWithReactions.attachments.firstOrNull()?.fileName ?: "document"
+                when {
+                    isFromMe -> "You sent $fileName"
+                    authorName != null -> "$authorName sent $fileName"
+                    else -> "You received $fileName"
+                }
+            }
+            "PDF" -> when {
+                isFromMe -> "You sent a PDF"
+                authorName != null -> "$authorName sent a PDF"
+                else -> "You received a PDF"
+            }
+            "SHARED_VAULT_FILE" -> if (isFromMe) "You shared a file from Vault" else "Shared a file from Vault"
+            "LOCATION" -> if (isFromMe) "You shared a location" else "You received a location"
+            "CONTACT" -> if (isFromMe) "You shared a contact" else "You received a contact"
+            else -> rawContent
+        }
+
+        val uri = latestMsgWithReactions.attachments.firstOrNull()?.storagePath
+
+        return DecryptedSnippetInfo(
+            lastMessage = snippetText,
+            lastDecryptedMessage = snippetText,
+            timestamp = msg.timestamp,
+            senderId = msg.senderId,
+            status = msg.status,
+            snippetType = normalizedType,
+            snippetUri = uri
+        )
+    }
+
+    private suspend fun repairChatSnippetsFromLocalMessages() {
+        try {
+            val chatsNeedingRepair = chatDao.getAllChatsOnce()
+            val missingChatsToSync = mutableListOf<String>()
+            
+            for (chat in chatsNeedingRepair) {
+                val localSnippet = getLatestDecryptedSnippetForChat(chat.id)
+                if (localSnippet != null) {
+                    if (chat.lastDecryptedMessage != localSnippet.lastDecryptedMessage || chat.lastMessage == null || chat.lastMessage.startsWith("[Encrypted]")) {
+                        chatDao.insertChat(chat.copy(
+                            lastMessage = localSnippet.lastMessage,
+                            lastDecryptedMessage = localSnippet.lastDecryptedMessage,
+                            lastTimestamp = maxOf(chat.lastTimestamp, localSnippet.timestamp),
+                            lastMessageSenderId = localSnippet.senderId,
+                            lastMessageStatus = localSnippet.status,
+                            snippetType = localSnippet.snippetType,
+                            snippetUri = localSnippet.snippetUri ?: chat.snippetUri
+                        ))
+                    }
+                } else if (chat.lastDecryptedMessage == null && !chat.isArchived) {
+                    missingChatsToSync.add(chat.id)
+                }
+            }
+
+            if (missingChatsToSync.isNotEmpty()) {
+                repositoryScope.launch {
+                    missingChatsToSync.take(15).forEach { chatId ->
+                        try {
+                            syncChatMessages(chatId)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Background sync for missing chat $chatId failed", e)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "repairChatSnippetsFromLocalMessages failed", e)
+        }
+    }
+
     override suspend fun syncFullChatHistory() {
         // Sync more chats, e.g., first 50
         syncChats(limit = 50, offset = 0)
+        repairChatSnippetsFromLocalMessages()
     }
 
     override suspend fun syncAllRecentContent() {
         // Initial sync of recent 15 chats
         syncChats(limit = 15, offset = 0)
+        repairChatSnippetsFromLocalMessages()
     }
     override suspend fun syncAllProfiles() {
         try {
