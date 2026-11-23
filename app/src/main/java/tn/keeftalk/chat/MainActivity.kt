@@ -430,6 +430,7 @@ fun FullAppContent(
             is AppScreen.Books -> "BOOKS"
             is AppScreen.MyDin -> "MY_DIN"
             is AppScreen.Docs, is AppScreen.DocViewer -> "DOCS"
+            is AppScreen.Drawings, is AppScreen.DrawingEditor -> "DRAWINGS"
             is AppScreen.Market -> "MARKET"
             is AppScreen.Habits -> "HABITS"
             is AppScreen.Todo -> "TODO"
@@ -1124,11 +1125,13 @@ fun MainScaffold(
                                           currentScreen is AppScreen.MyDin ||
                                           currentScreen is AppScreen.Docs ||
                                           currentScreen is AppScreen.DocViewer ||
+                                          currentScreen is AppScreen.Drawings ||
+                                          currentScreen is AppScreen.DrawingEditor ||
                                           currentScreen is AppScreen.Market ||
                                           currentScreen is AppScreen.Habits ||
                                           currentScreen is AppScreen.Todo
 
-                        val showGlobalTopBar = if (currentScreen is AppScreen.ChatList || (currentScreen is AppScreen.Books && (isReaderOpen || isBookDetailStatsOpen)) || currentScreen is AppScreen.MyDin || currentScreen is AppScreen.Docs || currentScreen is AppScreen.DocViewer) {
+                        val showGlobalTopBar = if (currentScreen is AppScreen.ChatList || (currentScreen is AppScreen.Books && (isReaderOpen || isBookDetailStatsOpen)) || currentScreen is AppScreen.MyDin || currentScreen is AppScreen.Docs || currentScreen is AppScreen.DocViewer || currentScreen is AppScreen.Drawings || currentScreen is AppScreen.DrawingEditor) {
                             false // Handled locally or hidden in full screen reader / book detail stats
                         } else {
                             isMainModule
@@ -1155,6 +1158,8 @@ fun MainScaffold(
                                     is AppScreen.Books -> "My Books"
                                     is AppScreen.Docs -> "My Docs"
                                     is AppScreen.DocViewer -> "Document Viewer"
+                                    is AppScreen.Drawings -> "My Drawings"
+                                    is AppScreen.DrawingEditor -> "Drawing Editor"
                                     is AppScreen.Market -> "My Market"
                                     is AppScreen.Habits -> "My Habits"
                                     is AppScreen.Todo -> "My Todo"
@@ -2810,6 +2815,30 @@ fun MainScaffold(
                                     onOpenInBrowser = { url -> onScreenChange(AppScreen.Browser(url)) }
                                 )
                             }
+                            is AppScreen.Drawings -> {
+                                val drawingsViewModel: tn.keeftalk.chat.ui.drawings.DrawingsViewModel = viewModel {
+                                    tn.keeftalk.chat.ui.drawings.DrawingsViewModel(
+                                        AppModule.provideDrawingRepository(context)
+                                    )
+                                }
+                                tn.keeftalk.chat.ui.drawings.DrawingsScreen(
+                                    viewModel = drawingsViewModel,
+                                    onOpenDrawing = { drawingId -> onScreenChange(AppScreen.DrawingEditor(drawingId)) },
+                                    onBack = { onNavigateBack() }
+                                )
+                            }
+                            is AppScreen.DrawingEditor -> {
+                                val drawingsViewModel: tn.keeftalk.chat.ui.drawings.DrawingsViewModel = viewModel {
+                                    tn.keeftalk.chat.ui.drawings.DrawingsViewModel(
+                                        AppModule.provideDrawingRepository(context)
+                                    )
+                                }
+                                tn.keeftalk.chat.ui.drawings.DrawingEditorScreen(
+                                    drawingId = currentScreen.drawingId,
+                                    viewModel = drawingsViewModel,
+                                    onBack = { onNavigateBack() }
+                                )
+                            }
                             is AppScreen.Market -> {
                                 tn.keeftalk.chat.ui.market.MarketScreen(
                                     onSettings = { onScreenChange(AppScreen.Settings) },
@@ -3097,6 +3126,10 @@ sealed class AppScreen : Parcelable {
     data object Docs : AppScreen()
     @Parcelize
     data class DocViewer(val docId: String) : AppScreen()
+    @Parcelize
+    data object Drawings : AppScreen()
+    @Parcelize
+    data class DrawingEditor(val drawingId: String) : AppScreen()
     @Parcelize
     data object Market : AppScreen()
     @Parcelize

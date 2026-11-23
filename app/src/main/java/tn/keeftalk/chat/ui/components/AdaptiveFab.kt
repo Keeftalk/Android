@@ -98,6 +98,7 @@ fun calculateModuleUnreadCount(
         tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET -> "MARKET"
         tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS -> "DOCS"
         tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER -> "BROWSER"
+        tn.keeftalk.chat.domain.model.KeeftalkModule.DRAWINGS -> "DRAWINGS"
         else -> module.name
     }
 
@@ -438,30 +439,29 @@ fun AdaptiveFab(
                 divider
             ) + qrAndAiItems + divider + commonNavItems
         }
+        currentScreen == AppScreen.Drawings || currentScreen is AppScreen.DrawingEditor -> {
+            listOf(
+                FabMenuItem("New Drawing", Icons.Default.Brush, { onNavigate(AppScreen.DrawingEditor("new")); closeMenu() }),
+                divider
+            ) + qrAndAiItems + divider + commonNavItems
+        }
         else -> {
             qrAndAiItems + divider + commonNavItems
         }
     }
 
     val menuItems: List<FabMenuItem> = rawMenuItems.filter { item ->
-        if (customization.isMinimalMode) {
-            true
-        } else if (customization.isEnabled) {
-            val moduleOk = item.module == null || customization.enabledModules.contains(item.module)
-            val actionOk = item.actionType == null || customization.enabledFabActions.contains(item.actionType)
-            
-            // SPECIAL: Hide "My Chats" if it's the only module enabled (beside mandatory actions)
-            // Chats is always enabled. So if size is 1, it's just Chats.
-            val isRedundantChats = item.module == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS && customization.enabledModules.size == 1
-            
-            moduleOk && actionOk && !isRedundantChats
-        } else {
+        val moduleOk = item.module == null || customization.enabledModules.contains(item.module)
+        val actionOk = item.actionType == null || customization.enabledFabActions.contains(item.actionType)
+        val isRedundantChats = item.module == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS && customization.enabledModules.size == 1
+
+        if (!customization.isEnabled) {
             // Revert to mandatory items if customization is disabled
-            // Mandatory Modules: CHATS. Mandatory Actions: NEW_CHAT, NEW_GROUP, QR.
-            // We also show CALLS by default if customization is OFF generally.
             val isMandatoryModule = item.module == null || item.module == tn.keeftalk.chat.domain.model.KeeftalkModule.CHATS || item.module == tn.keeftalk.chat.domain.model.KeeftalkModule.CALLS
             val isMandatoryAction = item.actionType == null || tn.keeftalk.chat.domain.model.AppCustomization.MANDATORY_FAB_ACTIONS.contains(item.actionType)
             isMandatoryModule && isMandatoryAction
+        } else {
+            moduleOk && actionOk && !isRedundantChats
         }
     }
 
@@ -764,6 +764,7 @@ fun AdaptiveFab(
                 currentScreen == AppScreen.Habits -> tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS
                 currentScreen == AppScreen.Todo -> tn.keeftalk.chat.domain.model.KeeftalkModule.TODO
                 currentScreen is AppScreen.Browser -> tn.keeftalk.chat.domain.model.KeeftalkModule.BROWSER
+                currentScreen == AppScreen.Drawings || currentScreen is AppScreen.DrawingEditor -> tn.keeftalk.chat.domain.model.KeeftalkModule.DRAWINGS
                 else -> null
             }
 
@@ -944,6 +945,7 @@ private fun buildCommonNavigationItems(
         FabMenuItem("My Feed", icons.feed, { onNavigate(AppScreen.Feed); closeMenu() }, isActive = currentScreen == AppScreen.Feed, module = tn.keeftalk.chat.domain.model.KeeftalkModule.FEED, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.FEED)),
         FabMenuItem("My Books", Icons.AutoMirrored.Filled.MenuBook, { onNavigate(AppScreen.Books); closeMenu() }, isActive = currentScreen == AppScreen.Books, module = tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.BOOKS)),
         FabMenuItem("My Docs", Icons.Default.Description, { onNavigate(AppScreen.Docs); closeMenu() }, isActive = currentScreen == AppScreen.Docs, module = tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.DOCS)),
+        FabMenuItem("My Drawings", Icons.Default.Brush, { onNavigate(AppScreen.Drawings); closeMenu() }, isActive = currentScreen == AppScreen.Drawings || currentScreen is AppScreen.DrawingEditor, module = tn.keeftalk.chat.domain.model.KeeftalkModule.DRAWINGS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.DRAWINGS)),
         FabMenuItem("My Market", Icons.Default.Storefront, { onNavigate(AppScreen.Market); closeMenu() }, isActive = currentScreen == AppScreen.Market, module = tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.MARKET)),
         FabMenuItem("My Habits", Icons.Default.CheckCircle, { onNavigate(AppScreen.Habits); closeMenu() }, isActive = currentScreen == AppScreen.Habits, module = tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.HABITS)),
         FabMenuItem("My Todo", tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo, { onNavigate(AppScreen.Todo); closeMenu() }, isActive = currentScreen == AppScreen.Todo, module = tn.keeftalk.chat.domain.model.KeeftalkModule.TODO, unreadCount = cnt(tn.keeftalk.chat.domain.model.KeeftalkModule.TODO)),

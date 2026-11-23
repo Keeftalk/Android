@@ -110,9 +110,11 @@ import tn.keeftalk.chat.feature.secrets.data.local.entities.*
         DocEntity::class,
         DocBookmarkEntity::class,
         DocHighlightEntity::class,
-        DocSyncQueueEntity::class
+        DocSyncQueueEntity::class,
+        DrawingEntity::class,
+        DrawingSyncQueueEntity::class
     ],
-    version = 120,
+    version = 121,
     exportSchema = true
 )
 @TypeConverters(KeeftalkConverters::class)
@@ -128,6 +130,7 @@ abstract class KeeftalkDatabase : RoomDatabase() {
     abstract fun vaultDao(): VaultDao
     abstract fun vaultSyncQueueDao(): VaultSyncQueueDao
     abstract fun bookDao(): BookDao
+    abstract fun drawingDao(): DrawingDao
     abstract fun docDao(): DocDao
     abstract fun xpDao(): XpDao
     abstract fun vaultBackupDao(): VaultBackupDao
@@ -1347,6 +1350,47 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                             id TEXT NOT NULL,
                             action TEXT NOT NULL,
                             entity_type TEXT NOT NULL,
+                            payload_json TEXT NOT NULL,
+                            status TEXT NOT NULL DEFAULT 'PENDING',
+                            created_at INTEGER NOT NULL,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_120_121 = object : Migration(120, 121) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS drawings (
+                            id TEXT NOT NULL,
+                            owner_user_id TEXT NOT NULL DEFAULT 'local',
+                            title TEXT NOT NULL,
+                            native_file_path TEXT NOT NULL DEFAULT '',
+                            thumbnail_path TEXT NOT NULL DEFAULT '',
+                            canvas_width INTEGER NOT NULL DEFAULT 1080,
+                            canvas_height INTEGER NOT NULL DEFAULT 1920,
+                            background_color TEXT NOT NULL DEFAULT '#FFFFFF',
+                            format_version INTEGER NOT NULL DEFAULT 1,
+                            content_hash TEXT,
+                            revision INTEGER NOT NULL DEFAULT 1,
+                            is_deleted INTEGER NOT NULL DEFAULT 0,
+                            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+                            created_at INTEGER NOT NULL,
+                            updated_at INTEGER NOT NULL,
+                            PRIMARY KEY(id)
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_drawings_is_deleted ON drawings(is_deleted)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS idx_drawings_updated_at ON drawings(updated_at)")
+
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS drawing_sync_queue (
+                            id TEXT NOT NULL,
+                            action TEXT NOT NULL,
+                            entity_type TEXT NOT NULL DEFAULT 'DRAWING',
                             payload_json TEXT NOT NULL,
                             status TEXT NOT NULL DEFAULT 'PENDING',
                             created_at INTEGER NOT NULL,

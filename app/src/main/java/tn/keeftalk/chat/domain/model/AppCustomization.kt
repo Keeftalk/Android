@@ -3,6 +3,7 @@ package tn.keeftalk.chat.domain.model
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
@@ -30,7 +31,8 @@ enum class KeeftalkModule {
     BROWSER,
     TODO,
     MAPS,
-    MY_DIN
+    MY_DIN,
+    DRAWINGS
 }
 
 @Serializable
@@ -64,7 +66,8 @@ data class AppCustomization(
         KeeftalkModule.BROWSER,
         KeeftalkModule.TODO,
         KeeftalkModule.MAPS,
-        KeeftalkModule.MY_DIN
+        KeeftalkModule.MY_DIN,
+        KeeftalkModule.DRAWINGS
     ),
     val bottomNavTabs: List<KeeftalkModule> = listOf(
         KeeftalkModule.CHATS,
@@ -107,7 +110,8 @@ data class AppCustomization(
                 KeeftalkModule.BROWSER,
                 KeeftalkModule.TODO,
                 KeeftalkModule.MAPS,
-                KeeftalkModule.MY_DIN
+                KeeftalkModule.MY_DIN,
+                KeeftalkModule.DRAWINGS
             )
         )
         
@@ -136,6 +140,7 @@ fun KeeftalkModule.toLabel(): String = when(this) {
     KeeftalkModule.TODO -> "My Todo"
     KeeftalkModule.MAPS -> "My Maps"
     KeeftalkModule.MY_DIN -> "My Din"
+    KeeftalkModule.DRAWINGS -> "My Drawings"
 }
 
 fun KeeftalkModule.toIcon(icons: tn.keeftalk.chat.ui.theme.AppIcons, chatTab: Int = 0): androidx.compose.ui.graphics.vector.ImageVector = when(this) {
@@ -158,6 +163,7 @@ fun KeeftalkModule.toIcon(icons: tn.keeftalk.chat.ui.theme.AppIcons, chatTab: In
     KeeftalkModule.TODO -> tn.keeftalk.chat.ui.theme.LucideIcons.ListTodo
     KeeftalkModule.MAPS -> tn.keeftalk.chat.ui.theme.LucideIcons.MapPinned
     KeeftalkModule.MY_DIN -> androidx.compose.material.icons.Icons.Default.Mosque
+    KeeftalkModule.DRAWINGS -> androidx.compose.material.icons.Icons.Default.Brush
 }
 
 fun KeeftalkModule.toAppScreen(): tn.keeftalk.chat.AppScreen = when(this) {
@@ -180,4 +186,5 @@ fun KeeftalkModule.toAppScreen(): tn.keeftalk.chat.AppScreen = when(this) {
     KeeftalkModule.TODO -> tn.keeftalk.chat.AppScreen.Todo
     KeeftalkModule.MAPS -> tn.keeftalk.chat.AppScreen.MyMaps
     KeeftalkModule.MY_DIN -> tn.keeftalk.chat.AppScreen.MyDin
+    KeeftalkModule.DRAWINGS -> tn.keeftalk.chat.AppScreen.Drawings
 }
