@@ -674,7 +674,7 @@ fun MainScaffold(
     var showFabSearchDialog by remember { mutableStateOf(false) }
     var fabSearchQuery by remember { mutableStateOf("") }
 
-    val currentVersion = "1.12"
+    val currentVersion = "1.2"
     var showReleaseNotesDialog by remember {
         mutableStateOf(
             context.getSharedPreferences("keeftalk_prefs", Context.MODE_PRIVATE)
@@ -689,17 +689,26 @@ fun MainScaffold(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.RocketLaunch, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Keeftalk 1.12 is here!", fontWeight = FontWeight.Bold)
+                    Text("What's New in version 1.2:", fontWeight = FontWeight.Bold)
                 }
             },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("We've improved Keeftalk's interface and readability, including a fix for chat text visibility in dark mode.", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Enjoy a better Keeftalk experience!", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                    Text("What's New in Keeftalk:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• New \"My Drawings\" Module: Create, sketch, and paint directly inside Keeftalk with offline-first speed and optional cloud sync!", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Full Drawing Toolkit: Pencil, pen, brush, marker, highlighter, eraser, geometric shapes, text objects, and color pickers.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Layers & Undo/Redo: Multi-layer editing with opacity controls, visibility toggles, and non-destructive undo/redo history.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Smart Canvas & 10K Support: Auto-detects your screen resolution, supports 10,000x10,000 px canvases, and saves default size preferences.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Quick Preview Mode: Preview drawings in high-res full screen with zoom & pan gestures without opening the paint editor.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Import & Export Options: Import photos directly onto canvas and export to PNG (transparent), JPEG, vector SVG, or native .ktd.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Encrypted & Cloud Synced: Encrypted local database storage with seamless Supabase cloud synchronization.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• FAB Menu Integration: Access My Drawings directly from the FAB (+) button or customize visibility in App Settings.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Instant Chat Previews: All your recent messages now appear instantly on the chat list the moment you open the app—no more tapping into individual chats to load previews!", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Faster & Smoother Startup: Optimized local message caching for lightning-fast chat list loading, even when offline.", style = MaterialTheme.typography.bodyMedium)
+                    Text("• Bug Fixes: Resolved an issue where message snippets were temporarily hidden upon initial app restart", style = MaterialTheme.typography.bodyMedium)
                 }
             },
             confirmButton = {
