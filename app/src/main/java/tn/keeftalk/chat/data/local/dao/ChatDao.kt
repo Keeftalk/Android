@@ -51,6 +51,9 @@ abstract class ChatDao {
     @Query("SELECT * FROM chats ORDER BY lastTimestamp DESC")
     abstract fun getAllChats(): Flow<List<ChatEntity>>
 
+    @Query("SELECT * FROM chats ORDER BY lastTimestamp DESC")
+    abstract suspend fun getAllChatsOnce(): List<ChatEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     protected abstract suspend fun insertChatInternal(chat: ChatEntity)
 

@@ -49,7 +49,7 @@ object FastPathInbox {
             }
 
             val cursor = db.openHelper.readableDatabase.query(
-                "SELECT id, name, avatarUrl, lastMessage, lastTimestamp, unreadCount, peerId, lastMessageStatus, lastMessageSenderId, isPinned, isMuted, snippetType, snippetUri, type FROM chats WHERE isArchived = 0 ORDER BY isPinned DESC, lastTimestamp DESC LIMIT 15"
+                "SELECT id, name, avatarUrl, COALESCE(lastDecryptedMessage, lastMessage), lastTimestamp, unreadCount, peerId, lastMessageStatus, lastMessageSenderId, isPinned, isMuted, snippetType, snippetUri, type FROM chats WHERE isArchived = 0 ORDER BY isPinned DESC, lastTimestamp DESC LIMIT 15"
             )
             val items = mutableListOf<ChatListItemUiModel>()
             while (cursor.moveToNext()) {

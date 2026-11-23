@@ -172,6 +172,19 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                                 WHEN NEW.type = 'PDF' THEN 'Sent a PDF'
                                 ELSE NEW.content 
                             END,
+                            lastDecryptedMessage = CASE
+                                WHEN NEW.decryptionState = 'SUCCESS' AND NEW.content != '' THEN (
+                                    CASE 
+                                        WHEN NEW.type = 'IMAGE' THEN 'Sent a picture'
+                                        WHEN NEW.type = 'VIDEO' THEN 'Sent a video'
+                                        WHEN NEW.type = 'VOICE' THEN 'Sent a voice message'
+                                        WHEN NEW.type = 'FILE' THEN 'Sent a document'
+                                        WHEN NEW.type = 'PDF' THEN 'Sent a PDF'
+                                        ELSE NEW.content 
+                                    END
+                                )
+                                ELSE lastDecryptedMessage
+                            END,
                             lastTimestamp = NEW.timestamp,
                             snippetType = NEW.type,
                             lastMessageSenderId = NEW.senderId,
@@ -189,8 +202,9 @@ abstract class KeeftalkDatabase : RoomDatabase() {
                     AFTER DELETE ON messages
                     BEGIN
                         UPDATE chats 
-                        SET lastMessage = (SELECT content FROM messages WHERE chatId = OLD.chatId ORDER BY timestamp DESC LIMIT 1),
-                            lastTimestamp = (SELECT timestamp FROM messages WHERE chatId = OLD.chatId ORDER BY timestamp DESC LIMIT 1),
+                        SET lastMessage = (SELECT content FROM messages WHERE chatId = OLD.chatId AND decryptionState = 'SUCCESS' ORDER BY timestamp DESC LIMIT 1),
+                            lastDecryptedMessage = (SELECT content FROM messages WHERE chatId = OLD.chatId AND decryptionState = 'SUCCESS' ORDER BY timestamp DESC LIMIT 1),
+                            lastTimestamp = COALESCE((SELECT timestamp FROM messages WHERE chatId = OLD.chatId ORDER BY timestamp DESC LIMIT 1), lastTimestamp),
                             snippetType = (SELECT type FROM messages WHERE chatId = OLD.chatId ORDER BY timestamp DESC LIMIT 1),
                             unreadCount = (CASE WHEN unreadCount > 0 THEN unreadCount - 1 ELSE 0 END)
                         WHERE id = OLD.chatId;
