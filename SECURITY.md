@@ -1,14 +1,12 @@
-# Security Policy
+# Security Policy & Privacy Guidelines
 
-At Keeftalk, security and user data sovereignty are fundamental design principles. We take security vulnerabilities seriously and appreciate the open-source community's efforts in identifying and reporting potential issues.
+At Keeftalk, security, privacy, and data sovereignty are fundamental design principles. We take security vulnerabilities seriously and appreciate the open-source community's help in identifying and reporting issues.
 
 ---
 
 ## 🛡️ Supported Versions
 
-We actively provide security updates and patches for the following versions:
-
-| Version | Supported          | Notes |
+| Version | Supported | Notes |
 | :--- | :--- | :--- |
 | `v1.x` (Latest) | :white_check_mark: | Maintained release branch |
 | `< 1.0` | :x: | Legacy alpha versions (Unsupported) |
@@ -17,46 +15,31 @@ We actively provide security updates and patches for the following versions:
 
 ## 🚨 Reporting a Vulnerability
 
-If you discover a security vulnerability, please do **NOT** open a public issue on GitHub. Publicly disclosing a vulnerability can endanger users before a fix is available.
+If you discover a security vulnerability, please **DO NOT** open a public issue on GitHub.
 
 ### Disclosure Process
-
-1. **Submit via GitHub Private Vulnerability Reporting:**
-   Use GitHub's private vulnerability reporting feature on the repository:
+1. Submit via **GitHub Private Vulnerability Reporting**:
    Navigate to **Security** -> **Advisories** -> **Report a vulnerability**.
-
-2. **What to include in your report:**
-   - Detailed summary of the vulnerability.
-   - Affected component (e.g., Vault SQLCipher key derivation, E2EE Signal protocol layer, WebRTC signaling, IPC Intent filters).
-   - Step-by-step proof-of-concept (PoC) or reproduction steps.
-   - Potential impact of the issue.
-   - Suggested remediation or patch, if available.
-
-3. **Response & Timeline:**
-   - We will acknowledge receipt of your vulnerability report within 48 hours.
-   - We will assess the report and provide status updates as we work on a resolution.
-   - Once a fix is verified, a patch release will be published alongside an advisory.
+2. Include:
+   - Detailed summary & affected component (e.g., Vault SQLCipher key derivation, WebRTC signaling, Edge Functions).
+   - Step-by-step Proof-of-Concept (PoC).
+   - Suggested remediation if available.
+3. We will acknowledge receipt within 48 hours and work on a resolution.
 
 ---
 
 ## 🔑 Credential & Secret Management Policy
 
 1. **Never Commit Private Credentials:**
-   - No private API keys, signing keystore passwords, server credentials, or personal access tokens must ever be committed to git.
-   - All release builds must use optional environment variables (`KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, etc.) or `keystore.properties` (which is excluded via `.gitignore`).
-2. **Public Client Configuration vs Private Secrets:**
-   - Client-side application keys (such as Supabase anon keys or Firebase public client configs) are intended for public distribution within Android APKs and carry scoped client-level permissions.
-   - Private admin keys, database service-role secrets, and private signing credentials must remain strictly server-side or local.
+   - Service-role keys, private API keys, signing keystores, or server passwords MUST NEVER be committed to Git.
+   - Use environment variables or `local.properties` / `keystore.properties` (excluded via `.gitignore`).
+2. **Public Client Keys:**
+   - Client-side public keys (e.g., Supabase anon key) carry scoped row-level permissions and are safe for APK distribution.
 
 ---
 
-## 🔒 Cryptographic Guidelines for Contributors
+## 🔒 Cryptographic Guidelines
 
-When contributing code to security-critical modules (e.g., `security/crypto/`, `data/local/`, `ui/vault/`):
-
-- **Master Keys:** Never store master keys or unencrypted key material in memory longer than necessary. Clear byte arrays explicitly when done.
-- **Randomness:** Always use `java.security.SecureRandom` for salt, IV, and nonce generation.
-- **KDF:** Key derivation must use Argon2id with recommended parameters (`64MB`, `3 iterations`, `4 parallelism`).
-- **Cipher:** Message and data payload encryption must use `AES-256-GCM` with non-repeating nonces.
-
-Thank you for helping keep Keeftalk secure!
+- **Master Keys:** Derived on-device via Argon2id (`64MB`, `3 iterations`, `4 parallelism`) and stored in memory only as long as necessary.
+- **Local Storage:** Room databases encrypted via **SQLCipher** and bound to hardware Keystore (`AES-256-GCM`).
+- **Zero Telemetry:** No ad networks, tracking SDKs, or behavioral telemetry are present in Keeftalk.
