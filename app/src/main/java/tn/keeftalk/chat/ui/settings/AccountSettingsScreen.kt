@@ -96,11 +96,11 @@ fun AccountSettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        SettingsSection(title = "Billing & Storage") {
+                        SettingsSection(title = "Cloud Billing & Storage") {
                             SettingsItem(
                                 icon = Icons.Rounded.Storage,
-                                title = "Subscription & Storage",
-                                subtitle = "Membership & Quota",
+                                title = "Cloud Usage & Billing",
+                                subtitle = "Pay-as-you-go & Resource Metering",
                                 onClick = { selectedSubSetting = AccountSubSetting.SUB_STORAGE },
                                 trailing = { ChevronRightIcon() }
                             )

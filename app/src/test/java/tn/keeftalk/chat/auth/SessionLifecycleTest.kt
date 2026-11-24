@@ -83,6 +83,7 @@ class SessionLifecycleTest {
         override suspend fun resetSecuritySettings(): Result<Unit> = Result.success(Unit)
         override suspend fun findProfilesByIdentifier(identifier: String): Result<List<Profile>> = Result.success(emptyList())
         override suspend fun verifySubscriptionPurchase(purchaseToken: String, productId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun continueAsGuest(): Result<Unit> = Result.success(Unit)
         override fun handleDeepLink(intent: android.content.Intent) {}
         override fun startSessionObservation() {}
         override fun shutdown() {}
