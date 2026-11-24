@@ -459,6 +459,16 @@ class AuthRepositoryImpl(
         Result.failure(e)
     }
 
+    override suspend fun continueAsGuest(): Result<Unit> = runCatching {
+        val guestId = "guest_${UUID.randomUUID()}"
+        prefs.updateUserId(guestId)
+        prefs.updateIsLogged(true)
+        if (!initDeferred.isCompleted) {
+            initDeferred.complete(Unit)
+        }
+        Log.i(TAG, "Continued as local guest: $guestId")
+    }
+
     override suspend fun logout(): Result<Unit> = runCatching {
         Log.d(TAG, "ENDPOINT: auth/logout")
         
