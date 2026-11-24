@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { purchaseToken, productId } = await req.json()
+    const { purchaseToken, productId, topupAmount } = await req.json()
 
     // 1. Get current user
     const authHeader = req.headers.get('Authorization')!
@@ -26,47 +26,54 @@ serve(async (req) => {
 
     if (userError || !user) throw new Error('Not authenticated')
 
-    // 2. Plan Mapping
-    let plan = 'FREE'
-    let limit = 5368709120 // 5GB
+    // Determine top-up amount in USD (default to $5.00 if topupAmount not specified)
+    const amountToAdd = Number(topupAmount) || 5.00
+    const idempotencyKey = `topup_${purchaseToken || Math.random().toString(36).substring(7)}`
 
-    if (productId === 'keeftalk_plus_monthly' || productId === 'keeftalk_plus_yearly') {
-        plan = productId === 'keeftalk_plus_monthly' ? 'PLUS_MONTHLY' : 'PLUS_YEARLY'
-        limit = 107374182400 // 100GB
-    } else if (productId === 'keeftalk_pro_monthly') {
-        plan = 'PRO_MONTHLY'
-        limit = 536870912000 // 500GB
-    } else if (productId === 'keeftalk_family_monthly') {
-        plan = 'FAMILY_MONTHLY'
-        limit = 2199023255552 // 2TB
-    }
+    // Record top-up in billing_payments
+    await supabaseClient.from('billing_payments').insert({
+      user_id: user.id,
+      amount: amountToAdd,
+      currency: 'USD',
+      provider: 'IN_APP_PURCHASE',
+      provider_transaction_id: purchaseToken || idempotencyKey,
+      status: 'SUCCESS',
+      idempotency_key: idempotencyKey
+    }).catch(() => null)
 
-    const expiryDate = new Date()
-    if (plan.includes('YEARLY')) {
-        expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-    } else {
-        expiryDate.setMonth(expiryDate.getMonth() + 1)
-    }
+    // Increment prepaid balance in billing_balances
+    const { data: balanceRec } = await supabaseClient.from('billing_balances')
+      .select('prepaid_balance')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-    // 3. Update Entitlement via RPC (Single Source of Truth)
-    const { error: rpcError } = await supabaseClient.rpc('sync_subscription_entitlement', {
-      target_user_id: user.id,
-      new_plan: plan,
-      new_limit: limit,
-      new_status: 'active',
-      new_expiry: expiryDate.toISOString(),
-      new_purchase_token: purchaseToken,
-      new_order_id: 'GPA.' + Math.random().toString().slice(2, 14) // Placeholder for actual order id from Google
+    const currentBal = balanceRec?.prepaid_balance || 0.0
+    const newBal = currentBal + amountToAdd
+
+    await supabaseClient.from('billing_balances').upsert({
+      user_id: user.id,
+      prepaid_balance: newBal,
+      currency: 'USD',
+      updated_at: new Date().toISOString()
     })
 
-    if (rpcError) throw rpcError
+    // Log transaction in billing_ledger
+    await supabaseClient.from('billing_ledger').insert({
+      user_id: user.id,
+      transaction_type: 'PREPAID_TOPUP',
+      base_amount: amountToAdd,
+      total_amount: amountToAdd,
+      currency: 'USD',
+      description: `Prepaid Cloud Balance Top-up ($${amountToAdd.toFixed(2)})`,
+      idempotency_key: idempotencyKey
+    }).catch(() => null)
 
-    return new Response(JSON.stringify({ success: true, plan, limit }), {
+    return new Response(JSON.stringify({ success: true, new_balance: newBal, topup_added: amountToAdd }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

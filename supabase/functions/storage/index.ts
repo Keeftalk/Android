@@ -33,7 +33,6 @@ const r2 = new AwsClient({
   region: 'auto',
 })
 
-// Helper to generate a full endpoint path URL
 export const getR2Url = (bkt: string, pth: string) => {
   const urlObj = new URL(R2_ENDPOINT)
   const url = new URL(urlObj.origin)
@@ -89,7 +88,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // 1. Resolve user's assigned storage region and buckets server-side
+    // 1. Resolve user storage region
     let { data: storageAssignment } = await supabase
       .from('user_storage_regions')
       .select('*')
@@ -125,16 +124,13 @@ Deno.serve(async (req) => {
     }
 
     const countryCode = storageAssignment.country_code.toUpperCase()
-
     const body = await req.json().catch(() => ({}))
     const { action, fileId, category, subpath, path, contentType, chatId } = body
 
     const isPublicCategory = ['avatars', 'covers', 'market', 'public'].includes((category || '').toLowerCase())
     const targetBucket = isPublicCategory ? storageAssignment.public_bucket : storageAssignment.private_bucket
 
-    // 2. Validate that the target regional bucket is provisioned ahead of time
     if (!isBucketProvisioned(targetBucket)) {
-      console.error(`[INFRASTRUCTURE_ERROR] Missing regional R2 bucket: ${targetBucket} for user ${user.id}`)
       return new Response(JSON.stringify({
         error: `INFRASTRUCTURE_ERROR: Regional R2 storage bucket '${targetBucket}' is not provisioned`,
         code: 'BUCKET_NOT_FOUND',
@@ -142,13 +138,11 @@ Deno.serve(async (req) => {
       }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Server-side object key construction
     let objectKey = path
     if (!objectKey && fileId) {
       objectKey = buildVaultObjectKey(countryCode, user.id, category || 'files', fileId, subpath || 'original')
     }
 
-    // Authorize path ownership if path supplied by client
     if (path) {
       const allowedUserPrefix = `${countryCode}/${user.id}/`
       const legacyUserPrefix = `${user.id}/`
@@ -166,26 +160,55 @@ Deno.serve(async (req) => {
       }
 
       if (!isUserPath && !isChatAuthorized) {
-        console.warn(`[UNAUTHORIZED_PATH] User ${user.id} attempted to access unauthorized path: ${path}`)
         return new Response(JSON.stringify({ error: 'Forbidden: Cannot access paths belonging to another user' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
 
-    // ACTION: get-upload-url
+    // ACTION: get-upload-url (With Pay-as-You-Go Balance Check & Usage Telemetry)
     if (action === 'get-upload-url') {
       if (!fileId) {
         return new Response(JSON.stringify({ error: 'Missing fileId' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
+      // Check payment preferences and balance
+      const { data: balanceRecord } = await supabase
+        .from('billing_balances')
+        .select('prepaid_balance')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      const { data: prefRecord } = await supabase
+        .from('billing_preferences')
+        .select('payment_mode, credit_limit')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      const mode = prefRecord?.payment_mode || 'PREPAID'
+      const balance = balanceRecord?.prepaid_balance || 0.0
+
+      if (mode === 'PREPAID' && balance <= 0) {
+        return new Response(JSON.stringify({
+          error: 'Prepaid balance empty. Cloud uploads are paused. Local features & data remain 100% accessible.',
+          code: 'PREPAID_BALANCE_EMPTY'
+        }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
       const finalKey = buildVaultObjectKey(countryCode, user.id, category || 'files', fileId, subpath || 'original')
       const targetUrl = getR2Url(targetBucket, finalKey)
-
-      console.log(`Presigning UPLOAD | User: ${user.id} | Bucket: ${targetBucket} | Key: ${finalKey}`)
 
       const signedRequest = await r2.sign(targetUrl.toString(), {
         method: 'PUT',
         aws: { signQuery: true }
       })
+
+      // Log Class A write operation telemetry
+      await supabase.from('billing_usage').insert({
+        user_id: user.id,
+        resource_type: 'WRITE_OPS',
+        quantity: 1,
+        unit: 'OPERATIONS',
+        metadata: { fileId, bucket: targetBucket, action: 'get-upload-url' }
+      }).catch(() => null)
 
       return new Response(JSON.stringify({
         url: signedRequest.url,
@@ -204,12 +227,19 @@ Deno.serve(async (req) => {
       }
 
       const targetUrl = getR2Url(targetBucket, finalKey)
-      console.log(`Presigning DOWNLOAD | User: ${user.id} | Bucket: ${targetBucket} | Key: ${finalKey}`)
-
       const signedRequest = await r2.sign(targetUrl.toString(), {
         method: 'GET',
         aws: { signQuery: true }
       })
+
+      // Log Class B read operation telemetry
+      await supabase.from('billing_usage').insert({
+        user_id: user.id,
+        resource_type: 'READ_OPS',
+        quantity: 1,
+        unit: 'OPERATIONS',
+        metadata: { objectKey: finalKey, bucket: targetBucket, action: 'get-download-url' }
+      }).catch(() => null)
 
       return new Response(JSON.stringify({
         url: signedRequest.url,
@@ -225,7 +255,6 @@ Deno.serve(async (req) => {
 
       const targetUrl = getR2Url(targetBucket, objectKey)
       const headRes = await r2.fetch(targetUrl.toString(), { method: 'HEAD' }).catch(() => null)
-
       const size = headRes && headRes.ok ? parseInt(headRes.headers.get('content-length') || '0', 10) : 0
 
       if (fileId) {
@@ -236,6 +265,15 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString()
         }).eq('id', fileId).eq('owner_id', user.id)
       }
+
+      // Log verified storage upload telemetry
+      await supabase.from('billing_usage').insert({
+        user_id: user.id,
+        resource_type: 'STORAGE',
+        quantity: size,
+        unit: 'BYTES',
+        metadata: { objectKey, physical_size: size, action: 'finalize-upload' }
+      }).catch(() => null)
 
       return new Response(JSON.stringify({ success: true, size, objectKey }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
@@ -248,7 +286,6 @@ Deno.serve(async (req) => {
 
       const sourceKey = objectKey || buildVaultObjectKey(countryCode, user.id, 'files', fileId, 'original')
       const destKey = buildVaultObjectKey(countryCode, user.id, 'archives', fileId, 'original')
-
       const sourceUrl = getR2Url(targetBucket, sourceKey)
       const destUrl = getR2Url(targetBucket, destKey)
 
@@ -280,7 +317,6 @@ Deno.serve(async (req) => {
 
       const sourceKey = objectKey || buildVaultObjectKey(countryCode, user.id, 'archives', fileId, 'original')
       const destKey = buildVaultObjectKey(countryCode, user.id, 'files', fileId, 'original')
-
       const sourceUrl = getR2Url(targetBucket, sourceKey)
       const destUrl = getR2Url(targetBucket, destKey)
 
