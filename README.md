@@ -17,7 +17,7 @@
   <a href="#-cryptographic-architecture"><img src="https://img.shields.io/badge/Security-AEK%20%2B%20AES--256--GCM-D50000?style=for-the-badge&logo=1password&logoColor=white" alt="Security"></a>
   <a href="#-tech-stack--architecture"><img src="https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin 2.0"></a>
   <a href="#-tech-stack--architecture"><img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose"></a>
-  <a href="#-license"><img src="https://img.shields.io/badge/License-Proprietary%20%2F%20Open-616161?style=for-the-badge" alt="License"></a>
+  <a href="#-license"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge&logo=apache" alt="License"></a>
 </p>
 
 ---
@@ -395,52 +395,68 @@ tn.keeftalk.chat
 
 ### Developer Prerequisites
 - **Android Studio:** Ladybug (2024.2.1) or newer
-- **Java Development Kit:** JDK 17
-- **Android SDK:** API Level 37 (Android 16 Preview / Stable)
-- **Gradle:** Version 8.x with Kotlin 2.0 compiler
+- **Java Development Kit:** JDK 17 or JDK 21
+- **Android SDK:** API Level 37 (Android 16)
+- **Gradle Wrapper:** Bundled Gradle wrapper (`./gradlew`)
 
 ### Compilation Steps
 
 1. **Clone the GitHub Repository:**
    ```bash
-   git clone https://github.com/your-org/keeftalk-android.git
-   cd keeftalk-android
+   git clone https://github.com/Keeftalk/Android.git
+   cd Android
    ```
 
-2. **Setup Environment Configuration:**
-   Place `keystore.properties` in the root directory for signed builds:
-   ```properties
-   keyAlias=your_keystore_alias
-   keyPassword=your_key_password
-   storeFile=your_keystore_file.jks
-   storePassword=your_store_password
-   ```
+2. **Backend & Service Configuration (Optional):**
+   Keeftalk is built offline-first and compiles cleanly out of the box using default public client configurations and standard Android debug signing.
 
-3. **Assemble Build via Gradle:**
+   To customize configuration for your own backend instances:
+   - Copy `local.properties.example` to `local.properties` (or `.env.example` to `.env`).
+   - Copy `keystore.properties.example` to `keystore.properties` if configuring custom release signing.
+   - Copy `app/google-services.json.example` to `app/google-services.json` if configuring a custom Firebase project.
+
+3. **Build & Test via Gradle:**
    ```bash
+   # Verify project structure
+   ./gradlew projects
+
+   # Execute Unit Tests
+   ./gradlew test
+
    # Build Debug APK
-   ./gradlew :app:assembleDebug
-
-   # Build Release APK / App Bundle
-   ./gradlew :app:assembleRelease
-
-   # Execute Unit & Cryptographic Robustness Tests
-   ./gradlew :app:testDebugUnitTest
+   ./gradlew assembleDebug
    ```
 
 ---
 
-## 🤝 Contact & Support
+## ⚙️ Service Integrations & Developer Setup
 
-For general questions, legal inquiries, or product feedback, reach out to the appropriate team:
+| Service | Feature Scope | Configuration Requirements |
+| :--- | :--- | :--- |
+| **Local Offline Modules** | Vault, Notes, Todo, Habits, EPUB/PDF Reader, Sky Engine | **None** (Works 100% offline out of the box) |
+| **Supabase Relay** | E2EE Cloud Chat Sync, Realtime Events, Remote Backup | Default public anon configuration included; customizable via `SUPABASE_URL` & `SUPABASE_ANON_KEY` |
+| **Firebase FCM** | Push Notifications | `app/google-services.json` included; customizable via custom Firebase project |
+| **Dropbox Import** | Vault Cloud File Import | Customizable via `DROPBOX_APP_KEY` in `local.properties` or `.env` |
+| **Google Drive & Gmail** | Cloud File Import & Native Email Auth | Customizable via `GMAIL_WEB_CLIENT_ID` in `local.properties` or `.env` |
 
-- **General Support:** `support@keeftalk.com`
-- **Legal & Privacy:** `legal@keeftalk.com`
-- **Feedback:** `feedback@keeftalk.com`
+---
+
+## 🤝 Contributing & Community
+
+We welcome contributions from developers worldwide!
+
+- Check out our [Contributing Guide](CONTRIBUTING.md) for developer setup, workflow, and commit guidelines.
+- Review our [Security Policy](SECURITY.md) for reporting security vulnerabilities.
+- Please adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) in all community interactions.
 
 ---
 
 ## ⚖️ License
 
-Copyright © 2026 **Keeftalk LLC**. All rights reserved.  
-Licensed under proprietary and open software license terms as specified in the project repository.
+Licensed under the **Apache License, Version 2.0** (the "License").  
+Copyright © 2026 **Keeftalk LLC**.
+
+You may obtain a copy of the License at:  
+[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+See the [LICENSE](LICENSE) file for full license terms and conditions.

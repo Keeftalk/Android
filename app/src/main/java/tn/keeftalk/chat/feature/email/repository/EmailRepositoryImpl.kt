@@ -16,7 +16,7 @@ class EmailRepositoryImpl(
 ) : EmailRepository {
 
     companion object {
-        private const val IDENTITY_TOOLKIT_API_KEY = "AIzaSyAQUUeXA-P2_jnc-F10KdVCLs4YH-EyQ5Y"
+        private val IDENTITY_TOOLKIT_API_KEY: String get() = tn.keeftalk.chat.BuildConfig.IDENTITY_TOOLKIT_API_KEY
     }
 
     override fun getAccounts(): Flow<List<EmailAccount>> = mailDao.getAccounts()

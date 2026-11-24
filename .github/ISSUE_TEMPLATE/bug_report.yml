@@ -1,0 +1,67 @@
+name: Bug Report
+description: Create a report to help us improve Keeftalk
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug! Please fill out the form below as completely as possible.
+  - type: input
+    id: keeftalk-version
+    attributes:
+      label: Keeftalk Version
+      description: What version of Keeftalk are you running? (e.g. v1.2, v1.1, main branch commit hash)
+      placeholder: "v1.2"
+    validations:
+      required: true
+  - type: input
+    id: android-version
+    attributes:
+      label: Android Version / API Level
+      description: What version of Android is installed on your device?
+      placeholder: "Android 14 (API Level 34)"
+    validations:
+      required: true
+  - type: input
+    id: device-info
+    attributes:
+      label: Device Model
+      description: Manufacturer and model of the device (or emulator).
+      placeholder: "Google Pixel 8 Pro / Samsung Galaxy S23"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: Describe the steps needed to reproduce the issue.
+      placeholder: |
+        1. Open 'My Vault'
+        2. Tap '+' button
+        3. Select file to import
+        4. See error message
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: A clear description of what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logcat / Stack Trace
+      description: |
+        Paste relevant logcat entries or stack traces here.
+        ⚠️ WARNING: Remove any personal information, tokens, or private credentials before submitting!
+      render: text

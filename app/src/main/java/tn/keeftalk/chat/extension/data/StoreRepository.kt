@@ -114,9 +114,9 @@ class StoreRepository(
 ) {
     private val TAG = "StoreRepository"
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
-    private val storeApiUrl = "https://lhlylcyuvfpauwvuxped.supabase.co/functions/v1/store-api"
-    private val supabaseRestUrl = "https://lhlylcyuvfpauwvuxped.supabase.co/rest/v1"
-    private val supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobHlsY3l1dmZwYXV3dnV4cGVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyOTUzNDMsImV4cCI6MjA5Nzg3MTM0M30.vu5Zga2iX37NlDV9v0IgQp_PjDNWJmmqqhrvLJ9Un9E"
+    private val storeApiUrl: String get() = "${tn.keeftalk.chat.BuildConfig.SUPABASE_URL}functions/v1/store-api"
+    private val supabaseRestUrl: String get() = "${tn.keeftalk.chat.BuildConfig.SUPABASE_URL}rest/v1"
+    private val supabaseAnonKey: String get() = tn.keeftalk.chat.BuildConfig.SUPABASE_ANON_KEY
 
     suspend fun fetchCatalog(
         category: String = "all",

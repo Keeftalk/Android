@@ -14,7 +14,7 @@ import com.microsoft.identity.client.exception.MsalException
 class EmailAuthManager(private val context: Context) {
 
     companion object {
-        private const val GMAIL_WEB_CLIENT_ID = "263449157700-5jmpabi45c5m8qkgmb3vsjiu4smfulo1.apps.googleusercontent.com"
+        private val GMAIL_WEB_CLIENT_ID: String get() = tn.keeftalk.chat.BuildConfig.GMAIL_WEB_CLIENT_ID
     }
 
     // --- Google OAuth ---

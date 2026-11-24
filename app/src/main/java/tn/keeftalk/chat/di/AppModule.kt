@@ -239,8 +239,8 @@ object AppModule {
 
     private val databaseDeferred = kotlinx.coroutines.CompletableDeferred<KeeftalkDatabase>()
 
-    private const val SUPABASE_URL = "https://lhlylcyuvfpauwvuxped.supabase.co/"
-    private const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxobHlsY3l1dmZwYXV3dnV4cGVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyOTUzNDMsImV4cCI6MjA5Nzg3MTM0M30.vu5Zga2iX37NlDV9v0IgQp_PjDNWJmmqqhrvLJ9Un9E"
+    private val SUPABASE_URL: String get() = tn.keeftalk.chat.BuildConfig.SUPABASE_URL
+    private val SUPABASE_ANON_KEY: String get() = tn.keeftalk.chat.BuildConfig.SUPABASE_ANON_KEY
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun startSupabaseInit(context: Context) {

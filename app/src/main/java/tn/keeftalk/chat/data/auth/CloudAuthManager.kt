@@ -13,7 +13,7 @@ class CloudAuthManager(private val context: android.content.Context) {
         private const val TAG = "CloudAuthManager"
         const val DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
         const val PHOTOS_PICKER_SCOPE = "https://www.googleapis.com/auth/photospicker.mediaitems.readonly"
-        const val DROPBOX_APP_KEY = "94qq780h7ci3de5"
+        val DROPBOX_APP_KEY: String get() = tn.keeftalk.chat.BuildConfig.DROPBOX_APP_KEY
     }
 
     fun startDropboxAuthFlow(activity: Activity) {

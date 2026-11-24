@@ -1,0 +1,30 @@
+# ==========================================
+# Keeftalk Android - Local Properties Template
+# ==========================================
+# Copy this file to 'local.properties' in the root directory to customize your local configuration.
+# DO NOT commit 'local.properties' to version control.
+
+# Android SDK Location (automatically populated by Android Studio)
+# sdk.dir=/path/to/your/android/sdk
+
+# --- Optional Backend & External API Configuration ---
+# Leave blank or omitted to default to public project client configuration.
+
+# Custom Supabase Instance Configuration
+# SUPABASE_URL=https://your-supabase-project.supabase.co/
+# SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Custom Dropbox OAuth Application Key
+# DROPBOX_APP_KEY=your_dropbox_app_key
+
+# Custom Google OAuth Web Client ID (for Gmail & Drive)
+# GMAIL_WEB_CLIENT_ID=your_google_web_client_id.apps.googleusercontent.com
+
+# Custom Google Identity Toolkit API Key
+# IDENTITY_TOOLKIT_API_KEY=your_identity_toolkit_api_key
+
+# --- Optional Release Signing Configuration ---
+# KEYSTORE_FILE=/path/to/your/keystore.jks
+# KEYSTORE_PASSWORD=your_store_password
+# KEY_ALIAS=your_key_alias
+# KEY_PASSWORD=your_key_password

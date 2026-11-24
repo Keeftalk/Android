@@ -28,6 +28,7 @@ Thumbs.db
 build/
 **/build/
 local.properties
+!local.properties.example
 .kotlin/
 .externalNativeBuild
 .cxx
@@ -53,6 +54,7 @@ app/release/
 secrets.properties
 keystore.properties
 !keystore.properties.example
+!google-services.json.example
 credentials.json
 service-account*.json
 secrets/
