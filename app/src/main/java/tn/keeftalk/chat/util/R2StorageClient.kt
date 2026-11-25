@@ -51,6 +51,7 @@ data class StorageOperationResponse(
 class InfrastructureStorageException(message: String) : Exception(message)
 class StorageUploadException(message: String) : Exception(message)
 class StorageDownloadException(message: String) : Exception(message)
+class PrepaidBalanceEmptyException(message: String) : Exception(message)
 
 class R2StorageClient(
     private val supabaseProvider: suspend () -> SupabaseClient,
@@ -83,6 +84,13 @@ class R2StorageClient(
                 val errorMsg = opResp?.error ?: "INFRASTRUCTURE_ERROR: Target R2 bucket not provisioned"
                 Log.e(TAG, "INFRASTRUCTURE_ERROR | $errorMsg")
                 return@withContext Result.failure(InfrastructureStorageException(errorMsg))
+            }
+
+            if (responseText.contains("PREPAID_BALANCE_EMPTY") || responseText.contains("free cloud storage allowance")) {
+                val opResp = runCatching { json.decodeFromString<StorageOperationResponse>(responseText) }.getOrNull()
+                val errorMsg = opResp?.error ?: "You have used your 1 GB free cloud storage allowance. Please top up your prepaid balance to continue uploading."
+                Log.e(TAG, "PREPAID_BALANCE_EMPTY | $errorMsg")
+                return@withContext Result.failure(PrepaidBalanceEmptyException(errorMsg))
             }
 
             val target = json.decodeFromString<UploadTargetResponse>(responseText)

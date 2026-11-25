@@ -80,6 +80,7 @@ fun VaultScreen(
     searchQuery: String = "",
     @Suppress("UNUSED_PARAMETER") onSettingsClick: () -> Unit = {},
     fabActionFlow: kotlinx.coroutines.flow.SharedFlow<FabActionType>? = null,
+    onSubscriptionPlansClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val fullSettings by viewModel.prefs.fullSettingsFlow.collectAsState(tn.keeftalk.chat.domain.model.UserSettings(userId = ""))
@@ -603,6 +604,30 @@ fun VaultScreen(
                         dismissButton = {
                             TextButton(onClick = { viewModel.clearUploadError(keyErrorUpload.id) }) {
                                 Text("Dismiss")
+                            }
+                        }
+                    )
+                }
+
+                val balanceErrorUpload = uiState.activeUploads.values.find { 
+                    it.isError && (it.errorMessage?.contains("1 GB") == true || it.errorMessage?.contains("Prepaid") == true || it.errorMessage?.contains("allowance") == true || it.errorMessage?.contains("402") == true)
+                }
+                if (balanceErrorUpload != null) {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.clearUploadError(balanceErrorUpload.id) },
+                        title = { Text("Prepaid Balance & Storage Limit") },
+                        text = { Text(balanceErrorUpload.errorMessage ?: "You have used your 1 GB free cloud storage allowance. Please top up your prepaid balance to continue uploading.") },
+                        confirmButton = {
+                            Button(onClick = { 
+                                viewModel.clearUploadError(balanceErrorUpload.id)
+                                onSubscriptionPlansClick()
+                            }) {
+                                Text("Top Up Balance")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { viewModel.clearUploadError(balanceErrorUpload.id) }) {
+                                Text("Cancel")
                             }
                         }
                     )
