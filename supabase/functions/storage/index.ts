@@ -19,6 +19,7 @@ const PROVISIONED_PRIVATE_BUCKETS = new Set([
 ])
 
 const PROVISIONED_PUBLIC_BUCKETS = new Set([
+  'keeftalk-public',
   'keeftalk-weur-public',
   'keeftalk-eeur-public',
   'keeftalk-enam-public',
@@ -43,16 +44,19 @@ export const getR2Url = (bkt: string, pth: string) => {
 
 export function validateCategory(category?: string): string {
   const cleanCat = (category || 'files').toLowerCase().trim()
-  if (['files', 'archives', 'exports', 'taging', 'avatars', 'covers', 'market'].includes(cleanCat)) {
+  if (['files', 'archives', 'exports', 'taging', 'avatars', 'covers', 'wallpapers', 'market', 'public'].includes(cleanCat)) {
     return cleanCat
   }
   return 'files'
 }
 
 export function buildVaultObjectKey(countryCode: string, userId: string, category: string, fileId: string, subpath: string = 'original'): string {
-  const cleanCountry = countryCode.toUpperCase().trim()
   const cleanCat = validateCategory(category)
   const cleanSub = subpath.trim().replace(/^\/+|\/+$/g, '')
+  if (['avatars', 'covers', 'wallpapers', 'market', 'public'].includes(cleanCat)) {
+    return `${userId}/${cleanCat}/${fileId}/${cleanSub}`
+  }
+  const cleanCountry = countryCode.toUpperCase().trim()
   return `${cleanCountry}/${userId}/${cleanCat}/${fileId}/${cleanSub}`
 }
 
@@ -127,8 +131,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const { action, fileId, category, subpath, path, contentType, chatId } = body
 
-    const isPublicCategory = ['avatars', 'covers', 'market', 'public'].includes((category || '').toLowerCase())
-    const targetBucket = isPublicCategory ? storageAssignment.public_bucket : storageAssignment.private_bucket
+    const isPublicCategory = ['avatars', 'covers', 'wallpapers', 'market', 'public'].includes((category || '').toLowerCase())
+    const targetBucket = isPublicCategory ? 'keeftalk-public' : storageAssignment.private_bucket
 
     if (!isBucketProvisioned(targetBucket)) {
       return new Response(JSON.stringify({

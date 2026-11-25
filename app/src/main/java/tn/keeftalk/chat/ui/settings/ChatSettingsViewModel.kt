@@ -9,9 +9,12 @@ import tn.keeftalk.chat.domain.repository.ChatSettingsRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+import tn.keeftalk.chat.domain.repository.AuthRepository
+
 class ChatSettingsViewModel(
     private val settingsRepository: tn.keeftalk.chat.domain.repository.SettingsRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val authRepository: AuthRepository? = null
 ) : ViewModel() {
 
     val chatSettings: StateFlow<UserChatSettings> = settingsRepository.settings
@@ -45,8 +48,35 @@ class ChatSettingsViewModel(
                     "save_to_gallery" -> current.copy(saveToGallery = value as Boolean)
                     "enter_key_behavior" -> current.copy(enterKeyBehavior = value as String)
                     "link_previews_enabled" -> current.copy(linkPreviewsEnabled = value as Boolean)
+                    "wallpaper_type" -> current.copy(wallpaperType = value as String)
+                    "wallpaper_reference" -> current.copy(wallpaperReference = value as String)
                     else -> current
                 }
+            }
+        }
+    }
+
+    fun updateWallpaper(type: String, reference: String) {
+        viewModelScope.launch {
+            settingsRepository.updateChatSettings { current ->
+                current.copy(wallpaperType = type, wallpaperReference = reference)
+            }
+            userPreferencesRepository.updateChatSettings(wallpaper = reference)
+        }
+    }
+
+    fun uploadWallpaper(byteArray: ByteArray, onResult: (Result<String>) -> Unit = {}) {
+        viewModelScope.launch {
+            val auth = authRepository
+            if (auth == null) {
+                onResult(Result.failure(Exception("AuthRepository not available")))
+                return@launch
+            }
+            auth.uploadWallpaper(byteArray).onSuccess { url ->
+                updateWallpaper("CUSTOM", url)
+                onResult(Result.success(url))
+            }.onFailure { error ->
+                onResult(Result.failure(error))
             }
         }
     }

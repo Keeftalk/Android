@@ -274,6 +274,7 @@ fun ViewProfileContent(
                     initials = AvatarUtils.getInitials(profile.fullName ?: profile.username),
                     seed = profile.id,
                     size = 110.dp,
+                    useOriginal = true,
                     modifier = Modifier
                         .padding(start = 24.dp)
                         .offset(y = (-55).dp)
@@ -732,6 +733,7 @@ fun EditProfileContent(
                         initials = AvatarUtils.getInitials(fullName),
                         seed = profile.id,
                         size = 100.dp,
+                        useOriginal = true,
                         modifier = Modifier.clip(CircleShape).clickable { onAvatarClick() }
                     )
                     Surface(

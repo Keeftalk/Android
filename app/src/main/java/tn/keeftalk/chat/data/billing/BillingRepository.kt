@@ -92,10 +92,15 @@ class BillingRepository(
         }
     }
 
-    suspend fun topUpPrepaidBalance(authToken: String, amountUsd: Double, purchaseToken: String): Result<Double> = withContext(Dispatchers.IO) {
+    suspend fun topUpPrepaidBalance(
+        authToken: String,
+        amountUsd: Double,
+        purchaseToken: String,
+        productId: String = ""
+    ): Result<Double> = withContext(Dispatchers.IO) {
         try {
             val url = "${BuildConfig.SUPABASE_URL.trimEnd('/')}/functions/v1/verify-purchase"
-            val payload = """{"purchaseToken":"$purchaseToken","topupAmount":$amountUsd}"""
+            val payload = """{"purchaseToken":"$purchaseToken","productId":"$productId","topupAmount":$amountUsd}"""
             val request = Request.Builder()
                 .url(url)
                 .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)

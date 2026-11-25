@@ -547,6 +547,16 @@ class AuthRepositoryImpl(
         }
     }
 
+    override suspend fun getCurrentAccessToken(): String? {
+        return try {
+            val supabase = getSupabase()
+            supabase.auth.currentAccessTokenOrNull() ?: supabase.auth.currentSessionOrNull()?.accessToken
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to retrieve access token: ${e.message}")
+            null
+        }
+    }
+
     override suspend fun updateProfile(profile: Profile): Result<Unit> = try {
         val supabase = getSupabase()
         val profileMap = buildJsonObject {
@@ -617,21 +627,33 @@ class AuthRepositoryImpl(
     override suspend fun uploadAvatar(byteArray: ByteArray): Result<String> = try {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
-        val fileId = UUID.randomUUID().toString()
+        val pictureId = UUID.randomUUID().toString()
 
-        val uploadTarget = r2StorageClient.getUploadUrl(
-            fileId = fileId,
+        val (originalBytes, compressedBytes) = tn.keeftalk.chat.util.AvatarUtils.createAvatarVariants(byteArray)
+
+        // Upload original
+        val origTarget = r2StorageClient.getUploadUrl(
+            fileId = pictureId,
             category = "avatars",
             subpath = "original",
             contentType = "image/jpeg"
         ).getOrThrow()
+        r2StorageClient.uploadByteArray(origTarget.url, originalBytes, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(pictureId, origTarget.objectKey)
 
-        r2StorageClient.uploadByteArray(uploadTarget.url, byteArray, "image/jpeg").getOrThrow()
-        r2StorageClient.finalizeUpload(fileId, uploadTarget.objectKey)
+        // Upload compressed
+        val compTarget = r2StorageClient.getUploadUrl(
+            fileId = pictureId,
+            category = "avatars",
+            subpath = "compressed",
+            contentType = "image/jpeg"
+        ).getOrThrow()
+        r2StorageClient.uploadByteArray(compTarget.url, compressedBytes, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(pictureId, compTarget.objectKey)
 
-        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(uploadTarget.objectKey)
-        PersistentAvatarManager.saveAvatar(context, userId, byteArray)
-        Result.success(url)
+        val compressedUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(compTarget.objectKey)
+        PersistentAvatarManager.saveAvatar(context, userId, compressedBytes, compressedUrl)
+        Result.success(compressedUrl)
     } catch (e: Exception) {
         Log.e(TAG, "ENDPOINT: storage/avatars/upload | ERROR: ${e.message}", e)
         Result.failure(e)
@@ -640,23 +662,78 @@ class AuthRepositoryImpl(
     override suspend fun uploadCover(byteArray: ByteArray): Result<String> = try {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
-        val fileId = UUID.randomUUID().toString()
+        val coverId = UUID.randomUUID().toString()
 
-        val uploadTarget = r2StorageClient.getUploadUrl(
-            fileId = fileId,
+        val (originalBytes, compressedBytes) = tn.keeftalk.chat.util.AvatarUtils.createAvatarVariants(byteArray)
+
+        val origTarget = r2StorageClient.getUploadUrl(
+            fileId = coverId,
             category = "covers",
             subpath = "original",
             contentType = "image/jpeg"
         ).getOrThrow()
+        r2StorageClient.uploadByteArray(origTarget.url, originalBytes, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(coverId, origTarget.objectKey)
 
-        r2StorageClient.uploadByteArray(uploadTarget.url, byteArray, "image/jpeg").getOrThrow()
-        r2StorageClient.finalizeUpload(fileId, uploadTarget.objectKey)
+        val compTarget = r2StorageClient.getUploadUrl(
+            fileId = coverId,
+            category = "covers",
+            subpath = "compressed",
+            contentType = "image/jpeg"
+        ).getOrThrow()
+        r2StorageClient.uploadByteArray(compTarget.url, compressedBytes, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(coverId, compTarget.objectKey)
 
-        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(uploadTarget.objectKey)
-        PersistentAvatarManager.saveAvatar(context, userId, byteArray)
+        val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(origTarget.objectKey)
         Result.success(url)
     } catch (e: Exception) {
         Log.e(TAG, "ENDPOINT: storage/covers/upload | ERROR: ${e.message}", e)
+        Result.failure(e)
+    }
+
+    override suspend fun uploadWallpaper(byteArray: ByteArray): Result<String> = try {
+        val supabase = getSupabase()
+        val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
+        val wallpaperId = UUID.randomUUID().toString()
+
+        val (originalBytes, compressedBytes) = tn.keeftalk.chat.util.AvatarUtils.createWallpaperVariants(byteArray)
+
+        val origTarget = r2StorageClient.getUploadUrl(
+            fileId = wallpaperId,
+            category = "wallpapers",
+            subpath = "original",
+            contentType = "image/jpeg"
+        ).getOrThrow()
+        r2StorageClient.uploadByteArray(origTarget.url, originalBytes, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(wallpaperId, origTarget.objectKey)
+
+        val compTarget = r2StorageClient.getUploadUrl(
+            fileId = wallpaperId,
+            category = "wallpapers",
+            subpath = "compressed",
+            contentType = "image/jpeg"
+        ).getOrThrow()
+        r2StorageClient.uploadByteArray(compTarget.url, compressedBytes, "image/jpeg").getOrThrow()
+        r2StorageClient.finalizeUpload(wallpaperId, compTarget.objectKey)
+
+        val originalUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(origTarget.objectKey)
+
+        // Update user_chat_settings in database
+        try {
+            val payload = mapOf(
+                "wallpaper_type" to "CUSTOM",
+                "wallpaper_reference" to originalUrl
+            )
+            supabase.postgrest["user_chat_settings"].update(payload) {
+                filter { eq("user_id", userId) }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to persist wallpaper reference in user_chat_settings", e)
+        }
+
+        Result.success(originalUrl)
+    } catch (e: Exception) {
+        Log.e(TAG, "ENDPOINT: storage/wallpapers/upload | ERROR: ${e.message}", e)
         Result.failure(e)
     }
 

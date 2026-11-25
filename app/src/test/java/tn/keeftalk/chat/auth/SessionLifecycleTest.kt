@@ -43,6 +43,8 @@ class SessionLifecycleTest {
         override val currentUserProfile: Flow<Profile?> = flowOf(null)
         override val isEncryptionContextAvailable: Flow<Boolean> = flowOf(true)
 
+        override suspend fun getCurrentAccessToken(): String? = "fake_access_token"
+
         override suspend fun complete2FALogin(userId: String, password: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun refreshSession(): Result<Unit> {
@@ -69,6 +71,7 @@ class SessionLifecycleTest {
         override suspend fun updateProfile(profile: Profile): Result<Unit> = Result.success(Unit)
         override suspend fun uploadAvatar(byteArray: ByteArray): Result<String> = Result.success("url")
         override suspend fun uploadCover(byteArray: ByteArray): Result<String> = Result.success("url")
+        override suspend fun uploadWallpaper(byteArray: ByteArray): Result<String> = Result.success("url")
         override suspend fun updateFcmToken(token: String): Result<Unit> = Result.success(Unit)
         override suspend fun updatePresence(isActive: Boolean): Result<Unit> = Result.success(Unit)
         override suspend fun refreshProfile(userId: String): Result<Unit> = Result.success(Unit)

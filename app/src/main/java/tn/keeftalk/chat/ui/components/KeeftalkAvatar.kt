@@ -49,16 +49,23 @@ fun KeeftalkAvatar(
     fontSize: Float = if (size < 20.dp) (size.value * 0.6f) else (size.value * 0.4f),
     isOnline: Boolean = false,
     isKeeftalkUser: Boolean = false,
-    isSkeleton: Boolean = false
+    isSkeleton: Boolean = false,
+    useOriginal: Boolean = false
 ) {
     val context = LocalContext.current
     val avatarColor = remember(seed, initials) { AvatarUtils.getAvatarColor(seed ?: initials) }
     val textColor = remember(avatarColor) { AvatarUtils.getTextColorForBackground(avatarColor) }
     
-    // Persistent caching logic
-    var localAvatarFile by remember(seed) { 
-        mutableStateOf(seed?.let { PersistentAvatarManager.getLocalAvatarFile(context, it) }) 
+    val resolvedUrl = remember(avatarUrl, useOriginal) {
+        if (useOriginal) AvatarUtils.toOriginalUrl(avatarUrl) else AvatarUtils.toCompressedUrl(avatarUrl)
     }
+
+    // Persistent caching logic checking URL match
+    var localAvatarFile by remember(seed, resolvedUrl) { 
+        mutableStateOf(seed?.let { PersistentAvatarManager.getLocalAvatarFile(context, it, resolvedUrl) }) 
+    }
+
+    var isLoadFailed by remember(resolvedUrl) { mutableStateOf(false) }
 
     val borderWidth = if (size < 20.dp) 1.dp else 2.dp
 
@@ -74,25 +81,31 @@ fun KeeftalkAvatar(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                if (!isSkeleton && (!avatarUrl.isNullOrBlank() || localAvatarFile != null)) {
-                    val model = remember(avatarUrl, localAvatarFile) {
+                if (!isSkeleton && !isLoadFailed && (!resolvedUrl.isNullOrBlank() || localAvatarFile != null)) {
+                    val targetPx = remember(size) {
+                        val density = context.resources.displayMetrics.density
+                        (size.value * density).toInt().coerceAtLeast(128)
+                    }
+                    val model = remember(resolvedUrl, localAvatarFile) {
                         ImageRequest.Builder(context)
-                            .data(localAvatarFile ?: avatarUrl)
+                            .data(localAvatarFile ?: resolvedUrl)
                             .crossfade(true)
-                            .size(width = 256, height = 256)
+                            .size(width = targetPx, height = targetPx)
                             .transformations(CircleCropTransformation())
                             .listener(
                                 onSuccess = { _, result ->
-                                    // If we successfully loaded from network, save it locally for persistence
-                                    if (result.dataSource == DataSource.NETWORK && seed != null) {
+                                    if (result.dataSource == DataSource.NETWORK && seed != null && resolvedUrl != null) {
                                         val drawable = result.drawable
                                         if (drawable is android.graphics.drawable.BitmapDrawable) {
                                             val bitmap = drawable.bitmap
                                             val stream = java.io.ByteArrayOutputStream()
                                             bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, stream)
-                                            PersistentAvatarManager.saveAvatar(context, seed, stream.toByteArray())
+                                            PersistentAvatarManager.saveAvatar(context, seed, stream.toByteArray(), resolvedUrl)
                                         }
                                     }
+                                },
+                                onError = { _, _ ->
+                                    isLoadFailed = true
                                 }
                             )
                             .build()

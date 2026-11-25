@@ -44,12 +44,19 @@ class SettingsViewModel(
     private val chatRepository: tn.keeftalk.chat.domain.repository.ChatRepository,
     private val privacyRepository: PrivacyRepository,
     private val securityRepository: SecurityRepository,
-    private val settingsRepository: tn.keeftalk.chat.domain.repository.SettingsRepository
+    private val settingsRepository: tn.keeftalk.chat.domain.repository.SettingsRepository,
+    private val billingRepository: tn.keeftalk.chat.data.billing.BillingRepository? = null
 ) : ViewModel() {
 
     init {
         settingsRepository.startSettingsSync()
     }
+
+    val cloudBillingState = MutableStateFlow<tn.keeftalk.chat.data.billing.CloudBillingState?>(null)
+    val cloudPricing = MutableStateFlow<tn.keeftalk.chat.data.billing.CloudPricing?>(null)
+    val invoiceHistory = MutableStateFlow<List<tn.keeftalk.chat.data.billing.InvoiceSummary>>(emptyList())
+    val isBillingLoading = MutableStateFlow<Boolean>(false)
+    val billingMessage = MutableStateFlow<String?>(null)
 
     val fullSettings: StateFlow<UserSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserSettings(userId = ""))
@@ -357,6 +364,66 @@ class SettingsViewModel(
                 enableSyncForUnlockedFeatures()
             }
             onResult(result)
+        }
+    }
+
+    fun loadBillingData() {
+        viewModelScope.launch {
+            isBillingLoading.value = true
+            val repo = billingRepository
+            if (repo != null) {
+                // Fetch pricing configuration
+                repo.fetchActivePricing().onSuccess { pricing ->
+                    cloudPricing.value = pricing
+                }
+
+                val token = authRepository.getCurrentAccessToken() ?: ""
+                if (token.isNotBlank()) {
+                    // Fetch real-time billing state (usage, prepaid balance, cost estimates)
+                    repo.fetchCloudBillingState(token).onSuccess { state ->
+                        cloudBillingState.value = state
+                        // Update profile storage count with real verified backend count
+                        currentUserProfile.value?.let { profile ->
+                            authRepository.updateProfile(profile.copy(storageUsed = state.currentUsage.storageBytes))
+                        }
+                    }
+
+                    // Fetch past invoice history
+                    repo.fetchInvoiceHistory(token).onSuccess { invoices ->
+                        invoiceHistory.value = invoices
+                    }
+                }
+            }
+            isBillingLoading.value = false
+        }
+    }
+
+    fun topUpBalance(
+        amountUsd: Double,
+        purchaseToken: String,
+        productId: String = "",
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            isBillingLoading.value = true
+            val token = authRepository.getCurrentAccessToken() ?: ""
+            val repo = billingRepository
+            if (repo != null && token.isNotBlank()) {
+                val result = repo.topUpPrepaidBalance(token, amountUsd, purchaseToken, productId)
+                if (result.isSuccess) {
+                    val msg = "Top-up of $$amountUsd verified with server successfully!"
+                    billingMessage.value = msg
+                    loadBillingData()
+                    onComplete(true, msg)
+                } else {
+                    val err = result.exceptionOrNull()?.message ?: "Top-up verification failed"
+                    billingMessage.value = err
+                    onComplete(false, err)
+                }
+            } else {
+                onComplete(false, "Authentication required for top-up")
+            }
+            isBillingLoading.value = false
         }
     }
 }

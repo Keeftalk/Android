@@ -106,38 +106,137 @@ fun ChatAppearanceSettingsScreen(
                     )
                 }
             }
+
+            item {
+                var showColorPicker by remember { mutableStateOf(false) }
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var isUploading by remember { mutableStateOf(false) }
+
+                val wallpaperLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                ) { uri ->
+                    uri?.let {
+                        val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+                        bytes?.let { data ->
+                            isUploading = true
+                            viewModel.uploadWallpaper(data) { _ ->
+                                isUploading = false
+                            }
+                        }
+                    }
+                }
+
+                SettingsSection(title = "Chat Wallpaper") {
+                    SettingsItem(
+                        icon = icons.sparkles,
+                        title = "Default Wallpaper",
+                        trailing = {
+                            RadioButton(
+                                selected = settings.wallpaperType == "COLOR" && settings.wallpaperReference == "#F0F2F5",
+                                onClick = { viewModel.updateWallpaper("COLOR", "#F0F2F5") }
+                            )
+                        },
+                        onClick = { viewModel.updateWallpaper("COLOR", "#F0F2F5") }
+                    )
+
+                    SettingsItem(
+                        icon = icons.palette,
+                        title = "Solid Color",
+                        subtitle = if (settings.wallpaperType == "COLOR" && settings.wallpaperReference != "#F0F2F5") settings.wallpaperReference else "Choose preset color",
+                        trailing = {
+                            RadioButton(
+                                selected = settings.wallpaperType == "COLOR" && settings.wallpaperReference != "#F0F2F5",
+                                onClick = { showColorPicker = true }
+                            )
+                        },
+                        onClick = { showColorPicker = true }
+                    )
+
+                    SettingsItem(
+                        icon = icons.edit,
+                        title = if (isUploading) "Uploading Wallpaper..." else "Custom Photo Wallpaper",
+                        subtitle = if (settings.wallpaperType == "CUSTOM") "Custom R2 CDN image applied" else "Choose photo from gallery",
+                        trailing = {
+                            if (isUploading) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                RadioButton(
+                                    selected = settings.wallpaperType == "CUSTOM",
+                                    onClick = { wallpaperLauncher.launch("image/*") }
+                                )
+                            }
+                        },
+                        onClick = { wallpaperLauncher.launch("image/*") },
+                        showDivider = false
+                    )
+                }
+
+                if (showColorPicker) {
+                    ColorPickerDialog(
+                        initialColor = settings.wallpaperReference,
+                        onDismiss = { showColorPicker = false },
+                        onColorSelected = { colorHex ->
+                            viewModel.updateWallpaper("COLOR", colorHex)
+                            showColorPicker = false
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 fun ChatPreview(settings: tn.keeftalk.chat.domain.model.UserChatSettings) {
-    Column(
+    val bgColor = remember(settings.wallpaperType, settings.wallpaperReference) {
+        if (settings.wallpaperType == "COLOR" && settings.wallpaperReference.startsWith("#")) {
+            try { Color(android.graphics.Color.parseColor(settings.wallpaperReference)) } catch (_: Exception) { Color.Transparent }
+        } else {
+            Color.Transparent
+        }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clip(RoundedCornerShape(24.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(16.dp)
+            .background(bgColor)
     ) {
-        Text(
-            "Preview",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
+        if (settings.wallpaperType == "CUSTOM" || settings.wallpaperReference.startsWith("http")) {
+            coil.compose.AsyncImage(
+                model = settings.wallpaperReference,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            )
+        }
         
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PreviewBubble(
-                text = "Hey! Check out this new redesign.",
-                isMe = false,
-                settings = settings
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                "Preview",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
-            PreviewBubble(
-                text = "Looks amazing! I love the smooth animations.",
-                isMe = true,
-                settings = settings
-            )
+            
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                PreviewBubble(
+                    text = "Hey! Check out this new redesign.",
+                    isMe = false,
+                    settings = settings
+                )
+                PreviewBubble(
+                    text = "Looks amazing! I love the smooth animations.",
+                    isMe = true,
+                    settings = settings
+                )
+            }
         }
     }
 }

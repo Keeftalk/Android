@@ -28,6 +28,7 @@ interface AuthRepository {
     suspend fun updateProfile(profile: Profile): Result<Unit>
     suspend fun uploadAvatar(byteArray: ByteArray): Result<String>
     suspend fun uploadCover(byteArray: ByteArray): Result<String>
+    suspend fun uploadWallpaper(byteArray: ByteArray): Result<String>
     suspend fun getProfile(userId: String): Result<Profile>
     suspend fun checkUsernameAvailability(username: String): Result<Boolean>
     suspend fun updateFcmToken(token: String): Result<Unit>
@@ -54,6 +55,7 @@ interface AuthRepository {
     suspend fun findProfilesByIdentifier(identifier: String): Result<List<tn.keeftalk.chat.domain.model.Profile>>
 
     suspend fun verifySubscriptionPurchase(purchaseToken: String, productId: String): Result<Unit>
+    suspend fun getCurrentAccessToken(): String?
 
     fun shutdown()
 

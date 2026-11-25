@@ -1900,7 +1900,8 @@ fun MainScaffold(
                                         mainViewModel.chatRepository,
                                         AppModule.providePrivacyRepository(context),
                                         AppModule.provideSecurityRepository(context),
-                                        AppModule.provideSettingsRepository(context)
+                                        AppModule.provideSettingsRepository(context),
+                                        AppModule.provideBillingRepository(context)
                                     )
                                 }
                                 tn.keeftalk.chat.ui.settings.SubscriptionPlansScreen(
@@ -1917,7 +1918,8 @@ fun MainScaffold(
                                         mainViewModel.chatRepository,
                                         AppModule.providePrivacyRepository(context),
                                         AppModule.provideSecurityRepository(context),
-                                        AppModule.provideSettingsRepository(context)
+                                        AppModule.provideSettingsRepository(context),
+                                        AppModule.provideBillingRepository(context)
                                     )
                                 }
                                 tn.keeftalk.chat.ui.settings.AccountSettingsScreen(
@@ -2188,7 +2190,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 ChatSettingsScreen(
@@ -2206,7 +2209,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 ChatAppearanceSettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.ChatSettings) })
@@ -2215,7 +2219,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 TextAccessibilitySettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
@@ -2224,7 +2229,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 MediaDownloadsSettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.ChatSettings) })
@@ -2233,7 +2239,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 ChatBehaviorSettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.ChatSettings) })
@@ -2242,7 +2249,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 StorageCacheSettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.Settings) })
@@ -2251,7 +2259,8 @@ fun MainScaffold(
                                 val chatSettingsViewModel: ChatSettingsViewModel = viewModel {
                                     ChatSettingsViewModel(
                                         AppModule.provideSettingsRepository(context),
-                                        AppModule.provideUserPreferencesRepository(context)
+                                        AppModule.provideUserPreferencesRepository(context),
+                                        AppModule.provideAuthRepository(context)
                                     )
                                 }
                                 ChatCleanupSettingsScreen(viewModel = chatSettingsViewModel, onBack = { onScreenChange(AppScreen.ChatStorageCacheSettings) })

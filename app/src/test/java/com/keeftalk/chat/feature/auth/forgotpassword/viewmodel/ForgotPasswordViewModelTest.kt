@@ -98,6 +98,8 @@ class ForgotPasswordViewModelTest {
         override val isEmailVerified: Flow<Boolean> = flowOf(false)
         override val isEncryptionContextAvailable: Flow<Boolean> = flowOf(true)
 
+        override suspend fun getCurrentAccessToken(): String? = "fake_access_token"
+
         override suspend fun complete2FALogin(userId: String, password: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun getAuthenticatedUser(): io.github.jan.supabase.auth.user.UserInfo? = null
@@ -123,6 +125,7 @@ class ForgotPasswordViewModelTest {
         override suspend fun updateProfile(profile: Profile): Result<Unit> = TODO()
         override suspend fun uploadAvatar(byteArray: ByteArray): Result<String> = TODO()
         override suspend fun uploadCover(byteArray: ByteArray): Result<String> = TODO()
+        override suspend fun uploadWallpaper(byteArray: ByteArray): Result<String> = TODO()
         override suspend fun getProfile(userId: String): Result<Profile> = TODO()
         override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = TODO()
         override suspend fun updateFcmToken(token: String): Result<Unit> = TODO()
