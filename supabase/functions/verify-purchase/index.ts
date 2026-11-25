@@ -17,17 +17,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { purchaseToken, productId, topupAmount } = await req.json()
+    const body = await req.json().catch(() => ({}))
+    const { purchaseToken, productId, topupAmount } = body
 
     // 1. Get current user
-    const authHeader = req.headers.get('Authorization')!
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), { status: 401, headers: corsHeaders })
+    }
+
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
 
-    if (userError || !user) throw new Error('Not authenticated')
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401, headers: corsHeaders })
+    }
 
-    // Determine top-up amount in USD (default to $5.00 if topupAmount not specified)
-    const amountToAdd = Number(topupAmount) || 5.00
+    // Determine top-up amount in USD accurately
+    let amountToAdd = Number(topupAmount)
+    if (isNaN(amountToAdd) || amountToAdd <= 0) {
+      if (productId === 'keeftalk_balance_10') amountToAdd = 10.00
+      else if (productId === 'keeftalk_balance_25') amountToAdd = 25.00
+      else amountToAdd = 5.00
+    }
     const idempotencyKey = `topup_${purchaseToken || Math.random().toString(36).substring(7)}`
 
     // Record top-up in billing_payments

@@ -44,12 +44,19 @@ object StorageConfig {
     const val MARKET_CDN_BASE = "https://$CDN_MARKET"
 
     /**
-     * Builds standard object key adhering to: {country_code}/{user_id}/{category}/...
+     * Builds standard object key:
+     * - Public categories (avatars, covers, wallpapers, market, public): {user_id}/{category}/{relative_path}
+     * - Private categories (files, archives, etc.): {country_code}/{user_id}/{category}/{relative_path}
      */
     fun buildUserKey(countryCode: String, userId: String, category: String, relativePath: String): String {
-        val cleanCountry = if (countryCode.isNotBlank()) countryCode.uppercase().trim() else "TN"
-        val cleanCat = category.trim('/')
+        val cleanCat = category.trim('/').lowercase()
         val cleanRel = relativePath.trim('/')
+        
+        if (cleanCat in listOf("avatars", "covers", "wallpapers", "market", "public")) {
+            return if (cleanCat.isEmpty()) "$userId/$cleanRel" else "$userId/$cleanCat/$cleanRel"
+        }
+
+        val cleanCountry = if (countryCode.isNotBlank()) countryCode.uppercase().trim() else "TN"
         return if (cleanCat.isEmpty()) "$cleanCountry/$userId/$cleanRel" else "$cleanCountry/$userId/$cleanCat/$cleanRel"
     }
 
@@ -62,19 +69,26 @@ object StorageConfig {
 
     /**
      * Resolves public CDN URL for public media.
-     * Example: https://public.cdn.keeftalk.com/TN/{user_id}/avatars/avatar_123.jpg
+     * Example: https://public.cdn.keeftalk.com/{user_id}/avatars/{picture_id}/original
      */
     fun getPublicCdnUrl(objectKey: String): String {
-        val cleanKey = objectKey.trim('/')
+        var cleanKey = objectKey.trim('/')
+        // Strip duplicate bucket prefix or legacy country prefix if present in public CDN keys
+        if (cleanKey.startsWith("keeftalk-public/")) {
+            cleanKey = cleanKey.removePrefix("keeftalk-public/").trim('/')
+        }
         return "$PUBLIC_CDN_BASE/$cleanKey"
     }
 
     /**
      * Resolves Market CDN URL for market media.
-     * Example: https://cdn.market.keeftalk.com/TN/{user_id}/item_123.jpg
+     * Example: https://cdn.market.keeftalk.com/{user_id}/item_123.jpg
      */
     fun getMarketCdnUrl(objectKey: String): String {
-        val cleanKey = objectKey.trim('/')
+        var cleanKey = objectKey.trim('/')
+        if (cleanKey.startsWith("keeftalk-market/")) {
+            cleanKey = cleanKey.removePrefix("keeftalk-market/").trim('/')
+        }
         return "$MARKET_CDN_BASE/$cleanKey"
     }
 }

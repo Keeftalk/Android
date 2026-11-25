@@ -21,9 +21,19 @@ object PersistentAvatarManager {
 
     private fun getPrefs(context: Context) = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
-    fun getLocalAvatarFile(context: Context, identifier: String): File? {
+    fun getLocalAvatarFile(context: Context, identifier: String, expectedUrl: String? = null): File? {
         val file = File(getAvatarDir(context), "${identifier}.jpg")
-        return if (file.exists()) file else null
+        if (!file.exists()) return null
+        if (!expectedUrl.isNullOrBlank()) {
+            val cachedUrl = getPrefs(context).getString(identifier, null)
+            if (cachedUrl != expectedUrl) {
+                // Cache is stale
+                file.delete()
+                getPrefs(context).edit { remove(identifier) }
+                return null
+            }
+        }
+        return file
     }
 
     fun saveAvatar(context: Context, identifier: String, bytes: ByteArray, url: String? = null) {
