@@ -61,30 +61,25 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             override fun onBillingServiceDisconnected() {
                 Log.w("BillingManager", "Billing service disconnected")
                 _isServiceConnected.value = false
-                // Attempt to reconnect later if needed
             }
         })
     }
 
     private fun queryProductDetails() {
-        Log.d("BillingManager", "Querying product details...")
+        Log.d("BillingManager", "Querying pay-as-you-go balance top-up products...")
         _isQuerying.value = true
         val productList = listOf(
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(PLUS_MONTHLY)
-                .setProductType(ProductType.SUBS)
+                .setProductId(BALANCE_TOPUP_5)
+                .setProductType(ProductType.INAPP)
                 .build(),
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(PLUS_YEARLY)
-                .setProductType(ProductType.SUBS)
+                .setProductId(BALANCE_TOPUP_10)
+                .setProductType(ProductType.INAPP)
                 .build(),
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(PRO_MONTHLY)
-                .setProductType(ProductType.SUBS)
-                .build(),
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(FAMILY_MONTHLY)
-                .setProductType(ProductType.SUBS)
+                .setProductId(BALANCE_TOPUP_25)
+                .setProductType(ProductType.INAPP)
                 .build()
         )
 
@@ -96,9 +91,6 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             _isQuerying.value = false
             if (billingResult.responseCode == BillingResponseCode.OK) {
                 Log.d("BillingManager", "Products queried successfully: ${result.productDetailsList.size} found")
-                result.productDetailsList.forEach { 
-                    Log.d("BillingManager", "Product: ${it.productId}, Title: ${it.title}")
-                }
                 _productDetails.value = result.productDetailsList
             } else {
                 Log.e("BillingManager", "Failed to query products: ${billingResult.responseCode} - ${billingResult.debugMessage}")
@@ -107,43 +99,20 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     }
 
     fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails) {
-        Log.d("BillingManager", "Attempting to launch purchase flow for: ${productDetails.productId}")
+        Log.d("BillingManager", "Attempting to launch top-up purchase flow for: ${productDetails.productId}")
         
         if (!_isServiceConnected.value) {
             Log.e("BillingManager", "Cannot launch purchase flow: Billing service not connected")
-            startConnection() // Attempt to reconnect
+            startConnection()
             scope.launch {
                 _purchaseEvents.emit(PurchaseResult.Error("Billing service is connecting. Please try again in a moment."))
             }
             return
         }
 
-        val subscriptionOfferDetails = productDetails.subscriptionOfferDetails
-        if (subscriptionOfferDetails.isNullOrEmpty()) {
-            Log.e("BillingManager", "No subscription offer details found for ${productDetails.productId}")
-            scope.launch {
-                _purchaseEvents.emit(PurchaseResult.Error("This plan is currently unavailable (no active offers found)."))
-            }
-            return
-        }
-
-        // Try to find the base plan offer (usually has no offerId) or take the first eligible offer
-        val offerDetails = subscriptionOfferDetails.find { it.offerId == null } 
-            ?: subscriptionOfferDetails.firstOrNull()
-            
-        val offerToken = offerDetails?.offerToken
-        if (offerToken.isNullOrBlank()) {
-            Log.e("BillingManager", "Offer token is null or blank for ${productDetails.productId}")
-            scope.launch {
-                _purchaseEvents.emit(PurchaseResult.Error("Could not initiate purchase: Invalid offer token."))
-            }
-            return
-        }
-        
         val productDetailsParamsList = listOf(
             BillingFlowParams.ProductDetailsParams.newBuilder()
                 .setProductDetails(productDetails)
-                .setOfferToken(offerToken)
                 .build()
         )
 
@@ -157,18 +126,10 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         
         Log.d("BillingManager", "Launch billing flow result: $responseCode $debugMessage")
         
-        if (responseCode != BillingResponseCode.OK) {
-            val errorMessage = when (responseCode) {
-                BillingResponseCode.USER_CANCELED -> null // Handled in onPurchasesUpdated
-                BillingResponseCode.ITEM_ALREADY_OWNED -> "You already own this subscription."
-                BillingResponseCode.DEVELOPER_ERROR -> "Internal billing error. Please check your account configuration."
-                else -> debugMessage.ifBlank { "Billing error (code $responseCode)" }
-            }
-            
-            errorMessage?.let {
-                scope.launch {
-                    _purchaseEvents.emit(PurchaseResult.Error(it))
-                }
+        if (responseCode != BillingResponseCode.OK && responseCode != BillingResponseCode.USER_CANCELED) {
+            val errorMessage = debugMessage.ifBlank { "Billing error (code $responseCode)" }
+            scope.launch {
+                _purchaseEvents.emit(PurchaseResult.Error(errorMessage))
             }
         }
     }
@@ -196,10 +157,15 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     }
 
     companion object {
-        const val PLUS_MONTHLY = "keeftalk_plus_monthly"
-        const val PLUS_YEARLY = "keeftalk_plus_yearly"
-        const val PRO_MONTHLY = "keeftalk_pro_monthly"
-        const val FAMILY_MONTHLY = "keeftalk_family_monthly"
+        const val BALANCE_TOPUP_5 = "keeftalk_balance_5"
+        const val BALANCE_TOPUP_10 = "keeftalk_balance_10"
+        const val BALANCE_TOPUP_25 = "keeftalk_balance_25"
+
+        // Legacy compatibility alias constants
+        const val PLUS_MONTHLY = BALANCE_TOPUP_5
+        const val PLUS_YEARLY = BALANCE_TOPUP_10
+        const val PRO_MONTHLY = BALANCE_TOPUP_25
+        const val FAMILY_MONTHLY = BALANCE_TOPUP_25
     }
 }
 
