@@ -3,8 +3,10 @@ package tn.keeftalk.chat.data.repository
 import android.content.Context
 import android.util.Log
 import tn.keeftalk.chat.data.local.dao.ProfileDao
+import tn.keeftalk.chat.data.local.dao.ProfileMediaDao
 import tn.keeftalk.chat.data.local.dao.UserDao
 import tn.keeftalk.chat.data.local.entities.ProfileEntity
+import tn.keeftalk.chat.data.local.entities.ProfileMediaEntity
 import tn.keeftalk.chat.data.local.entities.toDomain
 import tn.keeftalk.chat.data.local.entities.toEntity
 import tn.keeftalk.chat.data.prefs.UserPreferencesRepository
@@ -35,6 +37,8 @@ import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.statement.bodyAsText
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,8 +65,11 @@ class AuthRepositoryImpl(
     private val context: Context,
     private val profileDao: ProfileDao,
     private val userDao: UserDao,
-    private val prefs: UserPreferencesRepository
+    private val prefs: UserPreferencesRepository,
+    private val profileMediaDao: ProfileMediaDao? = null
 ) : AuthRepository {
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     private suspend fun getSupabase(): SupabaseClient {
         return AppModule.provideSupabaseClientAsync(context)
@@ -624,6 +631,54 @@ class AuthRepositoryImpl(
     private val r2StorageClient: tn.keeftalk.chat.util.R2StorageClient
         get() = tn.keeftalk.chat.util.R2StorageClient({ getSupabase() })
 
+    private suspend fun saveRegisteredMedia(
+        userId: String,
+        responseText: String,
+        mediaType: String,
+        origKey: String,
+        compKey: String?,
+        origUrl: String,
+        compUrl: String?
+    ) {
+        val dao = profileMediaDao ?: return
+        try {
+            val responseObj = json.parseToJsonElement(responseText).jsonObject
+            val mediaObj = responseObj["media"]?.jsonObject
+            if (mediaObj != null) {
+                val mediaId = mediaObj["id"]?.jsonPrimitive?.content ?: return
+                val createdAtStr = mediaObj["created_at"]?.jsonPrimitive?.content
+                val activatedAtStr = mediaObj["activated_at"]?.jsonPrimitive?.content
+                val entity = ProfileMediaEntity(
+                    id = mediaId,
+                    userId = userId,
+                    mediaType = mediaType,
+                    originalObjectKey = origKey,
+                    compressedObjectKey = compKey,
+                    originalCdnUrl = origUrl,
+                    compressedCdnUrl = compUrl,
+                    status = "ACTIVE",
+                    isActive = true,
+                    createdAt = parseTimestamp(createdAtStr),
+                    activatedAt = parseTimestamp(activatedAtStr)
+                )
+                dao.setActiveMedia(userId, mediaType, mediaId)
+                dao.insertOrUpdateMedia(entity)
+                Log.d(TAG, "Saved registered media entity locally with UUID: $mediaId")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to save registered media entity locally: ${e.message}")
+        }
+    }
+
+    private fun parseTimestamp(str: String?): Long {
+        if (str.isNullOrBlank()) return System.currentTimeMillis()
+        return try {
+            java.time.Instant.parse(str).toEpochMilli()
+        } catch (_: Exception) {
+            System.currentTimeMillis()
+        }
+    }
+
     override suspend fun uploadAvatar(byteArray: ByteArray): Result<String> = try {
         val supabase = getSupabase()
         val userId = supabase.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
@@ -652,6 +707,24 @@ class AuthRepositoryImpl(
         r2StorageClient.finalizeUpload(pictureId, compTarget.objectKey)
 
         val compressedUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(compTarget.objectKey)
+        val originalUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(origTarget.objectKey)
+
+        try {
+            val regPayload = buildJsonObject {
+                put("action", "register-profile-media")
+                put("mediaType", "AVATAR")
+                put("originalObjectKey", origTarget.objectKey)
+                put("compressedObjectKey", compTarget.objectKey)
+                put("originalCdnUrl", originalUrl)
+                put("compressedCdnUrl", compressedUrl)
+            }
+            val response = supabase.functions.invoke("storage", body = regPayload)
+            val text = response.bodyAsText()
+            saveRegisteredMedia(userId, text, "AVATAR", origTarget.objectKey, compTarget.objectKey, originalUrl, compressedUrl)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register avatar in profile_media: ${e.message}")
+        }
+
         PersistentAvatarManager.saveAvatar(context, userId, compressedBytes, compressedUrl)
         Result.success(compressedUrl)
     } catch (e: Exception) {
@@ -685,6 +758,22 @@ class AuthRepositoryImpl(
         r2StorageClient.finalizeUpload(coverId, compTarget.objectKey)
 
         val url = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(origTarget.objectKey)
+        val compUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(compTarget.objectKey)
+        try {
+            val regPayload = buildJsonObject {
+                put("action", "register-profile-media")
+                put("mediaType", "WALLPAPER")
+                put("originalObjectKey", origTarget.objectKey)
+                put("compressedObjectKey", compTarget.objectKey)
+                put("originalCdnUrl", url)
+                put("compressedCdnUrl", compUrl)
+            }
+            val response = supabase.functions.invoke("storage", body = regPayload)
+            val text = response.bodyAsText()
+            saveRegisteredMedia(userId, text, "WALLPAPER", origTarget.objectKey, compTarget.objectKey, url, compUrl)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register cover in profile_media: ${e.message}")
+        }
         Result.success(url)
     } catch (e: Exception) {
         Log.e(TAG, "ENDPOINT: storage/covers/upload | ERROR: ${e.message}", e)
@@ -717,6 +806,23 @@ class AuthRepositoryImpl(
         r2StorageClient.finalizeUpload(wallpaperId, compTarget.objectKey)
 
         val originalUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(origTarget.objectKey)
+        val compUrl = tn.keeftalk.chat.util.StorageConfig.getPublicCdnUrl(compTarget.objectKey)
+
+        try {
+            val regPayload = buildJsonObject {
+                put("action", "register-profile-media")
+                put("mediaType", "WALLPAPER")
+                put("originalObjectKey", origTarget.objectKey)
+                put("compressedObjectKey", compTarget.objectKey)
+                put("originalCdnUrl", originalUrl)
+                put("compressedCdnUrl", compUrl)
+            }
+            val response = supabase.functions.invoke("storage", body = regPayload)
+            val text = response.bodyAsText()
+            saveRegisteredMedia(userId, text, "WALLPAPER", origTarget.objectKey, compTarget.objectKey, originalUrl, compUrl)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register wallpaper in profile_media: ${e.message}")
+        }
 
         // Update user_chat_settings in database
         try {

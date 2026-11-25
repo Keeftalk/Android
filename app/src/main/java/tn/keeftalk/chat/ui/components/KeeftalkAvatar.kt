@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.graphicsLayer
 import coil.decode.DataSource
 import tn.keeftalk.chat.util.PersistentAvatarManager
+import androidx.compose.foundation.clickable
 import java.io.File
 
 @Composable
@@ -50,7 +51,8 @@ fun KeeftalkAvatar(
     isOnline: Boolean = false,
     isKeeftalkUser: Boolean = false,
     isSkeleton: Boolean = false,
-    useOriginal: Boolean = false
+    useOriginal: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val avatarColor = remember(seed, initials) { AvatarUtils.getAvatarColor(seed ?: initials) }
@@ -60,16 +62,24 @@ fun KeeftalkAvatar(
         if (useOriginal) AvatarUtils.toOriginalUrl(avatarUrl) else AvatarUtils.toCompressedUrl(avatarUrl)
     }
 
-    // Persistent caching logic checking URL match
-    var localAvatarFile by remember(seed, resolvedUrl) { 
-        mutableStateOf(seed?.let { PersistentAvatarManager.getLocalAvatarFile(context, it, resolvedUrl) }) 
+    val isLocalUri = resolvedUrl?.startsWith("content://") == true || resolvedUrl?.startsWith("file://") == true
+    var localAvatarFile by remember(seed, resolvedUrl, isLocalUri) { 
+        mutableStateOf(if (isLocalUri) null else seed?.let { PersistentAvatarManager.getLocalAvatarFile(context, it, resolvedUrl) }) 
     }
 
     var isLoadFailed by remember(resolvedUrl) { mutableStateOf(false) }
 
+    LaunchedEffect(resolvedUrl) {
+        isLoadFailed = false
+    }
+
     val borderWidth = if (size < 20.dp) 1.dp else 2.dp
 
-    Box(modifier = modifier.size(size)) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .then(if (onClick != null) Modifier.clip(CircleShape).clickable(onClick = onClick) else Modifier)
+    ) {
         // Avatar circular container
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -86,9 +96,9 @@ fun KeeftalkAvatar(
                         val density = context.resources.displayMetrics.density
                         (size.value * density).toInt().coerceAtLeast(128)
                     }
-                    val model = remember(resolvedUrl, localAvatarFile) {
+                    val model = remember(resolvedUrl, localAvatarFile, isLocalUri) {
                         ImageRequest.Builder(context)
-                            .data(localAvatarFile ?: resolvedUrl)
+                            .data(if (isLocalUri) resolvedUrl else (localAvatarFile ?: resolvedUrl))
                             .crossfade(true)
                             .size(width = targetPx, height = targetPx)
                             .transformations(CircleCropTransformation())

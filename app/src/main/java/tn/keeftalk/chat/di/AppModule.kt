@@ -706,11 +706,33 @@ object AppModule {
                     context.applicationContext,
                     db.profileDao(),
                     db.userDao(),
-                    provideUserPreferencesRepository(context)
+                    provideUserPreferencesRepository(context),
+                    db.profileMediaDao()
                 )
                 PerformanceProfiler.endStage("AuthRepository Creation")
                 repoImpl
             }.also { authRepository = it }
+        }
+    }
+
+    @Volatile
+    private var profileMediaRepository: tn.keeftalk.chat.domain.repository.ProfileMediaRepository? = null
+    private val profileMediaRepositoryLock = Any()
+
+    fun provideProfileMediaRepository(context: Context): tn.keeftalk.chat.domain.repository.ProfileMediaRepository {
+        synchronized(profileMediaRepositoryLock) {
+            val repo = profileMediaRepository
+            if (repo != null) return repo
+
+            val db = provideDatabase(context)
+            val repoImpl = tn.keeftalk.chat.data.repository.ProfileMediaRepositoryImpl(
+                supabaseProvider = { provideSupabaseClientAsync(context.applicationContext) },
+                mediaDao = db.profileMediaDao(),
+                chatDao = db.chatDao(),
+                userDao = db.userDao()
+            )
+            profileMediaRepository = repoImpl
+            return repoImpl
         }
     }
 
