@@ -102,7 +102,7 @@ object PersistentAvatarManager {
             }
             saveAvatar(context, identifier, bytes, url)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to proactively cache avatar for $identifier from $url", e)
+            Log.d(TAG, "Proactive CDN avatar cache pending/unavailable for $identifier from $url: ${e.message}")
         }
     }
 }

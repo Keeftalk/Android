@@ -54,6 +54,8 @@ app/release/
 secrets.properties
 keystore.properties
 !keystore.properties.example
+key.properties
+!key.properties.example
 !google-services.json.example
 credentials.json
 service-account*.json

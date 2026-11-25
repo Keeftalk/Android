@@ -185,11 +185,13 @@ Deno.serve(async (req) => {
       }
 
       // Increment download counter
-      await supabase.rpc('increment_extension_download', { p_extension_id: extensionId }).catch(() => {
-        supabase.from('store_extensions').update({
+      try {
+        await supabase.rpc('increment_extension_download', { p_extension_id: extensionId })
+      } catch (_) {
+        await supabase.from('store_extensions').update({
           download_count: (release.download_count || 0) + 1
         }).eq('id', extensionId)
-      })
+      }
 
       // Generate presigned GET URL for public package
       const packageUrl = getR2Url(PUBLIC_R2_BUCKET, release.package_object_key)
