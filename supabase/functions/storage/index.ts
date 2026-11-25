@@ -217,13 +217,15 @@ Deno.serve(async (req) => {
       })
 
       // Log Class A write operation telemetry
-      await supabase.from('billing_usage').insert({
-        user_id: user.id,
-        resource_type: 'WRITE_OPS',
-        quantity: 1,
-        unit: 'OPERATIONS',
-        metadata: { fileId, bucket: targetBucket, action: 'get-upload-url' }
-      }).catch(() => null)
+      try {
+        await supabase.from('billing_usage').insert({
+          user_id: user.id,
+          resource_type: 'WRITE_OPS',
+          quantity: 1,
+          unit: 'OPERATIONS',
+          metadata: { fileId, bucket: targetBucket, action: 'get-upload-url' }
+        })
+      } catch (_) {}
 
       return new Response(JSON.stringify({
         url: signedRequest.url,
@@ -248,13 +250,15 @@ Deno.serve(async (req) => {
       })
 
       // Log Class B read operation telemetry
-      await supabase.from('billing_usage').insert({
-        user_id: user.id,
-        resource_type: 'READ_OPS',
-        quantity: 1,
-        unit: 'OPERATIONS',
-        metadata: { objectKey: finalKey, bucket: targetBucket, action: 'get-download-url' }
-      }).catch(() => null)
+      try {
+        await supabase.from('billing_usage').insert({
+          user_id: user.id,
+          resource_type: 'READ_OPS',
+          quantity: 1,
+          unit: 'OPERATIONS',
+          metadata: { objectKey: finalKey, bucket: targetBucket, action: 'get-download-url' }
+        })
+      } catch (_) {}
 
       return new Response(JSON.stringify({
         url: signedRequest.url,
@@ -282,13 +286,15 @@ Deno.serve(async (req) => {
       }
 
       // Log verified storage upload telemetry
-      await supabase.from('billing_usage').insert({
-        user_id: user.id,
-        resource_type: 'STORAGE',
-        quantity: size,
-        unit: 'BYTES',
-        metadata: { objectKey, physical_size: size, action: 'finalize-upload' }
-      }).catch(() => null)
+      try {
+        await supabase.from('billing_usage').insert({
+          user_id: user.id,
+          resource_type: 'STORAGE',
+          quantity: size,
+          unit: 'BYTES',
+          metadata: { objectKey, physical_size: size, action: 'finalize-upload' }
+        })
+      } catch (_) {}
 
       return new Response(JSON.stringify({ success: true, size, objectKey }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }

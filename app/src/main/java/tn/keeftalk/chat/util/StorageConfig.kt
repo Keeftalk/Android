@@ -77,6 +77,11 @@ object StorageConfig {
         if (cleanKey.startsWith("keeftalk-public/")) {
             cleanKey = cleanKey.removePrefix("keeftalk-public/").trim('/')
         }
+        // Handle legacy URLs with country prefix (e.g. TN/avatars/...)
+        val parts = cleanKey.split('/')
+        if (parts.size >= 3 && parts[0].length == 2 && parts[1].lowercase() in listOf("avatars", "covers", "wallpapers", "market", "public")) {
+            cleanKey = parts.drop(1).joinToString("/")
+        }
         return "$PUBLIC_CDN_BASE/$cleanKey"
     }
 
