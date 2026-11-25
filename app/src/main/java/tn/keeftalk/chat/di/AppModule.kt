@@ -1392,9 +1392,17 @@ object AppModule {
         }
     }
 
+    private var billingRepository: tn.keeftalk.chat.data.billing.BillingRepository? = null
+
     fun provideBillingManager(context: Context): tn.keeftalk.chat.data.billing.BillingManager {
         return billingManager ?: synchronized(this) {
             billingManager ?: tn.keeftalk.chat.data.billing.BillingManager(context.applicationContext).also { billingManager = it }
+        }
+    }
+
+    fun provideBillingRepository(context: Context): tn.keeftalk.chat.data.billing.BillingRepository {
+        return billingRepository ?: synchronized(this) {
+            billingRepository ?: tn.keeftalk.chat.data.billing.BillingRepository(context.applicationContext).also { billingRepository = it }
         }
     }
 
