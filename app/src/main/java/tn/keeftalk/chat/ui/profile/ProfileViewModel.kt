@@ -139,62 +139,90 @@ class ProfileViewModel(
         }
     }
 
+    data class PendingImage(
+        val uri: String,
+        val bytes: ByteArray
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as PendingImage
+            if (uri != other.uri) return false
+            return bytes.contentEquals(other.bytes)
+        }
+
+        override fun hashCode(): Int {
+            var result = uri.hashCode()
+            result = 31 * result + bytes.contentHashCode()
+            return result
+        }
+    }
+
+    private val _pendingAvatar = MutableStateFlow<PendingImage?>(null)
+    val pendingAvatar: StateFlow<PendingImage?> = _pendingAvatar.asStateFlow()
+
+    private val _pendingCover = MutableStateFlow<PendingImage?>(null)
+    val pendingCover: StateFlow<PendingImage?> = _pendingCover.asStateFlow()
+
+    fun onAvatarSelected(uri: String, bytes: ByteArray) {
+        _pendingAvatar.value = PendingImage(uri, bytes)
+        val updated = (_pendingProfile.value ?: _profile.value)?.copy(avatarUrl = uri)
+        updated?.let {
+            _profile.value = it
+            if (_isEditing.value) _pendingProfile.value = it
+        }
+    }
+
+    fun onCoverSelected(uri: String, bytes: ByteArray) {
+        _pendingCover.value = PendingImage(uri, bytes)
+        val updated = (_pendingProfile.value ?: _profile.value)?.copy(coverUrl = uri)
+        updated?.let {
+            _profile.value = it
+            if (_isEditing.value) _pendingProfile.value = it
+        }
+    }
+
     fun saveProfile() {
-        val profileToSave = _pendingProfile.value ?: return
+        val baseProfile = _pendingProfile.value ?: _profile.value ?: return
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
+
+            var profileToSave = baseProfile
+            val avatarState = _pendingAvatar.value
+            val coverState = _pendingCover.value
+
+            if (avatarState != null) {
+                val avatarRes = authRepository.uploadAvatar(avatarState.bytes)
+                if (avatarRes.isFailure) {
+                    _error.value = avatarRes.exceptionOrNull()?.message ?: "Failed to upload avatar"
+                    _isLoading.value = false
+                    return@launch
+                }
+                val newAvatarUrl = avatarRes.getOrThrow()
+                profileToSave = profileToSave.copy(avatarUrl = newAvatarUrl)
+            }
+
+            if (coverState != null) {
+                val coverRes = authRepository.uploadCover(coverState.bytes)
+                if (coverRes.isFailure) {
+                    _error.value = coverRes.exceptionOrNull()?.message ?: "Failed to upload cover"
+                    _isLoading.value = false
+                    return@launch
+                }
+                val newCoverUrl = coverRes.getOrThrow()
+                profileToSave = profileToSave.copy(coverUrl = newCoverUrl)
+            }
+
             authRepository.updateProfile(profileToSave).onSuccess {
-                _isEditing.value = false
+                _pendingAvatar.value = null
+                _pendingCover.value = null
                 _pendingProfile.value = null
+                _profile.value = profileToSave
+                _isEditing.value = false
                 _error.value = null
-            }.onFailure {
-                _error.value = it.message
-            }
-            _isLoading.value = false
-        }
-    }
-
-    fun uploadAvatar(byteArray: ByteArray) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            authRepository.uploadAvatar(byteArray).onSuccess { url ->
-                val updatedProfile = (_profile.value ?: _pendingProfile.value)?.copy(avatarUrl = url)
-                updatedProfile?.let { 
-                    _profile.value = it
-                    if (_isEditing.value) {
-                        _pendingProfile.value = it
-                    }
-                    authRepository.updateProfile(it).onSuccess {
-                        _error.value = null
-                    }.onFailure { e ->
-                        _error.value = e.message
-                    }
-                }
-            }.onFailure {
-                _error.value = it.message
-            }
-            _isLoading.value = false
-        }
-    }
-
-    fun uploadCover(byteArray: ByteArray) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            authRepository.uploadCover(byteArray).onSuccess { url ->
-                val updatedProfile = (_profile.value ?: _pendingProfile.value)?.copy(coverUrl = url)
-                updatedProfile?.let { 
-                    _profile.value = it
-                    if (_isEditing.value) {
-                        _pendingProfile.value = it
-                    }
-                    authRepository.updateProfile(it).onSuccess {
-                        _error.value = null
-                    }.onFailure { e ->
-                        _error.value = e.message
-                    }
-                }
-            }.onFailure {
-                _error.value = it.message
+            }.onFailure { e ->
+                _error.value = e.message
             }
             _isLoading.value = false
         }
@@ -204,15 +232,19 @@ class ProfileViewModel(
         if (editing) {
             _isEditing.value = true
             _pendingProfile.value = _profile.value
+            _pendingAvatar.value = null
+            _pendingCover.value = null
         } else {
-            // Revert changes if cancelled
-            _pendingProfile.value = null
-            _isEditing.value = false
+            cancelEditing()
         }
     }
 
     fun cancelEditing() {
-        setEditing(false)
+        _pendingAvatar.value = null
+        _pendingCover.value = null
+        _pendingProfile.value = null
+        _isEditing.value = false
+        loadProfile()
     }
 
     fun checkUsername(username: String) {

@@ -1,6 +1,7 @@
 package tn.keeftalk.chat.ui.profile
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import java.io.File
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -28,6 +29,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import tn.keeftalk.chat.domain.model.MediaType
+import tn.keeftalk.chat.ui.profile.media.ProfileMediaViewerScreen
+import tn.keeftalk.chat.ui.profile.media.ProfileMediaViewerViewModel
 import tn.keeftalk.chat.ui.theme.LocalAppTheme
 import coil.compose.AsyncImage
 import tn.keeftalk.chat.domain.model.Profile
@@ -58,16 +63,34 @@ fun ProfileScreen(
     ) { uri ->
         uri?.let { selectedUri ->
             val bytes = context.contentResolver.openInputStream(selectedUri)?.readBytes()
-            bytes?.let { viewModel.uploadAvatar(it) }
+            bytes?.let { b ->
+                val previewUri = try {
+                    val tempFile = File(context.cacheDir, "temp_avatar_preview_${System.currentTimeMillis()}.jpg")
+                    tempFile.writeBytes(b)
+                    "file://${tempFile.absolutePath}"
+                } catch (e: Exception) {
+                    selectedUri.toString()
+                }
+                viewModel.onAvatarSelected(previewUri, b)
+            }
         }
     }
 
     val coverLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-            bytes?.let { viewModel.uploadCover(it) }
+        uri?.let { selectedUri ->
+            val bytes = context.contentResolver.openInputStream(selectedUri)?.readBytes()
+            bytes?.let { b ->
+                val previewUri = try {
+                    val tempFile = File(context.cacheDir, "temp_cover_preview_${System.currentTimeMillis()}.jpg")
+                    tempFile.writeBytes(b)
+                    "file://${tempFile.absolutePath}"
+                } catch (e: Exception) {
+                    selectedUri.toString()
+                }
+                viewModel.onCoverSelected(previewUri, b)
+            }
         }
     }
 
@@ -144,21 +167,29 @@ fun ViewProfileContent(
     val isKeef = false
     val bgBaseColor = if (isKeef) Color.Transparent else MaterialTheme.colorScheme.background
     val surfaceBgColor = if (isKeef) MaterialTheme.colorScheme.surface.copy(alpha = 0.82f) else MaterialTheme.colorScheme.surface
+
+    var viewingMediaState by remember { mutableStateOf<Pair<MediaType, String?>?>(null) }
     
     Box(modifier = modifier.fillMaxSize().background(bgBaseColor)) {
         // Cover Image with Parallax
-        AsyncImage(
-            model = profile.coverUrl ?: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-            contentDescription = null,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(280.dp)
-                .graphicsLayer {
-                    alpha = 1f - (scrollState.value.toFloat() / 1000f).coerceIn(0f, 0.7f)
-                    translationY = -scrollState.value.toFloat() * 0.5f
-                },
-            contentScale = ContentScale.Crop
-        )
+                .clickable { viewingMediaState = Pair(MediaType.WALLPAPER, profile.coverUrl) }
+        ) {
+            AsyncImage(
+                model = profile.coverUrl ?: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = 1f - (scrollState.value.toFloat() / 1000f).coerceIn(0f, 0.7f)
+                        translationY = -scrollState.value.toFloat() * 0.5f
+                    },
+                contentScale = ContentScale.Crop
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -275,6 +306,7 @@ fun ViewProfileContent(
                     seed = profile.id,
                     size = 110.dp,
                     useOriginal = true,
+                    onClick = { viewingMediaState = Pair(MediaType.AVATAR, profile.avatarUrl) },
                     modifier = Modifier
                         .padding(start = 24.dp)
                         .offset(y = (-55).dp)
@@ -323,6 +355,36 @@ fun ViewProfileContent(
                     Icon(icons.back, null, modifier = Modifier.size(24.dp))
                 }
             }
+        }
+
+        if (viewingMediaState != null) {
+            val targetType = viewingMediaState!!.first
+            val targetUrl = viewingMediaState!!.second
+            val context = LocalContext.current
+            
+            val viewerViewModel: ProfileMediaViewerViewModel = viewModel(
+                key = "ProfileMediaViewer_${profile.id}_${targetType.name}",
+                factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                        val repo = tn.keeftalk.chat.di.AppModule.provideProfileMediaRepository(context.applicationContext)
+                        val authRepo = tn.keeftalk.chat.di.AppModule.provideAuthRepository(context.applicationContext)
+                        val supabaseProvider: suspend () -> io.github.jan.supabase.SupabaseClient = {
+                            tn.keeftalk.chat.di.AppModule.provideSupabaseClientAsync(context.applicationContext)
+                        }
+                        return ProfileMediaViewerViewModel(repo, authRepo, supabaseProvider) as T
+                    }
+                }
+            )
+
+            LaunchedEffect(profile.id, targetType, targetUrl) {
+                viewerViewModel.init(profile.id, targetType, initialUrl = targetUrl)
+            }
+
+            ProfileMediaViewerScreen(
+                viewModel = viewerViewModel,
+                onClose = { viewingMediaState = null }
+            )
         }
     }
 }
@@ -755,11 +817,24 @@ fun EditProfileContent(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (profile.coverUrl != null) {
-                            AsyncImage(model = profile.coverUrl, contentDescription = null, contentScale = ContentScale.Crop)
+                            AsyncImage(
+                                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                    .data(profile.coverUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(icons.image, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("Change Cover", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(icons.image, null, tint = Color.White)
+                            Text("Change Cover", style = MaterialTheme.typography.labelSmall, color = Color.White)
                         }
                     }
                 }

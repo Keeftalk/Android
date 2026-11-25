@@ -112,7 +112,9 @@ import tn.keeftalk.chat.feature.secrets.data.local.entities.*
         DocHighlightEntity::class,
         DocSyncQueueEntity::class,
         DrawingEntity::class,
-        DrawingSyncQueueEntity::class
+        DrawingSyncQueueEntity::class,
+        tn.keeftalk.chat.data.local.entities.ProfileMediaEntity::class,
+        tn.keeftalk.chat.data.local.entities.ProfileMediaLikeEntity::class
     ],
     version = 121,
     exportSchema = true
@@ -123,6 +125,7 @@ abstract class KeeftalkDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun messageDao(): MessageDao
     abstract fun profileDao(): ProfileDao
+    abstract fun profileMediaDao(): tn.keeftalk.chat.data.local.dao.ProfileMediaDao
     abstract fun marketDao(): tn.keeftalk.chat.data.local.dao.MarketDao
     abstract fun noteDao(): NoteDao
     abstract fun syncQueueDao(): SyncQueueDao

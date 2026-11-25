@@ -168,44 +168,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ACTION: get-upload-url (With Pay-as-You-Go Balance Check & Usage Telemetry)
+    // ACTION: get-upload-url
     if (action === 'get-upload-url') {
       if (!fileId) {
         return new Response(JSON.stringify({ error: 'Missing fileId' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-      }
-
-      // Check 1 GB free allowance vs prepaid balance
-      const { data: fileStats } = await supabase
-        .from('files')
-        .select('file_size, physical_size')
-        .eq('owner_id', user.id)
-        .neq('status', 'DELETED')
-
-      const totalStorageBytes = (fileStats || []).reduce((acc: number, f: any) => acc + (f.physical_size || f.file_size || 0), 0)
-      const ONE_GB = 1024 * 1024 * 1024
-
-      const { data: balanceRecord } = await supabase
-        .from('billing_balances')
-        .select('prepaid_balance')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      const { data: prefRecord } = await supabase
-        .from('billing_preferences')
-        .select('payment_mode, credit_limit')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      const mode = prefRecord?.payment_mode || 'PREPAID'
-      const balance = balanceRecord?.prepaid_balance || 0.0
-
-      if (mode === 'PREPAID' && totalStorageBytes >= ONE_GB && balance <= 0) {
-        return new Response(JSON.stringify({
-          error: 'You have used your 1 GB free cloud storage allowance. Please top up your prepaid balance to continue uploading.',
-          code: 'PREPAID_BALANCE_EMPTY',
-          storage_used_bytes: totalStorageBytes,
-          free_allowance_bytes: ONE_GB
-        }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
       const finalKey = buildVaultObjectKey(countryCode, user.id, category || 'files', fileId, subpath || 'original')
@@ -215,17 +181,6 @@ Deno.serve(async (req) => {
         method: 'PUT',
         aws: { signQuery: true }
       })
-
-      // Log Class A write operation telemetry
-      try {
-        await supabase.from('billing_usage').insert({
-          user_id: user.id,
-          resource_type: 'WRITE_OPS',
-          quantity: 1,
-          unit: 'OPERATIONS',
-          metadata: { fileId, bucket: targetBucket, action: 'get-upload-url' }
-        })
-      } catch (_) {}
 
       return new Response(JSON.stringify({
         url: signedRequest.url,
@@ -249,17 +204,6 @@ Deno.serve(async (req) => {
         aws: { signQuery: true }
       })
 
-      // Log Class B read operation telemetry
-      try {
-        await supabase.from('billing_usage').insert({
-          user_id: user.id,
-          resource_type: 'READ_OPS',
-          quantity: 1,
-          unit: 'OPERATIONS',
-          metadata: { objectKey: finalKey, bucket: targetBucket, action: 'get-download-url' }
-        })
-      } catch (_) {}
-
       return new Response(JSON.stringify({
         url: signedRequest.url,
         objectKey: finalKey
@@ -276,27 +220,223 @@ Deno.serve(async (req) => {
       const headRes = await r2.fetch(targetUrl.toString(), { method: 'HEAD' }).catch(() => null)
       const size = headRes && headRes.ok ? parseInt(headRes.headers.get('content-length') || '0', 10) : 0
 
-      if (fileId) {
-        await supabase.from('files').update({
-          status: 'ACTIVE',
-          physical_size: size,
-          storage_path: objectKey,
-          updated_at: new Date().toISOString()
-        }).eq('id', fileId).eq('owner_id', user.id)
+      return new Response(JSON.stringify({ success: true, size, objectKey }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // ACTION: register-profile-media
+    if (action === 'register-profile-media') {
+      const { mediaType, originalObjectKey, compressedObjectKey, originalCdnUrl, compressedCdnUrl } = body
+      if (!mediaType || !originalObjectKey || !originalCdnUrl) {
+        return new Response(JSON.stringify({ error: 'Missing media parameters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      // Log verified storage upload telemetry
-      try {
-        await supabase.from('billing_usage').insert({
-          user_id: user.id,
-          resource_type: 'STORAGE',
-          quantity: size,
-          unit: 'BYTES',
-          metadata: { objectKey, physical_size: size, action: 'finalize-upload' }
-        })
-      } catch (_) {}
+      const typeUpper = mediaType.toUpperCase() // 'AVATAR' or 'WALLPAPER'
 
-      return new Response(JSON.stringify({ success: true, size, objectKey }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      // Deactivate current active media of same type
+      await supabase
+        .from('profile_media')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .eq('media_type', typeUpper)
+        .eq('is_active', true)
+
+      const { data: newMedia, error: insertErr } = await supabase
+        .from('profile_media')
+        .insert({
+          user_id: user.id,
+          media_type: typeUpper,
+          original_object_key: originalObjectKey,
+          compressed_object_key: compressedObjectKey,
+          original_cdn_url: originalCdnUrl,
+          compressed_cdn_url: compressedCdnUrl,
+          status: 'ACTIVE',
+          is_active: true,
+          created_at: new Date().toISOString(),
+          activated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (insertErr) {
+        return new Response(JSON.stringify({ error: insertErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      return new Response(JSON.stringify({ success: true, media: newMedia }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // ACTION: move-media-to-detention (30-Day Detention Storage)
+    if (action === 'move-media-to-detention') {
+      const { mediaId } = body
+      if (!mediaId) {
+        return new Response(JSON.stringify({ error: 'Missing mediaId' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { data: media, error: mediaErr } = await supabase
+        .from('profile_media')
+        .select('*')
+        .eq('id', mediaId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (mediaErr || !media) {
+        return new Response(JSON.stringify({ error: 'Media not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const catName = media.media_type.toLowerCase() === 'avatar' ? 'avatars' : 'wallpapers'
+      const detentionOrigKey = `30-day-detention/${countryCode}/${user.id}/${catName}/${media.id}/original`
+      const detentionCompKey = `30-day-detention/${countryCode}/${user.id}/${catName}/${media.id}/compressed`
+
+      const activeBucket = 'keeftalk-public'
+      const detentionBucket = storageAssignment.detention_bucket || 'keeftalk-weur-detention'
+
+      const origSourceUrl = getR2Url(activeBucket, media.original_object_key)
+      const origDestUrl = getR2Url(detentionBucket, detentionOrigKey)
+
+      const origCopyRes = await r2.fetch(origDestUrl.toString(), {
+        method: 'PUT',
+        headers: { 'x-amz-copy-source': `/${activeBucket}/${media.original_object_key}` }
+      }).catch(() => null)
+
+      if (origCopyRes && origCopyRes.ok) {
+        await r2.fetch(origSourceUrl.toString(), { method: 'DELETE' }).catch(() => null)
+      }
+
+      if (media.compressed_object_key) {
+        const compSourceUrl = getR2Url(activeBucket, media.compressed_object_key)
+        const compDestUrl = getR2Url(detentionBucket, detentionCompKey)
+        const compCopyRes = await r2.fetch(compDestUrl.toString(), {
+          method: 'PUT',
+          headers: { 'x-amz-copy-source': `/${activeBucket}/${media.compressed_object_key}` }
+        }).catch(() => null)
+        if (compCopyRes && compCopyRes.ok) {
+          await r2.fetch(compSourceUrl.toString(), { method: 'DELETE' }).catch(() => null)
+        }
+      }
+
+      const now = new Date()
+      const purgeAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+      await supabase.from('profile_media').update({
+        status: 'DETENTION',
+        is_active: false,
+        deleted_at: now.toISOString(),
+        scheduled_purge_at: purgeAt.toISOString(),
+        detention_object_key: detentionOrigKey
+      }).eq('id', media.id)
+
+      if (media.is_active) {
+        const { data: remaining } = await supabase
+          .from('profile_media')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('media_type', media.media_type)
+          .neq('status', 'DETENTION')
+          .order('activated_at', { ascending: false })
+          .limit(1)
+
+        const nextActive = remaining && remaining.length > 0 ? remaining[0] : null
+        if (nextActive) {
+          await supabase.from('profile_media').update({ is_active: true, status: 'ACTIVE' }).eq('id', nextActive.id)
+        }
+
+        const newUrl = nextActive ? (media.media_type === 'AVATAR' ? (nextActive.compressed_cdn_url || nextActive.original_cdn_url) : nextActive.original_cdn_url) : null
+        if (media.media_type === 'AVATAR') {
+          await supabase.from('profiles').update({ avatar_url: newUrl }).eq('id', user.id)
+        } else {
+          await supabase.from('profiles').update({ cover_url: newUrl }).eq('id', user.id)
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, mediaId: media.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // ACTION: restore-media-from-detention
+    if (action === 'restore-media-from-detention') {
+      const { mediaId } = body
+      if (!mediaId) {
+        return new Response(JSON.stringify({ error: 'Missing mediaId' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const { data: media } = await supabase
+        .from('profile_media')
+        .select('*')
+        .eq('id', mediaId)
+        .eq('user_id', user.id)
+        .eq('status', 'DETENTION')
+        .single()
+
+      if (!media) {
+        return new Response(JSON.stringify({ error: 'Detained media not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const activeBucket = 'keeftalk-public'
+      const detentionBucket = storageAssignment.detention_bucket || 'keeftalk-weur-detention'
+      const catName = media.media_type.toLowerCase() === 'avatar' ? 'avatars' : 'wallpapers'
+
+      const detentionOrigKey = media.detention_object_key || `30-day-detention/${countryCode}/${user.id}/${catName}/${media.id}/original`
+      const detentionCompKey = `30-day-detention/${countryCode}/${user.id}/${catName}/${media.id}/compressed`
+
+      const origSourceUrl = getR2Url(detentionBucket, detentionOrigKey)
+      const origDestUrl = getR2Url(activeBucket, media.original_object_key)
+
+      const copyRes = await r2.fetch(origDestUrl.toString(), {
+        method: 'PUT',
+        headers: { 'x-amz-copy-source': `/${detentionBucket}/${detentionOrigKey}` }
+      }).catch(() => null)
+
+      if (copyRes && copyRes.ok) {
+        await r2.fetch(origSourceUrl.toString(), { method: 'DELETE' }).catch(() => null)
+      }
+
+      if (media.compressed_object_key) {
+        const compSourceUrl = getR2Url(detentionBucket, detentionCompKey)
+        const compDestUrl = getR2Url(activeBucket, media.compressed_object_key)
+        const cRes = await r2.fetch(compDestUrl.toString(), {
+          method: 'PUT',
+          headers: { 'x-amz-copy-source': `/${detentionBucket}/${detentionCompKey}` }
+        }).catch(() => null)
+        if (cRes && cRes.ok) {
+          await r2.fetch(compSourceUrl.toString(), { method: 'DELETE' }).catch(() => null)
+        }
+      }
+
+      await supabase.from('profile_media').update({
+        status: 'INACTIVE',
+        deleted_at: null,
+        scheduled_purge_at: null,
+        detention_object_key: null
+      }).eq('id', media.id)
+
+      return new Response(JSON.stringify({ success: true, mediaId: media.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // ACTION: purge-media-detention (Expired 30-day detention purge)
+    if (action === 'purge-media-detention') {
+      const nowIso = new Date().toISOString()
+      const { data: expiredMedia } = await supabase
+        .from('profile_media')
+        .select('*')
+        .eq('status', 'DETENTION')
+        .lte('scheduled_purge_at', nowIso)
+
+      let purgedCount = 0
+      const detentionBucket = storageAssignment.detention_bucket || 'keeftalk-weur-detention'
+
+      if (expiredMedia && expiredMedia.length > 0) {
+        for (const item of expiredMedia) {
+          const catName = item.media_type.toLowerCase() === 'avatar' ? 'avatars' : 'wallpapers'
+          const detentionOrigKey = item.detention_object_key || `30-day-detention/${countryCode}/${user.id}/${catName}/${item.id}/original`
+          const detentionCompKey = `30-day-detention/${countryCode}/${user.id}/${catName}/${item.id}/compressed`
+
+          await r2.fetch(getR2Url(detentionBucket, detentionOrigKey).toString(), { method: 'DELETE' }).catch(() => null)
+          await r2.fetch(getR2Url(detentionBucket, detentionCompKey).toString(), { method: 'DELETE' }).catch(() => null)
+
+          await supabase.from('profile_media').delete().eq('id', item.id)
+          purgedCount++
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, purgedCount }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // ACTION: move-to-trash
