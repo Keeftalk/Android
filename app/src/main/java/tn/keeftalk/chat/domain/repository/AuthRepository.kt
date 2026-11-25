@@ -10,6 +10,7 @@ interface AuthRepository {
 
     suspend fun login(identifier: String, password: String): Result<Unit>
     suspend fun complete2FALogin(userId: String, password: String): Result<Unit>
+    suspend fun continueAsGuest(): Result<Unit>
     suspend fun signup(
         fullName: String,
         username: String,
