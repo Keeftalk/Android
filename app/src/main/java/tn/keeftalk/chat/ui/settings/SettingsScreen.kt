@@ -54,6 +54,7 @@ fun SettingsScreen(
     onTodoSettingsClick: () -> Unit = {},
     onMapSettingsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
+    onUpdateClick: () -> Unit = {},
     onHelpClick: () -> Unit = {},
     onTestScreensPreviewClick: () -> Unit = {},
     title: String = "Settings"
@@ -243,6 +244,12 @@ fun SettingsScreen(
                         title = "About",
                         subtitle = "App info, version, licenses",
                         onClick = onAboutClick
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.SystemUpdate,
+                        title = "Check for Updates",
+                        subtitle = "Stable & pre-release versions, automatic APK download",
+                        onClick = onUpdateClick
                     )
                     SettingsItem(
                         icon = icons.help,

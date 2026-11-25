@@ -1801,6 +1801,7 @@ fun MainScaffold(
                                     onExtensionsClick = { onScreenChange(AppScreen.Extensions) },
                                     onDisplaySettingsClick = { onScreenChange(AppScreen.DisplaySettings) },
                                     onAboutClick = { onScreenChange(AppScreen.About) },
+                                    onUpdateClick = { onScreenChange(AppScreen.Update) },
                                     onHelpClick = { onScreenChange(AppScreen.Help) },
                                     onSecretsSettingsClick = { onScreenChange(AppScreen.SecretsSettings) },
                                     onTestScreensPreviewClick = { onScreenChange(AppScreen.TestScreensPreview) },
@@ -2391,6 +2392,7 @@ fun MainScaffold(
                                 )
                             }
                             is AppScreen.About -> AboutScreen(onBack = { onScreenChange(AppScreen.Settings) })
+                            is AppScreen.Update -> tn.keeftalk.chat.feature.updates.UpdateScreen(viewModel = androidx.lifecycle.viewmodel.compose.viewModel(), onBack = { onScreenChange(AppScreen.Settings) })
                             is AppScreen.Notes -> {
                                 NotesScreen(
                                     initialNoteId = currentScreen.noteId,
@@ -3111,6 +3113,8 @@ sealed class AppScreen : Parcelable {
     data object AccountSettings : AppScreen()
     @Parcelize
     data object About : AppScreen()
+    @Parcelize
+    data object Update : AppScreen()
     @Parcelize
     data object Help : AppScreen()
     @Parcelize

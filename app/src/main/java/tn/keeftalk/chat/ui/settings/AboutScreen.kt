@@ -139,22 +139,13 @@ fun AboutHero(versionName: String) {
             modifier = Modifier
                 .size(100.dp)
                 .scale(scale)
-                .background(
-                    Brush.linearGradient(
-                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-                    ),
-                    CircleShape
-                )
-                .padding(2.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface, CircleShape),
+                .clip(CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                LocalAppIcons.current.chat,
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = tn.keeftalk.chat.R.drawable.ic_keeftalk_logo),
                 contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary
+                modifier = Modifier.fillMaxSize()
             )
         }
 
