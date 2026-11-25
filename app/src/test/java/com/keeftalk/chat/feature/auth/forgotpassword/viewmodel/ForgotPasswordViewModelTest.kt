@@ -134,6 +134,7 @@ class ForgotPasswordViewModelTest {
         override fun handleDeepLink(intent: android.content.Intent) = TODO()
         override fun startSessionObservation() = TODO()
         override suspend fun verifySubscriptionPurchase(purchaseToken: String, productId: String): Result<Unit> = TODO()
+        override suspend fun continueAsGuest(): Result<Unit> = Result.success(Unit)
         override suspend fun refreshProfile(userId: String): Result<Unit> = Result.success(Unit)
         override suspend fun optimisticUpdateStorageUsed(userId: String, delta: Long) {}
         override suspend fun resetSecuritySettings(): Result<Unit> = Result.success(Unit)
