@@ -174,7 +174,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Missing fileId' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      // Check payment preferences and balance
+      // Check 1 GB free allowance vs prepaid balance
+      const { data: fileStats } = await supabase
+        .from('files')
+        .select('file_size, physical_size')
+        .eq('owner_id', user.id)
+        .neq('status', 'DELETED')
+
+      const totalStorageBytes = (fileStats || []).reduce((acc: number, f: any) => acc + (f.physical_size || f.file_size || 0), 0)
+      const ONE_GB = 1024 * 1024 * 1024
+
       const { data: balanceRecord } = await supabase
         .from('billing_balances')
         .select('prepaid_balance')
@@ -190,10 +199,12 @@ Deno.serve(async (req) => {
       const mode = prefRecord?.payment_mode || 'PREPAID'
       const balance = balanceRecord?.prepaid_balance || 0.0
 
-      if (mode === 'PREPAID' && balance <= 0) {
+      if (mode === 'PREPAID' && totalStorageBytes >= ONE_GB && balance <= 0) {
         return new Response(JSON.stringify({
-          error: 'Prepaid balance empty. Cloud uploads are paused. Local features & data remain 100% accessible.',
-          code: 'PREPAID_BALANCE_EMPTY'
+          error: 'You have used your 1 GB free cloud storage allowance. Please top up your prepaid balance to continue uploading.',
+          code: 'PREPAID_BALANCE_EMPTY',
+          storage_used_bytes: totalStorageBytes,
+          free_allowance_bytes: ONE_GB
         }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 

@@ -2425,7 +2425,8 @@ fun MainScaffold(
                                     viewModel = vaultViewModel,
                                     onBack = { onScreenChange(AppScreen.ChatList) },
                                     searchQuery = searchQuery,
-                                    fabActionFlow = fabActionFlow
+                                    fabActionFlow = fabActionFlow,
+                                    onSubscriptionPlansClick = { onScreenChange(AppScreen.SubscriptionPlans) }
                                 )
                             }
                             is AppScreen.Secrets -> {
