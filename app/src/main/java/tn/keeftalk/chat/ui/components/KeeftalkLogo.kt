@@ -33,7 +33,7 @@ fun KeeftalkLogo(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.ic_app_logo),
+                painter = painterResource(id = R.drawable.ic_keeftalk_logo),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize()
             )

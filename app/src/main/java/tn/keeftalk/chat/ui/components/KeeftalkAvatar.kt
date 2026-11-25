@@ -164,7 +164,7 @@ fun KeeftalkAvatar(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(id = tn.keeftalk.chat.R.drawable.ic_app_logo),
+                    painter = painterResource(id = tn.keeftalk.chat.R.drawable.ic_keeftalk_logo),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     tint = Color.Unspecified
